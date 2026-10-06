@@ -21,6 +21,7 @@ Where should file and image attachments be stored in a local Docker Compose setu
 ### 1. Anthropic (Claude API)
 
 **Images** ([Vision](https://platform.claude.com/docs/en/build-with-claude/vision))
+
 - Images go in `image` content blocks. There are three source types: base64, URL, and `file_id` (Files API). On Bedrock and Vertex, only base64 works.
 - Formats: `image/jpeg`, `image/png`, `image/gif`, `image/webp`. "Animations are unsupported, and only the first frame is used."
 - Max size: **10 MB per image (base64-encoded)** on the direct API, and 5 MB on Bedrock and Google Cloud. Max **8000x8000 px**. If a request has more than 20 images, a stricter limit applies: keep each dimension at or below 2000 px.
@@ -30,12 +31,14 @@ Where should file and image attachments be stored in a local Docker Compose setu
 - The docs warn that multi-turn conversations resend the whole history. With base64, "the full image bytes are included in the payload on every turn".
 
 **PDFs** ([PDF support](https://platform.claude.com/docs/en/build-with-claude/pdf-support))
+
 - PDFs go in `document` blocks. Sources: URL, base64, or `file_id`.
 - Max request size: 32 MB. Max pages: **600, or 100 when the request's context window is under 1M tokens**. Password-protected or encrypted PDFs are not supported.
 - Each page is converted to an image, and its extracted text goes alongside it. That costs about 1,500–3,000 text tokens per page, plus the image tokens.
 - Plain text (`.txt`, `.csv`, `.md`) can go in document blocks when it is uploaded through the Files API as `text/plain`. Binary formats such as `.docx` and `.xlsx` are **not supported**: convert them to text or PDF first.
 
 **Files API** ([Files API](https://platform.claude.com/docs/en/build-with-claude/files))
+
 - Generally available. It no longer needs the `files-api-2025-04-14` beta header. It is not available on Bedrock or Vertex.
 - Limits: 500 MB per file and 1 TB per organization. Files can expire automatically after 1 hour to 90 days, or never expire.
 - **Files you upload cannot be downloaded** (`downloadable: false`). Only files that tools generate can be downloaded. So the Files API cannot be our store: we couldn't show the attachment back to the user.
@@ -44,17 +47,20 @@ Where should file and image attachments be stored in a local Docker Compose setu
 ### 2. OpenAI
 
 **Images** ([Images and vision](https://developers.openai.com/api/docs/guides/images-vision))
+
 - Formats: PNG, JPEG, WEBP, and **non-animated** GIF.
 - The docs say "up to 512 MB total payload per request" and "up to 1,500 images per request". `detail` can be `low`, `high`, `original` or `auto`.
 - Three ways to pass an image: a URL, a base64 data URL (`data:image/...;base64,...`), or a Files API `file_id` (the docs say to use purpose `vision`). In the Responses API that is an `input_image` with `image_url` or `file_id`. Chat Completions uses `image_url`.
 
 **PDFs and other files** ([File inputs](https://developers.openai.com/api/docs/guides/pdf-files))
+
 - "Each file must be under 50 MB. The combined limit across all files in the request is 50 MB."
 - The Responses API accepts PDFs plus `.docx`, `.pptx`, `.xlsx`, `.csv` and code files. "Chat Completions accepts only PDF files as `file` content parts."
 - Files go in as `input_file`, using one of `file_id`, `file_url` (Responses only) or `file_data` (base64, which needs a `filename`).
 - For PDFs on vision models, "the API extracts both text and page images". Other documents get text extraction only.
 
 **Files API** ([Files: create](https://developers.openai.com/api/reference/resources/files/methods/create))
+
 - Limits: 512 MB per file and 2.5 TB per project. Purposes include `vision` and `user_data`. `expires_after` is optional.
 
 ### 3. TanStack AI: how attachments reach each adapter
@@ -75,17 +81,17 @@ Source: the `TanStack/ai` repo at `a32782c` (2026-10-06): `@tanstack/ai` 0.64.1,
   - `image` becomes `input_image`, using either a data URL built from `mimeType` or a `file_id`. `detail` comes from metadata and defaults to `auto`.
   - `document` becomes `input_file`. Inline `data` must be **`application/pdf` only**: the adapter checks the MIME type and the `%PDF` magic bytes, and throws for anything else. It wraps the data as a data URL and sends `filename` from `metadata.filename`, defaulting to `document.pdf`.
 - **OpenAI Chat Completions adapter** (`openaiChatCompletions`, in [`chat-completions-text.ts`](https://github.com/TanStack/ai/blob/main/packages/openai-base/src/adapters/chat-completions-text.ts)): images work through `image_url` and accept data or URL sources only, not `file_id`. **Document parts throw an error.** The error message says: "use the Responses adapter".
-- **Persistence.** `@tanstack/ai-persistence` has a `BlobStore` contract (`put` / `get` with range / `list` / `delete`), but its docs scope it to *generated* media (`withGenerationPersistence`). I found nothing in it for user-uploaded chat attachments. The app has to store those itself.
+- **Persistence.** `@tanstack/ai-persistence` has a `BlobStore` contract (`put` / `get` with range / `list` / `delete`), but its docs scope it to _generated_ media (`withGenerationPersistence`). I found nothing in it for user-uploaded chat attachments. The app has to store those itself.
 
 ### 4. Storage options
 
-| | Postgres `bytea` | Local disk volume | MinIO |
-|---|---|---|---|
-| Extra Compose service | none | none (one more named volume) | one more service |
-| Backup | one `pg_dump` | separate volume backup, which can get out of sync with the DB | separate |
-| Delete / referential integrity | FKs and cascades, transactional | the app has to garbage-collect orphan files | the app has to garbage-collect orphans |
-| Size ceiling | 1 GB per value ([TOAST](https://www.postgresql.org/docs/current/storage-toast.html)) | filesystem | effectively none |
-| Maintenance status | core Postgres | n/a | **[repo archived and "no longer maintained"](https://github.com/minio/minio); community edition is source-only, no binary releases** |
+|                                | Postgres `bytea`                                                                     | Local disk volume                                             | MinIO                                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Extra Compose service          | none                                                                                 | none (one more named volume)                                  | one more service                                                                                                                     |
+| Backup                         | one `pg_dump`                                                                        | separate volume backup, which can get out of sync with the DB | separate                                                                                                                             |
+| Delete / referential integrity | FKs and cascades, transactional                                                      | the app has to garbage-collect orphan files                   | the app has to garbage-collect orphans                                                                                               |
+| Size ceiling                   | 1 GB per value ([TOAST](https://www.postgresql.org/docs/current/storage-toast.html)) | filesystem                                                    | effectively none                                                                                                                     |
+| Maintenance status             | core Postgres                                                                        | n/a                                                           | **[repo archived and "no longer maintained"](https://github.com/minio/minio); community edition is source-only, no binary releases** |
 
 - **Postgres facts.** TOAST moves values wider than about 2 kB out of the row. `EXTERNAL` storage (out-of-line, uncompressed) is "recommended for wide `text` and `bytea` columns". It also suits images and PDFs, which are already compressed. The [PostgreSQL wiki](https://wiki.postgresql.org/wiki/BinaryFilesInDB) lists the costs of storing files in the DB: a "performance hit", higher memory use and slower backups. It suggests the filesystem only for "very large files (100MB+)". Our files are capped at around 10 MB by the providers (see above).
 - **Drizzle.** `drizzle-orm/pg-core` has a native `bytea()` column type ([docs](https://orm.drizzle.team/docs/column-types/pg)). The repo pins `drizzle-orm` 1.0.0-rc.4 and `pg` 8.x.
@@ -105,6 +111,7 @@ Source: the `TanStack/ai` repo at `a32782c` (2026-10-06): `@tanstack/ai` 0.64.1,
    - text file → `{type:'text', content: "<file name>\n```\n…\n```"}`
 
    Don't trust parts sent from the client. The client uploads first and sends attachment ids. Use `openaiText` (Responses), not `openaiChatCompletions`.
+
 5. **Watch the total size of each request.** History is resent on every turn, so all attachments on the active Branch count each time. Anthropic caps a request at 32 MB and OpenAI caps files at 50 MB per request. Either cap attachments per Conversation (for example, total ≤ 25 MB) or show a clear error. A later optimisation could cache provider `file_id`s per attachment and provider (`uploadFile` + `fileSourceFromHandle`), but that adds state and is not needed for v1.
 
 ## Implications for this app
