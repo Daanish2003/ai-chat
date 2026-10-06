@@ -97,6 +97,19 @@ describe("createFakeAdapter", () => {
     await done;
   });
 
+  it("settles releaseAll when a run error ends the run before the last round", async () => {
+    const fake = createFakeAdapter({
+      rounds: [round(text("a"), runError("Boom")), round(text("unused"))],
+      manual: true,
+    });
+    const done = collect(chat({ adapter: fake.adapter, messages: hello }));
+
+    await fake.releaseAll();
+    const chunks = await done;
+
+    expect(chunks.at(-1)).toMatchObject({ type: "RUN_ERROR", message: "Boom" });
+  });
+
   it("stops streaming when the run is aborted while a chunk is held", async () => {
     const fake = createFakeAdapter({ rounds: [round(text("never"))], manual: true });
     const abortController = new AbortController();

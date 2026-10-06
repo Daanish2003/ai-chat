@@ -41,7 +41,7 @@ export type AppDeps = {
   /** Builds the TanStack AI text adapter for a `"provider:model"` id. */
   adapterFor: (model: string, credentials: Credentials) => AnyTextAdapter;
   searchClient: SearchClient;
-  /** In-process abort registry of running replies, keyed by assistant Message id. */
+  /** In-process abort registry of runs, keyed by the streaming assistant Message id. */
   runs: Map<string, AbortController>;
   limits: Limits;
   fetch: typeof fetch;

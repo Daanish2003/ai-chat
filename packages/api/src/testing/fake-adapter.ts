@@ -156,15 +156,29 @@ export function createFakeAdapter({
   const waitForRelease = (signal: AbortSignal | undefined) =>
     new Promise<void>((resolve) => {
       if (released > consumed || signal?.aborted) return resolve();
-      wakeStream = resolve;
-      signal?.addEventListener("abort", () => resolve(), { once: true });
+      const wake = () => {
+        signal?.removeEventListener("abort", wake);
+        resolve();
+      };
+      wakeStream = wake;
+      signal?.addEventListener("abort", wake, { once: true });
     });
 
+  const finish = () => {
+    finished = true;
+    settleWaiters();
+  };
+
+  // Rounds play one after another (one per tool-loop iteration), never concurrently.
   async function* play(options: TextOptions): AsyncGenerator<AdapterYieldChunk> {
     const index = calls.push(options) - 1;
     const script = rounds[index];
-    if (!script) throw new Error(`The fake adapter has no round ${index + 1} scripted`);
+    if (!script) {
+      finish();
+      throw new Error(`The fake adapter has no round ${index + 1} scripted`);
+    }
     const signal = options.request?.signal ?? undefined;
+    let playedAll = false;
     try {
       for (const chunk of script) {
         await waitForRelease(signal);
@@ -173,11 +187,12 @@ export function createFakeAdapter({
         consumed++;
         settleWaiters();
       }
+      playedAll = true;
     } finally {
-      if (index === rounds.length - 1 || signal?.aborted) {
-        finished = true;
-        settleWaiters();
-      }
+      // The run is over after the last round, a run error, or a round that ended early
+      // (aborted, or the consumer stopped pulling).
+      const failed = script.some((chunk) => chunk.type === EventType.RUN_ERROR);
+      if (!playedAll || failed || index === rounds.length - 1) finish();
     }
   }
 
