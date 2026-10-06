@@ -1,6 +1,8 @@
 import type { Database } from "@ai-chat/db";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
+import { adapterFor } from "./chat/adapters";
+
 /** Decrypted Provider credentials or Tool credential fields, keyed by field name. */
 export type Credentials = Record<string, string>;
 
@@ -54,7 +56,7 @@ export const defaultLimits: Limits = {
   runCapMs: 5 * 60_000,
 };
 
-/** The production `AppDeps`. Providers and web search are wired in by later features. */
+/** The production `AppDeps`. Web search is wired in by a later feature. */
 export function createAppDeps({
   db,
   keyEncryptionSecret,
@@ -64,9 +66,7 @@ export function createAppDeps({
 }): AppDeps {
   return {
     db,
-    adapterFor: (model) => {
-      throw new Error(`No adapter is available for model "${model}"`);
-    },
+    adapterFor,
     searchClient: {
       search: async () => {
         throw new SearchError("failed", "Web search is not available");
