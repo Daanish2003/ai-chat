@@ -45,6 +45,23 @@ pnpm run dev
 
 Open [http://localhost:3001](http://localhost:3001) in your browser to see the fullstack application.
 
+## Testing
+
+Vitest runs every package's tests from the root config (`vitest.config.ts`):
+
+```bash
+pnpm db:start          # the compose Postgres
+pnpm test              # whole suite, through Turbo
+pnpm test:vitest packages/api/src/routers   # one file or folder, without Turbo
+pnpm test:watch        # watch mode
+```
+
+- `*.test.ts` files are unit tests. `*.integration.test.ts` files run one at a time against a real Postgres database: it is created if missing, migrated once per run, and every table is truncated before each test.
+- The test database defaults to `postgresql://postgres:password@localhost:5432/ai-chat_test`. Point `TEST_DATABASE_URL` at another one, for example to give parallel runs their own database: `TEST_DATABASE_URL=postgresql://postgres:password@localhost:5434/ai-chat_test_2 pnpm test`.
+- Tests never call a Provider, Tavily or the network. Build `AppDeps` with `createTestDeps` and use the fakes in `packages/api/src/testing/` (scripted text adapter, search client, in-process router client).
+
+CI (`.github/workflows/ci.yml`) runs lint, typecheck and tests on every pull request.
+
 ## UI Customization
 
 React web apps in this stack share shadcn/ui primitives through `packages/ui`.
