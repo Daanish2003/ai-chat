@@ -1,11 +1,13 @@
 import { buttonVariants } from "@ai-chat/ui/components/button";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Composer } from "@/components/chat/composer";
+import { Welcome } from "@/components/chat/welcome";
 import { availableModels, setPendingFirstMessage } from "@/lib/chat";
+import { invalidateConversationList } from "@/lib/conversation-list";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/c/")({
@@ -15,6 +17,7 @@ export const Route = createFileRoute("/_auth/c/")({
 /** A new Conversation: pick a Model, type the first Message; it's created when sent. */
 function NewConversation() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const credentials = useQuery(orpc.credentials.list.queryOptions());
   const models = availableModels(credentials.data ?? []);
   const [chosen, setChosen] = useState<string>();
@@ -25,6 +28,7 @@ function NewConversation() {
     if (!model) return;
     try {
       const { id } = await create.mutateAsync({ model });
+      void invalidateConversationList(queryClient);
       setPendingFirstMessage(id, text);
       await navigate({ to: "/c/$id", params: { id } });
     } catch (error) {
@@ -46,7 +50,7 @@ function NewConversation() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <main className="flex flex-1 items-center justify-center p-6">
-        <h1 className="text-xl font-medium">What can I help with?</h1>
+        <Welcome onSuggest={(text) => void start(text)} disabled={!model || create.isPending} />
       </main>
       <div className="border-t bg-background px-6 py-3">
         <Composer onSend={(text) => void start(text)} disabled={!model || create.isPending}>

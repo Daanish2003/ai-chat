@@ -3,7 +3,14 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { findModel } from "../chat/models";
-import { findConversation, loadPath, toClientMessage } from "../chat/store";
+import {
+  deleteConversation,
+  findConversation,
+  listConversations,
+  loadPath,
+  renameConversation,
+  toClientMessage,
+} from "../chat/store";
 import { protectedProcedure } from "../index";
 import { uuidv7 } from "../lib/uuidv7";
 
@@ -24,6 +31,11 @@ export const conversationRouter = {
       return { id };
     }),
 
+  /** The caller's Conversations for the Conversation panel, newest Message first. */
+  list: protectedProcedure.handler(({ context }) =>
+    listConversations(context.deps, context.session.user.id),
+  ),
+
   /** The Conversation with its Active Branch, oldest Message first. */
   get: protectedProcedure.input(z.object({ id: z.uuid() })).handler(async ({ context, input }) => {
     const row = await findConversation(context.deps, context.session.user.id, input.id);
@@ -36,4 +48,25 @@ export const conversationRouter = {
       messages: path.map(toClientMessage),
     };
   }),
+
+  /** A manual rename from the top bar. Doesn't bump `lastMessageAt`. */
+  rename: protectedProcedure
+    .input(z.object({ id: z.uuid(), title: z.string().trim().min(1).max(200) }))
+    .handler(async ({ context, input }) => {
+      const renamed = await renameConversation(
+        context.deps,
+        context.session.user.id,
+        input.id,
+        input.title,
+      );
+      if (!renamed) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }),
+
+  /** Deletes the Conversation for good; its Messages go with it (cascade). */
+  delete: protectedProcedure
+    .input(z.object({ id: z.uuid() }))
+    .handler(async ({ context, input }) => {
+      const deleted = await deleteConversation(context.deps, context.session.user.id, input.id);
+      if (!deleted) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }),
 };

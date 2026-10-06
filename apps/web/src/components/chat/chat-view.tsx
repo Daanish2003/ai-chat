@@ -6,9 +6,10 @@ import {
 import { ScrollButton } from "@ai-chat/ui/components/prompt-kit/scroll-button";
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useEffectEvent, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
+import { invalidateConversationList } from "@/lib/conversation-list";
 import { orpc } from "@/utils/orpc";
 
 import { Composer } from "./composer";
@@ -24,15 +25,23 @@ const connection = fetchServerSentEvents("/api/chat");
  */
 export function ChatView({ conversation }: { conversation: ConversationData }) {
   const queryClient = useQueryClient();
+  // The server writes the new Messages before it streams, so the first chunk means "sent".
+  const awaitingFirstChunk = useRef(false);
   const { messages, sendMessage, setMessages, error } = useChat({
     connection,
     initialMessages: toUIMessages(conversation.messages),
+    onChunk: () => {
+      if (!awaitingFirstChunk.current) return;
+      awaitingFirstChunk.current = false;
+      void invalidateConversationList(queryClient);
+    },
   });
   const [sending, setSending] = useState(false);
   const streaming = sending || conversation.messages.some((m) => m.status === "streaming");
 
   const send = async (text: string) => {
     setSending(true);
+    awaitingFirstChunk.current = true;
     try {
       await sendMessage(text, {
         body: {
@@ -53,6 +62,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
         setMessages(toUIMessages(fresh.messages));
       } finally {
         setSending(false);
+        void invalidateConversationList(queryClient);
       }
     }
   };
