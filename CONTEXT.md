@@ -16,6 +16,26 @@ _Avoid_: Turn, reply, prompt
 One path through a Conversation's tree of Messages, created when a Message is edited or regenerated.
 _Avoid_: Fork, version, variant
 
+**Active Branch**:
+The one Branch of a Conversation that is currently shown and that the next Message continues. Switching to a sibling makes its newest Branch active.
+_Avoid_: Current branch, selected path
+
+**Provider**:
+An LLM vendor a user can chat through, one per TanStack AI chat adapter (Anthropic, OpenAI, Gemini, OpenRouter, Ollama, …).
+_Avoid_: Vendor, backend
+
+**Model**:
+One specific LLM offered by a Provider. A Conversation has a selected Model, and each assistant Message records the Model that wrote it.
+_Avoid_: Engine, LLM (as a noun for one choice)
+
+**Provider credentials**:
+What one user supplies to reach one Provider: usually an API key, sometimes with an account or region, or just a host for a local Provider. Every run uses the user's own Provider credentials; the app holds none of its own.
+_Avoid_: Provider key, API key (ambiguous), token, BYOK key
+
+**Tool credential**:
+A user's own API key for a non-LLM service a tool needs, such as web search. Without it, that tool is unavailable to the user.
+_Avoid_: Search key, Provider credentials (those are for Providers only)
+
 **Shared link**:
 A public, read-only snapshot of a Conversation taken at the moment it is shared.
 _Avoid_: Share, public chat, permalink
