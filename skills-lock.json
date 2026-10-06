@@ -46,6 +46,12 @@
       "skillPath": "skills/shadcn/SKILL.md",
       "computedHash": "d04e43ec01e921558b93bb8046c14a42a22556689a2827243df900825a4e1604"
     },
+    "tanstack-ai": {
+      "source": "TanStack/ai",
+      "sourceType": "github",
+      "skillPath": "skills/tanstack-ai/SKILL.md",
+      "computedHash": "ba667851520553a6f4dfd401c4520d55e64c843baf8b084d353741d5b8c9b398"
+    },
     "turborepo": {
       "source": "vercel/turborepo",
       "sourceType": "github",
