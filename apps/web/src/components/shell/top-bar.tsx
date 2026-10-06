@@ -5,6 +5,7 @@ import { PanelLeftIcon, PencilIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { invalidateConversationList } from "@/lib/conversation-list";
 import { orpc } from "@/utils/orpc";
 
 import UserMenu from "../user-menu";
@@ -12,6 +13,7 @@ import UserMenu from "../user-menu";
 const pageTitles: Record<string, string> = {
   "/c": "New Conversation",
   "/settings/keys": "Keys & settings",
+  "/dashboard": "Dashboard",
 };
 
 /** The bar above the page: the Conversation title (renamed inline) or the page's name. */
@@ -59,7 +61,7 @@ function ConversationTitle({ id }: { id: string }) {
           orpc.conversation.get.queryKey({ input: { id } }),
           (old) => old && { ...old, title },
         );
-        void queryClient.invalidateQueries({ queryKey: orpc.conversation.list.key() });
+        void invalidateConversationList(queryClient);
       },
       onError: (error) => toast.error(error.message),
     }),
@@ -93,6 +95,7 @@ function ConversationTitle({ id }: { id: string }) {
     <button
       type="button"
       title="Rename"
+      disabled={!conversation.isSuccess}
       className="group flex min-w-0 items-center gap-1.5 px-2 text-sm font-medium"
       onClick={() => setRenaming(true)}
     >

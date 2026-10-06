@@ -159,6 +159,28 @@ describe("conversation.list", () => {
     });
   });
 
+  it("previews the question while its reply hasn't written any text yet", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+    const question = await insertMessage({
+      conversationId: conv.id,
+      role: "user",
+      text: "What is a CTE?",
+    });
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "",
+      status: "streaming",
+      active: true,
+    });
+
+    const [row] = await client.conversation.list();
+
+    expect(row).toMatchObject({ preview: "What is a CTE?", hasError: false });
+  });
+
   it("shows an empty Conversation with no preview and no error", async () => {
     const { user, client } = await signedIn();
     await insertConversation(user);

@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Composer } from "@/components/chat/composer";
 import { Welcome } from "@/components/chat/welcome";
 import { availableModels, setPendingFirstMessage } from "@/lib/chat";
+import { invalidateConversationList } from "@/lib/conversation-list";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/c/")({
@@ -27,7 +28,7 @@ function NewConversation() {
     if (!model) return;
     try {
       const { id } = await create.mutateAsync({ model });
-      void queryClient.invalidateQueries({ queryKey: orpc.conversation.list.key() });
+      void invalidateConversationList(queryClient);
       setPendingFirstMessage(id, text);
       await navigate({ to: "/c/$id", params: { id } });
     } catch (error) {

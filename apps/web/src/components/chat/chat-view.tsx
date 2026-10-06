@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
+import { invalidateConversationList } from "@/lib/conversation-list";
 import { orpc } from "@/utils/orpc";
 
 import { Composer } from "./composer";
@@ -24,8 +25,6 @@ const connection = fetchServerSentEvents("/api/chat");
  */
 export function ChatView({ conversation }: { conversation: ConversationData }) {
   const queryClient = useQueryClient();
-  const invalidateConversationList = () =>
-    queryClient.invalidateQueries({ queryKey: orpc.conversation.list.key() });
   // The server writes the new Messages before it streams, so the first chunk means "sent".
   const awaitingFirstChunk = useRef(false);
   const { messages, sendMessage, setMessages, error } = useChat({
@@ -34,7 +33,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
     onChunk: () => {
       if (!awaitingFirstChunk.current) return;
       awaitingFirstChunk.current = false;
-      void invalidateConversationList();
+      void invalidateConversationList(queryClient);
     },
   });
   const [sending, setSending] = useState(false);
@@ -63,7 +62,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
         setMessages(toUIMessages(fresh.messages));
       } finally {
         setSending(false);
-        void invalidateConversationList();
+        void invalidateConversationList(queryClient);
       }
     }
   };

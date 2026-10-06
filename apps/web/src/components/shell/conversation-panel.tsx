@@ -6,6 +6,7 @@ import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
+import { invalidateConversationList } from "@/lib/conversation-list";
 import { relativeTime } from "@/lib/relative-time";
 import { orpc } from "@/utils/orpc";
 
@@ -48,7 +49,7 @@ function ConversationRow({ conversation }: { conversation: ConversationSummary }
         queryClient.removeQueries({
           queryKey: orpc.conversation.get.queryKey({ input: { id: conversation.id } }),
         });
-        await queryClient.invalidateQueries({ queryKey: orpc.conversation.list.key() });
+        await invalidateConversationList(queryClient);
       },
       onError: (error) => toast.error(error.message),
     }),
