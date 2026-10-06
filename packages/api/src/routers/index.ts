@@ -1,10 +1,12 @@
 import type { RouterClient } from "@orpc/server";
 
 import { protectedProcedure, publicProcedure } from "../index";
+import { chatRouter } from "./chat";
 import { conversationRouter } from "./conversation";
 import { credentialsRouter } from "./credentials";
 
 export const appRouter = {
+  chat: chatRouter,
   conversation: conversationRouter,
   credentials: credentialsRouter,
   healthCheck: publicProcedure.handler(() => {

@@ -7,7 +7,7 @@ import type { AppDeps } from "../deps";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestDeps } from "../testing/deps";
 import { createFakeAdapter, round, runError, text } from "../testing/fake-adapter";
-import { insertUser, sessionFor, type TestUser } from "../testing/router-client";
+import { createTestClient, insertUser, sessionFor, type TestUser } from "../testing/router-client";
 import { type ChatCommand, handleChat } from "./handle-chat";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
@@ -212,6 +212,89 @@ describe("handleChat", () => {
     });
   });
 
+  it("keeps running to the end when the client disconnects", async () => {
+    const { deps, conv, fake, send } = await setup({ manual: true });
+
+    const response = await send();
+    const reader = response.body!.getReader();
+    await fake.release(3);
+    await reader.read();
+    await reader.cancel();
+    await fake.releaseAll();
+
+    await expect
+      .poll(async () => (await messagesOf(deps, conv.id))[1], { interval: 10 })
+      .toMatchObject({
+        status: "complete",
+        parts: { parts: [{ type: "text", text: "Hello there!" }] },
+      });
+    expect(deps.runs.size).toBe(0);
+  });
+
+  it("ends a run that hits the cap as error, timed out, keeping the text that arrived", async () => {
+    const { deps, conv, fake, send } = await setup({
+      manual: true,
+      deps: { limits: { snapshotIntervalMs: 20, runCapMs: 100 } },
+    });
+
+    const response = await send();
+    await fake.release(3);
+    await response.text();
+
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "error",
+      error: "timed out",
+      errorReason: null,
+      parts: { parts: [{ type: "text", text: "Hello" }] },
+    });
+    expect(deps.runs.size).toBe(0);
+  });
+
+  it.each([
+    // Anthropic's SDK errors carry only the HTTP status, which the adapter reports as the code.
+    { code: "401", reason: "invalid_key" },
+    { code: "403", reason: "invalid_key" },
+    { code: "invalid_api_key", reason: "invalid_key" },
+    { code: "429", reason: "rate_limited" },
+    { code: "rate_limit_exceeded", reason: "rate_limited" },
+    { code: "insufficient_quota", reason: "rate_limited" },
+    { code: "529", reason: "provider_error" },
+    { code: undefined, reason: "provider_error" },
+  ])("saves a Provider error with code $code as reason $reason", async ({ code, reason }) => {
+    const { deps, conv, send } = await setup({ rounds: [round(runError("It failed", code))] });
+
+    await (await send()).text();
+
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "error",
+      error: "It failed",
+      errorReason: reason,
+    });
+  });
+
+  it("saves an error the adapter throws with its HTTP status as the reason", async () => {
+    const fake = createFakeAdapter({ rounds: [] });
+    const { deps, conv, send } = await setup({
+      deps: {
+        adapterFor: () => ({
+          ...fake.adapter,
+          // oxlint-disable-next-line require-yield
+          chatStream: async function* () {
+            throw Object.assign(new Error("Unauthorized"), { status: 401 });
+          },
+        }),
+      },
+    });
+
+    await (await send()).text();
+
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "error",
+      error: "Unauthorized",
+      errorReason: "invalid_key",
+    });
+  });
+
   it("registers the run in deps.runs until it ends", async () => {
     const { deps, conv, fake, send } = await setup({ manual: true });
 
@@ -222,6 +305,70 @@ describe("handleChat", () => {
     await fake.releaseAll();
     await response.text();
     expect(deps.runs.size).toBe(0);
+  });
+});
+
+describe("chat.stop", () => {
+  it("aborts the run, which ends stopped and keeps the text that arrived", async () => {
+    const { user, deps, conv, fake, send } = await setup({ manual: true });
+    const response = await send();
+    const [, reply] = await messagesOf(deps, conv.id);
+    await fake.release(3);
+
+    await createTestClient({ user, deps }).chat.stop({ messageId: reply!.id });
+
+    await response.text();
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "stopped",
+      error: null,
+      parts: { parts: [{ type: "text", text: "Hello" }] },
+    });
+    expect(deps.runs.size).toBe(0);
+  });
+
+  it("marks a streaming Message with no run in this process stopped", async () => {
+    const { user, deps } = await setup();
+    const conv = await insertConversation(user);
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
+    const reply = await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Half",
+      status: "streaming",
+    });
+
+    await createTestClient({ user, deps }).chat.stop({ messageId: reply.id });
+
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "stopped",
+      parts: { parts: [{ type: "text", text: "Half" }] },
+    });
+  });
+
+  it("leaves a Message that already ended alone", async () => {
+    const { user, deps } = await setup();
+    const conv = await insertConversation(user);
+    const reply = await insertMessage({ conversationId: conv.id, role: "assistant", text: "Done" });
+
+    await createTestClient({ user, deps }).chat.stop({ messageId: reply.id });
+
+    expect((await messagesOf(deps, conv.id))[0]).toMatchObject({ status: "complete" });
+  });
+
+  it("answers NOT_FOUND for another user's Message, without stopping it", async () => {
+    const { deps, conv, fake, send } = await setup({ manual: true });
+    const response = await send();
+    const [, reply] = await messagesOf(deps, conv.id);
+    const stranger = await insertUser();
+
+    await expect(
+      createTestClient({ user: stranger, deps }).chat.stop({ messageId: reply!.id }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(deps.runs.has(reply!.id)).toBe(true);
+    await fake.releaseAll();
+    await response.text();
   });
 });
 
@@ -288,6 +435,18 @@ describe("handleChat refuses", () => {
 
     await expect(send()).rejects.toThrow("No adapter");
     expect(await messagesOf(deps, conv.id)).toEqual([]);
+  });
+
+  it("a second run in a Conversation that has a streaming Message with 409", async () => {
+    const { deps, conv, fake, send } = await setup({ manual: true });
+    const first = await send();
+
+    const second = await send({ text: "Again" });
+
+    expect(second.status).toBe(409);
+    expect(await messagesOf(deps, conv.id)).toHaveLength(2);
+    await fake.releaseAll();
+    await first.text();
   });
 
   it("a malformed command with 400", async () => {
