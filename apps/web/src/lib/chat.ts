@@ -31,6 +31,29 @@ export function messageInfo(message: UIMessage): MessageInfo {
   };
 }
 
+/** What to tell the user about a Message that ended in `error`, and whether to link Key settings. */
+export function errorMessage({ error, errorReason }: MessageInfo) {
+  switch (errorReason) {
+    case "invalid_key":
+      return { text: "The Provider rejected your API key.", keySettings: true };
+    case "rate_limited":
+      return {
+        text: "The Provider rate limited this request. Try again in a moment.",
+        keySettings: false,
+      };
+    case "provider_error":
+      return { text: `The Provider returned an error: ${error}`, keySettings: false };
+  }
+  // Errors with no reason are the run's own guards (ADR 0002).
+  const text =
+    error === "timed out"
+      ? "The reply took too long and timed out."
+      : error === "interrupted"
+        ? "The reply was interrupted by a server restart."
+        : (error ?? "Something went wrong.");
+  return { text, keySettings: false };
+}
+
 /** The curated Models of the Providers the user has credentials for. */
 export function availableModels(credentials: CredentialSummary[]) {
   const services = new Set(credentials.map((credential) => credential.service));

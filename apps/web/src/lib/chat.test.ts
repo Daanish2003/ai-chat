@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   availableModels,
+  errorMessage,
   messageInfo,
   takePendingFirstMessage,
   toUIMessages,
   setPendingFirstMessage,
+  type MessageInfo,
 } from "./chat";
 
 const createdAt = new Date("2026-10-06T12:00:00Z");
@@ -68,6 +70,48 @@ describe("toUIMessages", () => {
       error: null,
       errorReason: null,
     });
+  });
+});
+
+describe("errorMessage", () => {
+  const info = (fields: Partial<MessageInfo>): MessageInfo => ({
+    model: null,
+    status: "error",
+    error: null,
+    errorReason: null,
+    ...fields,
+  });
+
+  it("points a rejected key at Key settings", () => {
+    expect(errorMessage(info({ error: "invalid x-api-key", errorReason: "invalid_key" }))).toEqual({
+      text: "The Provider rejected your API key.",
+      keySettings: true,
+    });
+  });
+
+  it("explains a rate limit", () => {
+    expect(errorMessage(info({ error: "Too many requests", errorReason: "rate_limited" }))).toEqual(
+      {
+        text: "The Provider rate limited this request. Try again in a moment.",
+        keySettings: false,
+      },
+    );
+  });
+
+  it("quotes the Provider for any other Provider error", () => {
+    expect(errorMessage(info({ error: "Overloaded", errorReason: "provider_error" }))).toEqual({
+      text: "The Provider returned an error: Overloaded",
+      keySettings: false,
+    });
+  });
+
+  it("explains a run that timed out or was interrupted", () => {
+    expect(errorMessage(info({ error: "timed out" })).text).toBe(
+      "The reply took too long and timed out.",
+    );
+    expect(errorMessage(info({ error: "interrupted" })).text).toBe(
+      "The reply was interrupted by a server restart.",
+    );
   });
 });
 
