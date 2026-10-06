@@ -17,6 +17,7 @@
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
     "@tanstack/ai": "0.64.1",
+    "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
