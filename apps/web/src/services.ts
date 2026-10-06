@@ -6,4 +6,4 @@ import { ENV } from "./env.server";
 
 export const db = createDb(ENV);
 export const auth = createAuth(ENV, db);
-export const deps = createAppDeps({ db });
+export const deps = createAppDeps({ db, keyEncryptionSecret: ENV.KEY_ENCRYPTION_SECRET });

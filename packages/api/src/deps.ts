@@ -45,6 +45,8 @@ export type AppDeps = {
   runs: Map<string, AbortController>;
   limits: Limits;
   fetch: typeof fetch;
+  /** `KEY_ENCRYPTION_SECRET`: encrypts Provider credentials and Tool credentials at rest (ADR 0003). */
+  keyEncryptionSecret: string;
 };
 
 export const defaultLimits: Limits = {
@@ -53,7 +55,13 @@ export const defaultLimits: Limits = {
 };
 
 /** The production `AppDeps`. Providers and web search are wired in by later features. */
-export function createAppDeps({ db }: { db: Database }): AppDeps {
+export function createAppDeps({
+  db,
+  keyEncryptionSecret,
+}: {
+  db: Database;
+  keyEncryptionSecret: string;
+}): AppDeps {
   return {
     db,
     adapterFor: (model) => {
@@ -67,5 +75,6 @@ export function createAppDeps({ db }: { db: Database }): AppDeps {
     runs: new Map(),
     limits: defaultLimits,
     fetch: globalThis.fetch,
+    keyEncryptionSecret,
   };
 }
