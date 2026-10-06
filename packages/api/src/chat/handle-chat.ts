@@ -53,8 +53,8 @@ export async function handleChat(
   if (command.text === undefined) return refuse(400, "Regenerating isn't available yet");
   if (command.attachmentIds.length > 0) return refuse(400, "Attachments aren't available yet");
 
-  const chat = await findConversation(deps, userId, command.conversationId);
-  if (!chat) return refuse(404, "Conversation not found");
+  const owned = await findConversation(deps, userId, command.conversationId);
+  if (!owned) return refuse(404, "Conversation not found");
 
   const model = findModel(command.model);
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
@@ -63,12 +63,18 @@ export async function handleChat(
     return refuse(400, `Add an ${providerLabel(model.provider)} key or pick another Model`);
   }
 
-  const history = await loadPath(deps, chat.id, command.parentId);
+  const history = await loadPath(deps, owned.id, command.parentId);
   if (command.parentId && history.length === 0) {
     return refuse(400, "The parent Message is not in this Conversation");
   }
 
+  // Everything that can fail runs before the Messages are written.
+  const adapter = deps.adapterFor(model.id, credentials);
   const userParts = storedParts([{ type: "text", text: command.text }]);
+  const messages = toModelMessages([
+    ...history.map((row) => ({ role: row.role, parts: parseStoredParts(row.parts) })),
+    { role: "user", parts: userParts },
+  ]);
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
   const now = new Date();
@@ -76,7 +82,7 @@ export async function handleChat(
     await tx.insert(message).values([
       {
         id: userMessageId,
-        conversationId: chat.id,
+        conversationId: owned.id,
         parentId: command.parentId,
         role: "user",
         parts: userParts,
@@ -86,7 +92,7 @@ export async function handleChat(
       },
       {
         id: assistantMessageId,
-        conversationId: chat.id,
+        conversationId: owned.id,
         parentId: userMessageId,
         role: "assistant",
         parts: storedParts([]),
@@ -98,17 +104,9 @@ export async function handleChat(
     await tx
       .update(conversation)
       .set({ activeLeafId: assistantMessageId, lastMessageAt: now, model: model.id })
-      .where(eq(conversation.id, chat.id));
+      .where(eq(conversation.id, owned.id));
   });
 
-  const messages = toModelMessages([
-    ...history.map((row) => ({ role: row.role, parts: parseStoredParts(row.parts) })),
-    { role: "user", parts: userParts },
-  ]);
-  const chunks = startRun(deps, {
-    messageId: assistantMessageId,
-    adapter: deps.adapterFor(model.id, credentials),
-    messages,
-  });
+  const chunks = startRun(deps, { messageId: assistantMessageId, adapter, messages });
   return toServerSentEventsResponse(chunks);
 }

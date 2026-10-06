@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { auth, deps } from "../../services";
 
-/** Streams a reply. A thin wrapper: everything happens in `handleChat` (ADR 0002). */
+/** Streams an assistant Message. A thin wrapper: everything happens in `handleChat` (ADR 0002). */
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {

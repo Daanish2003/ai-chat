@@ -12,7 +12,7 @@ import {
 import type { StoredParts } from "../message-parts";
 import { user } from "./auth";
 
-/** A chat thread owned by one user. Its Messages form a tree (ADR 0001). */
+/** A Conversation, owned by one user. Its Messages form a tree (ADR 0001). */
 export const conversation = pgTable(
   "conversation",
   {
@@ -55,7 +55,7 @@ export const messageErrorReason = pgEnum("message_error_reason", [
   "provider_error",
 ]);
 
-/** One turn of a Conversation. Several roots are allowed; there is no hidden root. */
+/** One Message of a Conversation. Several roots are allowed; there is no hidden root. */
 export const message = pgTable(
   "message",
   {

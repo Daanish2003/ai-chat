@@ -14,7 +14,7 @@ import { createPartsBuilder, searchTextOf } from "./parts";
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 
 /**
- * Runs one assistant reply (ADR 0002). The run drains `chat()` to the end on its own,
+ * Runs one assistant Message (ADR 0002). The run drains `chat()` to the end on its own,
  * whether or not anyone reads the returned chunks: it snapshots the streaming Message's parts
  * every `deps.limits.snapshotIntervalMs`, and finishes the row in `finally`. It is registered in
  * `deps.runs` under the Message id until it ends; aborting that controller stops it.

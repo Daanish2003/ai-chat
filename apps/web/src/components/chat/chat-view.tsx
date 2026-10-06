@@ -6,7 +6,7 @@ import {
 import { ScrollButton } from "@ai-chat/ui/components/prompt-kit/scroll-button";
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { orpc } from "@/utils/orpc";
@@ -45,22 +45,24 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
         },
       });
     } finally {
-      const fresh = await queryClient.fetchQuery({
-        ...orpc.conversation.get.queryOptions({ input: { id: conversation.id } }),
-        staleTime: 0,
-      });
-      setMessages(toUIMessages(fresh.messages));
-      setSending(false);
+      try {
+        const fresh = await queryClient.fetchQuery({
+          ...orpc.conversation.get.queryOptions({ input: { id: conversation.id } }),
+          staleTime: 0,
+        });
+        setMessages(toUIMessages(fresh.messages));
+      } finally {
+        setSending(false);
+      }
     }
   };
 
   // A new Conversation arrives here with its first Message still to send.
-  const sendRef = useRef(send);
-  sendRef.current = send;
-  useEffect(() => {
+  const sendPendingFirstMessage = useEffectEvent(() => {
     const text = takePendingFirstMessage(conversation.id);
-    if (text) void sendRef.current(text);
-  }, [conversation.id]);
+    if (text) void send(text);
+  });
+  useEffect(() => sendPendingFirstMessage(), [conversation.id]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

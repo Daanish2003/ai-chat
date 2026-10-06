@@ -47,11 +47,11 @@ async function setup({
     hint: "…-key",
     verified: true,
   });
-  const chat = await insertConversation(user, { model: "openai:gpt-5.6" });
+  const conv = await insertConversation(user, { model: "openai:gpt-5.6" });
   const send = (command: Partial<ChatCommand> = {}, as: TestUser | null = user) =>
     handleChat(
       chatRequest({
-        conversationId: chat.id,
+        conversationId: conv.id,
         parentId: null,
         text: "Hi",
         attachmentIds: [],
@@ -62,7 +62,7 @@ async function setup({
       as ? sessionFor(as) : null,
       deps,
     );
-  return { user, deps, fake, adapterCalls, chat, send };
+  return { user, deps, fake, adapterCalls, conv, send };
 }
 
 async function messagesOf(deps: AppDeps, conversationId: string) {
@@ -79,8 +79,8 @@ async function conversationRow(deps: AppDeps, id: string) {
 }
 
 describe("handleChat", () => {
-  it("streams the reply as server-sent events and saves it complete", async () => {
-    const { deps, chat, send } = await setup();
+  it("streams the assistant Message as server-sent events and saves it complete", async () => {
+    const { deps, conv, send } = await setup();
 
     const response = await send();
     const body = await response.text();
@@ -90,7 +90,7 @@ describe("handleChat", () => {
     expect(body).toContain('"delta":"Hello"');
     expect(body).toContain('"delta":" there!"');
 
-    const [question, reply] = await messagesOf(deps, chat.id);
+    const [question, reply] = await messagesOf(deps, conv.id);
     expect(question).toMatchObject({
       role: "user",
       parentId: null,
@@ -110,16 +110,16 @@ describe("handleChat", () => {
     });
   });
 
-  it("makes the reply the Active Branch leaf, bumps lastMessageAt and selects the Model", async () => {
-    const { deps, chat, send } = await setup();
+  it("makes the assistant Message the Active Branch leaf, bumps lastMessageAt and selects the Model", async () => {
+    const { deps, conv, send } = await setup();
 
     await (await send()).text();
 
-    const [, reply] = await messagesOf(deps, chat.id);
-    const after = await conversationRow(deps, chat.id);
+    const [, reply] = await messagesOf(deps, conv.id);
+    const after = await conversationRow(deps, conv.id);
     expect(after.activeLeafId).toBe(reply!.id);
     expect(after.model).toBe(anthropicModel);
-    expect(after.lastMessageAt.getTime()).toBeGreaterThan(chat.lastMessageAt.getTime());
+    expect(after.lastMessageAt.getTime()).toBeGreaterThan(conv.lastMessageAt.getTime());
   });
 
   it("builds the adapter for the chosen Model from the user's Provider credentials", async () => {
@@ -132,17 +132,17 @@ describe("handleChat", () => {
     ]);
   });
 
-  it("writes snapshots of the reply while it streams", async () => {
-    const { deps, chat, fake, send } = await setup({ manual: true });
+  it("writes snapshots of the assistant Message while it streams", async () => {
+    const { deps, conv, fake, send } = await setup({ manual: true });
 
     const response = await send();
-    const [, reply] = await messagesOf(deps, chat.id);
+    const [, reply] = await messagesOf(deps, conv.id);
     expect(reply).toMatchObject({ status: "streaming", parts: { parts: [] } });
 
     // RUN_STARTED, TEXT_MESSAGE_START, the first delta
     await fake.release(3);
     await expect
-      .poll(async () => (await messagesOf(deps, chat.id))[1], { interval: 10 })
+      .poll(async () => (await messagesOf(deps, conv.id))[1], { interval: 10 })
       .toMatchObject({
         status: "streaming",
         parts: { parts: [{ type: "text", text: "Hello" }] },
@@ -151,7 +151,7 @@ describe("handleChat", () => {
 
     await fake.releaseAll();
     await response.text();
-    expect((await messagesOf(deps, chat.id))[1]).toMatchObject({
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
       status: "complete",
       parts: { parts: [{ type: "text", text: "Hello there!" }] },
     });
@@ -159,22 +159,22 @@ describe("handleChat", () => {
 
   it("rebuilds history from the database, not from the request", async () => {
     const { user, deps, fake } = await setup();
-    const chat = await insertConversation(user);
-    const question = await insertMessage({ conversationId: chat.id, role: "user", text: "Hi" });
+    const conv = await insertConversation(user);
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
     const reply = await insertMessage({
-      conversationId: chat.id,
+      conversationId: conv.id,
       parentId: question.id,
       role: "assistant",
       text: "Hello!",
       active: true,
     });
     // Another Branch that must not be sent.
-    await insertMessage({ conversationId: chat.id, role: "user", text: "Other Branch" });
+    await insertMessage({ conversationId: conv.id, role: "user", text: "Other Branch" });
 
     const response = await handleChat(
       chatRequest(
         {
-          conversationId: chat.id,
+          conversationId: conv.id,
           parentId: reply.id,
           text: "How are you?",
           attachmentIds: [],
@@ -193,19 +193,19 @@ describe("handleChat", () => {
       { role: "assistant", content: "Hello!" },
       { role: "user", content: "How are you?" },
     ]);
-    const after = await messagesOf(deps, chat.id);
+    const after = await messagesOf(deps, conv.id);
     const newQuestion = after.find((row) => row.searchText === "How are you?");
     expect(newQuestion?.parentId).toBe(reply.id);
   });
 
-  it("saves a reply that hits a Provider error as error, keeping the text that arrived", async () => {
-    const { deps, chat, send } = await setup({
+  it("saves an assistant Message that hits a Provider error as error, keeping the text that arrived", async () => {
+    const { deps, conv, send } = await setup({
       rounds: [round(text("Partial"), runError("Overloaded"))],
     });
 
     await (await send()).text();
 
-    expect((await messagesOf(deps, chat.id))[1]).toMatchObject({
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
       status: "error",
       error: "Overloaded",
       parts: { parts: [{ type: "text", text: "Partial" }] },
@@ -213,10 +213,10 @@ describe("handleChat", () => {
   });
 
   it("registers the run in deps.runs until it ends", async () => {
-    const { deps, chat, fake, send } = await setup({ manual: true });
+    const { deps, conv, fake, send } = await setup({ manual: true });
 
     const response = await send();
-    const [, reply] = await messagesOf(deps, chat.id);
+    const [, reply] = await messagesOf(deps, conv.id);
     expect([...deps.runs.keys()]).toEqual([reply!.id]);
 
     await fake.releaseAll();
@@ -227,35 +227,35 @@ describe("handleChat", () => {
 
 describe("handleChat refuses", () => {
   it("a caller without a session with 401", async () => {
-    const { deps, chat, send } = await setup();
+    const { deps, conv, send } = await setup();
 
     const response = await send({}, null);
 
     expect(response.status).toBe(401);
-    expect(await messagesOf(deps, chat.id)).toEqual([]);
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
   });
 
   it("another user's Conversation with 404", async () => {
-    const { deps, chat, send } = await setup();
+    const { deps, conv, send } = await setup();
     const stranger = await insertUser();
 
     const response = await send({}, stranger);
 
     expect(response.status).toBe(404);
-    expect(await messagesOf(deps, chat.id)).toEqual([]);
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
   });
 
   it("a Model that isn't available with 400", async () => {
-    const { deps, chat, send } = await setup();
+    const { deps, conv, send } = await setup();
 
     const response = await send({ model: "anthropic:claude-2" });
 
     expect(response.status).toBe(400);
-    expect(await messagesOf(deps, chat.id)).toEqual([]);
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
   });
 
   it("a Model whose Provider the user has no credentials for with 400", async () => {
-    const { deps, chat, send } = await setup();
+    const { deps, conv, send } = await setup();
 
     const response = await send({ model: "openai:gpt-5.6" });
 
@@ -263,26 +263,39 @@ describe("handleChat refuses", () => {
     expect(await response.json()).toMatchObject({
       message: "Add an OpenAI key or pick another Model",
     });
-    expect(await messagesOf(deps, chat.id)).toEqual([]);
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
   });
 
   it("a parent from another Conversation with 400", async () => {
-    const { user, deps, chat, send } = await setup();
+    const { user, deps, conv, send } = await setup();
     const elsewhere = await insertConversation(user);
     const foreign = await insertMessage({ conversationId: elsewhere.id, role: "user", text: "Hi" });
 
     const response = await send({ parentId: foreign.id });
 
     expect(response.status).toBe(400);
-    expect(await messagesOf(deps, chat.id)).toEqual([]);
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
+  });
+
+  it("a Model whose adapter can't be built, before writing anything", async () => {
+    const { deps, conv, send } = await setup({
+      deps: {
+        adapterFor: () => {
+          throw new Error("No adapter");
+        },
+      },
+    });
+
+    await expect(send()).rejects.toThrow("No adapter");
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
   });
 
   it("a malformed command with 400", async () => {
-    const { deps, chat, send } = await setup();
+    const { deps, conv, send } = await setup();
 
     const response = await send({ conversationId: "not-a-uuid" });
 
     expect(response.status).toBe(400);
-    expect(await messagesOf(deps, chat.id)).toEqual([]);
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
   });
 });

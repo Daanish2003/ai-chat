@@ -7,14 +7,14 @@ import { BotIcon, UserIcon } from "lucide-react";
 
 import { messageInfo } from "@/lib/chat";
 
-function textOf(message: UIMessage) {
+function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
 }
 
 /** One full-width Message row: avatar, header, then the text (Markdown for the assistant). */
 export function MessageRow({ message }: { message: UIMessage }) {
   const info = messageInfo(message);
-  const text = textOf(message);
+  const text = plainText(message);
   const isUser = message.role === "user";
   const model = info.model ? (findModel(info.model)?.label ?? info.model) : null;
 

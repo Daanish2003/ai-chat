@@ -34,23 +34,23 @@ describe("conversation.create", () => {
 describe("conversation.get", () => {
   it("returns the Active Branch path, oldest first, leaving out other Branches", async () => {
     const { user, client } = await signedIn();
-    const chat = await insertConversation(user);
-    const question = await insertMessage({ conversationId: chat.id, role: "user", text: "Hi" });
+    const conv = await insertConversation(user);
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
     await insertMessage({
-      conversationId: chat.id,
+      conversationId: conv.id,
       parentId: question.id,
       role: "assistant",
       text: "An older reply",
     });
     const reply = await insertMessage({
-      conversationId: chat.id,
+      conversationId: conv.id,
       parentId: question.id,
       role: "assistant",
       text: "Hello!",
       active: true,
     });
 
-    const result = await client.conversation.get({ id: chat.id });
+    const result = await client.conversation.get({ id: conv.id });
 
     expect(result.messages).toEqual([
       {
@@ -80,10 +80,10 @@ describe("conversation.get", () => {
 
   it("hides other users' Conversations", async () => {
     const owner = await signedIn();
-    const chat = await insertConversation(owner.user);
+    const conv = await insertConversation(owner.user);
     const other = await signedIn();
 
-    await expect(other.client.conversation.get({ id: chat.id })).rejects.toMatchObject({
+    await expect(other.client.conversation.get({ id: conv.id })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
   });
