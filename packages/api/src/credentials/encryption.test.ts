@@ -46,3 +46,15 @@ describe("credential encryption", () => {
     expect(decryptCredentials("garbage", { secret, context })).toBeNull();
   });
 });
+
+describe("credential encryption against tampering", () => {
+  it("returns null when the auth tag was truncated", () => {
+    const encrypted = encryptCredentials({ apiKey: "sk-ant-secret" }, { secret, context });
+    const [version, iv, tag = "", ciphertext] = encrypted.split(".");
+    const truncatedTag = Buffer.from(tag, "base64url").subarray(0, 4).toString("base64url");
+
+    expect(
+      decryptCredentials([version, iv, truncatedTag, ciphertext].join("."), { secret, context }),
+    ).toBeNull();
+  });
+});

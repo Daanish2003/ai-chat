@@ -11,6 +11,8 @@ type Options = {
 
 const VERSION = "v1";
 const ALGORITHM = "aes-256-gcm";
+/** Full-length tags only: Node would otherwise accept a truncated tag on decrypt. */
+const AUTH_TAG_LENGTH = 16;
 
 function deriveKey(secret: string) {
   return Buffer.from(hkdfSync("sha256", secret, "", "ai-chat user_credentials", 32));
@@ -19,7 +21,9 @@ function deriveKey(secret: string) {
 /** Encrypts credentials with AES-256-GCM, as `v1.<iv>.<tag>.<ciphertext>` in base64url (ADR 0003). */
 export function encryptCredentials(credentials: Credentials, { secret, context }: Options): string {
   const iv = randomBytes(12);
-  const cipher = createCipheriv(ALGORITHM, deriveKey(secret), iv);
+  const cipher = createCipheriv(ALGORITHM, deriveKey(secret), iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
   cipher.setAAD(Buffer.from(context));
   const ciphertext = Buffer.concat([
     cipher.update(JSON.stringify(credentials), "utf8"),
@@ -38,7 +42,9 @@ export function decryptCredentials(
   const [version, iv, tag, ciphertext, ...rest] = encrypted.split(".");
   if (version !== VERSION || !iv || !tag || !ciphertext || rest.length > 0) return null;
   try {
-    const decipher = createDecipheriv(ALGORITHM, deriveKey(secret), Buffer.from(iv, "base64url"));
+    const decipher = createDecipheriv(ALGORITHM, deriveKey(secret), Buffer.from(iv, "base64url"), {
+      authTagLength: AUTH_TAG_LENGTH,
+    });
     decipher.setAAD(Buffer.from(context));
     decipher.setAuthTag(Buffer.from(tag, "base64url"));
     const plaintext = Buffer.concat([

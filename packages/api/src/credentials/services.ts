@@ -35,6 +35,12 @@ export const credentialFieldSchemas = {
 
 export type CredentialService = keyof typeof credentialFieldSchemas;
 
+/** `credentials.save` input: a service and its fields. */
+export const saveCredentialsInput = z.discriminatedUnion("service", [
+  z.object({ service: z.literal("anthropic"), fields: credentialFieldSchemas.anthropic }),
+  z.object({ service: z.literal("openai"), fields: credentialFieldSchemas.openai }),
+]);
+
 export const credentialServices = Object.keys(credentialFieldSchemas) as [
   CredentialService,
   ...CredentialService[],
