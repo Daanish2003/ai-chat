@@ -37,5 +37,5 @@ A user's own API key for a non-LLM service a tool needs, such as web search. Wit
 _Avoid_: Search key, Provider credentials (those are for Providers only)
 
 **Shared link**:
-A public, read-only snapshot of a Conversation taken at the moment it is shared.
+A public, read-only snapshot of a Conversation's Active Branch taken at the moment it is shared. A Conversation has at most one; sharing again moves it to the current Active Branch under the same link. It disappears when its Conversation is deleted.
 _Avoid_: Share, public chat, permalink

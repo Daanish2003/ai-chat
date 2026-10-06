@@ -10,5 +10,6 @@ TanStack AI's persistence (`@tanstack/ai-persistence` `withPersistence`) keeps o
 
 ## Consequences
 
-- Attachments are not parts. They are linked through a `message_attachment` join table so foreign keys can protect Shared link snapshots.
+- Attachments are not parts. They are linked through a `message_attachment` join table, so foreign keys keep an attachment alive while any Message uses it.
+- Messages are never mutated once written, which is what lets a Shared link point at the tree instead of copying it (ADR 0004).
 - Every TanStack AI upgrade only needs the boundary converter checked.
