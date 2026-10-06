@@ -1,0 +1,3 @@
+{
+  "extends": "@ai-chat/config/tsconfig.base.json"
+}
