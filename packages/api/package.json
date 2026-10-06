@@ -16,10 +16,12 @@
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
+    "@tanstack/ai": "0.64.1",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@ai-chat/config": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "^5.0.3"
   }
 }

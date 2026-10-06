@@ -1,7 +1,8 @@
 import type { Session } from "@ai-chat/auth";
-import type { Database } from "@ai-chat/db";
+
+import type { AppDeps } from "./deps";
 
 export type Context = {
   session: Session | null;
-  db: Database;
+  deps: AppDeps;
 };

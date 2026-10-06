@@ -1,14 +1,13 @@
 import type { Context as ApiContext } from "@ai-chat/api/context";
 
-import { db } from "./services";
-import { auth } from "./services";
+import { auth, deps } from "./services";
 
 export async function createContext({ req }: { req: Request }): Promise<ApiContext> {
   const session = await auth.api.getSession({
     headers: req.headers,
   });
   return {
-    db,
+    deps,
     session,
   };
 }
