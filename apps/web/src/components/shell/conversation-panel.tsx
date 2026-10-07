@@ -1,12 +1,11 @@
 import type { AppRouterClient } from "@ai-chat/api/routers/index";
 import { findModel } from "@ai-chat/api/chat/models";
 import { Button } from "@ai-chat/ui/components/button";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import { Share2Icon, Trash2Icon } from "lucide-react";
-import { toast } from "sonner";
 
-import { invalidateConversationList } from "@/lib/conversation-list";
+import { useDeleteConversation } from "@/lib/delete-conversation";
 import { relativeTime } from "@/lib/relative-time";
 import { orpc } from "@/utils/orpc";
 
@@ -38,29 +37,8 @@ export function ConversationPanel() {
 }
 
 function ConversationRow({ conversation }: { conversation: ConversationSummary }) {
-  const queryClient = useQueryClient();
-  const navigate = useNavigate();
-  const { id: openId } = useParams({ strict: false });
   const title = conversation.title ?? "Untitled";
-  const remove = useMutation(
-    orpc.conversation.delete.mutationOptions({
-      onSuccess: async () => {
-        if (openId === conversation.id) await navigate({ to: "/c" });
-        queryClient.removeQueries({
-          queryKey: orpc.conversation.get.queryKey({ input: { id: conversation.id } }),
-        });
-        await invalidateConversationList(queryClient);
-      },
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-
-  const confirmDelete = () => {
-    const sharedNote = conversation.shared ? " This also deletes its Shared link." : "";
-    if (window.confirm(`Delete "${title}"?${sharedNote} This can't be undone.`)) {
-      remove.mutate({ id: conversation.id });
-    }
-  };
+  const remove = useDeleteConversation();
 
   return (
     <li className="group relative border-b">
@@ -98,7 +76,7 @@ function ConversationRow({ conversation }: { conversation: ConversationSummary }
         title="Delete"
         aria-label={`Delete "${title}"`}
         disabled={remove.isPending}
-        onClick={confirmDelete}
+        onClick={() => remove.confirmDelete(conversation)}
         className="absolute top-1.5 right-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-destructive"
       >
         <Trash2Icon />

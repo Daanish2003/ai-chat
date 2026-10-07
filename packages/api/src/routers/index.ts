@@ -6,6 +6,7 @@ import { conversationRouter } from "./conversation";
 import { credentialsRouter } from "./credentials";
 import { modelsRouter } from "./models";
 import { settingsRouter } from "./settings";
+import { searchRouter } from "./search";
 import { shareRouter } from "./share";
 
 export const appRouter = {
@@ -14,6 +15,7 @@ export const appRouter = {
   credentials: credentialsRouter,
   models: modelsRouter,
   settings: settingsRouter,
+  search: searchRouter,
   share: shareRouter,
   healthCheck: publicProcedure.handler(() => {
     return "OK";
