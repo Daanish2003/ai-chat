@@ -16,7 +16,7 @@ import {
   AttachmentTitle,
 } from "@ai-chat/ui/components/attachment";
 import { Button } from "@ai-chat/ui/components/button";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { FileTextIcon, ImageIcon, PaperclipIcon, XIcon } from "lucide-react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -41,7 +41,13 @@ export function useAttachmentDraft(model: string | undefined, initial: Attachmen
     initial.map((info) => ({ ...info, key: info.id, state: "done" })),
   );
   const upload = useMutation(orpc.attachment.upload.mutationOptions());
-  const kinds = acceptedKinds(model ? findModel(model) : undefined);
+  // `models.list` includes the live OpenRouter and Ollama Models, which aren't curated.
+  const available = useQuery(orpc.models.list.queryOptions());
+  const kinds = acceptedKinds(
+    model
+      ? (available.data?.models.find((candidate) => candidate.id === model) ?? findModel(model))
+      : undefined,
+  );
   const update = (key: string, fields: Partial<DraftAttachment>) =>
     setItems((current) =>
       current.map((item) => (item.key === key ? { ...item, ...fields } : item)),

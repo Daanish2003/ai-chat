@@ -31,7 +31,8 @@ async function setup() {
       verified: true,
     });
   }
-  const conv = await insertConversation(user);
+  // Titled, so no title is generated in the background (a second adapter call).
+  const conv = await insertConversation(user, { title: "Attachments" });
   const send = (command: Partial<ChatCommand> = {}, as: TestUser = user) =>
     handleChat(
       new Request("http://localhost/api/chat", {
