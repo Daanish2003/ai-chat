@@ -609,4 +609,37 @@ describe("handleChat Branches", () => {
     expect(response.status).toBe(400);
     expect(await messagesOf(deps, conv.id)).toHaveLength(2);
   });
+
+  it("continues the Active Branch after switching to another one", async () => {
+    const { user, deps, conv, fake, send } = await setup();
+    const { question, reply } = await seedExchange(conv.id);
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Howdy!",
+      createdAt: ago(8),
+      active: true,
+    });
+    const client = createTestClient({ user, deps });
+
+    await client.conversation.switchBranch({ messageId: reply.id });
+    // The client sends the next Message under the last one it shows.
+    const shown = await client.conversation.get({ id: conv.id });
+    await (await send({ parentId: shown.messages.at(-1)!.id, text: "And then?" })).text();
+
+    expect(fake.calls[0]?.messages).toEqual([
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hello!" },
+      { role: "user", content: "And then?" },
+    ]);
+    const after = await client.conversation.get({ id: conv.id });
+    expect(after.messages.map((m) => m.parts)).toEqual([
+      [{ type: "text", content: "Hi" }],
+      [{ type: "text", content: "Hello!" }],
+      [{ type: "text", content: "And then?" }],
+      [{ type: "text", content: "Hello there!" }],
+    ]);
+    expect(after.messages[1]?.branch).toMatchObject({ index: 0, count: 2 });
+  });
 });
