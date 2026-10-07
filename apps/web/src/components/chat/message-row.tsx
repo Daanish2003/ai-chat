@@ -1,11 +1,13 @@
 import { findModel } from "@ai-chat/api/chat/models";
 import { Loader } from "@ai-chat/ui/components/prompt-kit/loader";
 import { Markdown } from "@ai-chat/ui/components/prompt-kit/markdown";
+import { SystemMessage } from "@ai-chat/ui/components/prompt-kit/system-message";
 import { cn } from "@ai-chat/ui/lib/utils";
 import type { UIMessage } from "@tanstack/ai-react";
+import { Link } from "@tanstack/react-router";
 import { BotIcon, UserIcon } from "lucide-react";
 
-import { messageInfo } from "@/lib/chat";
+import { describeError, messageInfo, type MessageInfo } from "@/lib/chat";
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
@@ -57,14 +59,28 @@ export function MessageRow({ message }: { message: UIMessage }) {
             {info.status === "stopped" && (
               <span className="text-xs text-muted-foreground italic">Stopped</span>
             )}
-            {info.status === "error" && (
-              <p role="alert" className="text-xs text-destructive">
-                {info.error ?? "The Provider returned an error."}
-              </p>
-            )}
+            {info.status === "error" && <ErrorMessage info={info} />}
           </>
         )}
       </div>
     </div>
+  );
+}
+
+/** Why the reply ended in `error`, with a way to fix a rejected key. */
+function ErrorMessage({ info }: { info: MessageInfo }) {
+  const { text, keySettings } = describeError(info);
+  return (
+    <SystemMessage variant="error" fill role="alert" className="max-w-[80ch] rounded-none">
+      {text}
+      {keySettings && (
+        <>
+          {" "}
+          <Link to="/settings/keys" className="font-medium underline underline-offset-2">
+            Key settings
+          </Link>
+        </>
+      )}
+    </SystemMessage>
   );
 }

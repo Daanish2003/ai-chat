@@ -4,23 +4,31 @@ import {
   PromptInputActions,
   PromptInputTextarea,
 } from "@ai-chat/ui/components/prompt-kit/prompt-input";
-import { ArrowUpIcon } from "lucide-react";
+import { ArrowUpIcon, SquareIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-/** The docked composer: Enter sends, Shift+Enter starts a new line. */
+/**
+ * The docked composer: Enter sends, Shift+Enter starts a new line. While a reply streams, sending
+ * is disabled and Send becomes Stop.
+ */
 export function Composer({
   onSend,
+  onStop,
+  streaming = false,
   disabled = false,
   children,
 }: {
   onSend: (text: string) => void;
-  /** While a reply streams, or when sending isn't possible. */
+  onStop?: () => void;
+  /** A reply is streaming in this Conversation. */
+  streaming?: boolean;
+  /** When sending isn't possible. */
   disabled?: boolean;
   /** Extra controls on the left of the actions row. */
   children?: ReactNode;
 }) {
   const [value, setValue] = useState("");
-  const canSend = !disabled && value.trim().length > 0;
+  const canSend = !disabled && !streaming && value.trim().length > 0;
 
   const submit = () => {
     if (!canSend) return;
@@ -33,7 +41,7 @@ export function Composer({
       value={value}
       onValueChange={setValue}
       onSubmit={submit}
-      isLoading={disabled}
+      isLoading={disabled || streaming}
       className="rounded-none bg-card"
     >
       <PromptInputTextarea
@@ -46,11 +54,11 @@ export function Composer({
         <Button
           size="icon"
           className="rounded-full"
-          disabled={!canSend}
-          onClick={submit}
-          aria-label="Send"
+          disabled={streaming ? !onStop : !canSend}
+          onClick={streaming ? onStop : submit}
+          aria-label={streaming ? "Stop" : "Send"}
         >
-          <ArrowUpIcon />
+          {streaming ? <SquareIcon className="fill-current" /> : <ArrowUpIcon />}
         </Button>
       </PromptInputActions>
     </PromptInput>

@@ -2,7 +2,7 @@ import type { Session } from "@ai-chat/auth";
 import { storedParts } from "@ai-chat/db/message-parts";
 import { conversation, message } from "@ai-chat/db/schema/chat";
 import { toServerSentEventsResponse } from "@tanstack/ai";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { providerLabel } from "../credentials/services";
@@ -78,7 +78,21 @@ export async function handleChat(
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
   const now = new Date();
-  await deps.db.transaction(async (tx) => {
+  const started = await deps.db.transaction(async (tx) => {
+    // One run per Conversation (ADR 0002). Locking the Conversation row queues concurrent sends
+    // here, so the later one sees the earlier one's streaming Message.
+    await tx
+      .select({ id: conversation.id })
+      .from(conversation)
+      .where(eq(conversation.id, owned.id))
+      .for("update");
+    const [running] = await tx
+      .select({ id: message.id })
+      .from(message)
+      .where(and(eq(message.conversationId, owned.id), eq(message.status, "streaming")))
+      .limit(1);
+    if (running) return false;
+
     await tx.insert(message).values([
       {
         id: userMessageId,
@@ -105,7 +119,9 @@ export async function handleChat(
       .update(conversation)
       .set({ activeLeafId: assistantMessageId, lastMessageAt: now, model: model.id })
       .where(eq(conversation.id, owned.id));
+    return true;
   });
+  if (!started) return refuse(409, "A reply is still streaming in this Conversation");
 
   const chunks = startRun(deps, { messageId: assistantMessageId, adapter, messages });
   return toServerSentEventsResponse(chunks);
