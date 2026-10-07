@@ -1,3 +1,4 @@
+import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
 import type { AppRouterClient } from "@ai-chat/api/routers/index";
 import {
   ChatContainerContent,
@@ -15,6 +16,7 @@ import { invalidateConversationList } from "@/lib/conversation-list";
 import { missingCredentialsMessage } from "@/lib/models";
 import { orpc } from "@/utils/orpc";
 
+import { AttachButton, DraftAttachmentChips, useAttachmentDraft } from "./attachments";
 import { Composer } from "./composer";
 import { MessageRow } from "./message-row";
 import { MissingCredentialsBanner } from "./missing-credentials-banner";
@@ -79,24 +81,35 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
     ? missingCredentialsMessage(conversation.model, models.data.models)
     : null;
 
+  const draft = useAttachmentDraft(conversation.model);
+
   /**
    * Runs a command under `parentId`: a send or an edit with `text`, a regenerate without.
    * A new Branch replaces what's on screen with `history`, the Messages above the new ones.
+   * `attachments` are the new Message's files; an edit passes the full list it keeps.
    */
-  const run = async (parentId: string | null, text?: string, history?: UIMessage[]) => {
+  const run = async (
+    parentId: string | null,
+    text?: string,
+    history?: UIMessage[],
+    attachments: AttachmentInfo[] = [],
+  ) => {
     setSending(true);
     awaitingFirstChunk.current = true;
     command.current = {
       conversationId: conversation.id,
       parentId,
       text,
-      attachmentIds: [],
+      attachmentIds: attachments.map((attachment) => attachment.id),
       model: conversation.model,
       webSearch: false,
     };
     try {
       if (history) setMessages(history);
-      await (text === undefined ? reload() : sendMessage(text));
+      // The attachments ride along in the metadata so their chips show while the reply streams.
+      await (text === undefined
+        ? reload()
+        : sendMessage({ content: text, metadata: { attachments } }));
     } finally {
       try {
         const fresh = await fetchConversation();
@@ -108,12 +121,16 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
     }
   };
 
-  const send = (text: string) => run(conversation.messages.at(-1)?.id ?? null, text);
+  const send = (text: string, attachments: AttachmentInfo[] = []) =>
+    run(conversation.messages.at(-1)?.id ?? null, text, undefined, attachments);
 
-  /** Edit (with `text`) or regenerate `messageId` into a new Branch beside it. */
-  const startBranch = (messageId: string, text?: string) => {
+  /**
+   * Edit (with `text`) or regenerate `messageId` into a new Branch beside it. An edit sends the
+   * attachments the user kept and added; a regenerate leaves the user Message's alone.
+   */
+  const startBranch = (messageId: string, text?: string, attachments?: AttachmentInfo[]) => {
     const { parentId, history } = branchFrom(messages, messageId);
-    void run(parentId, text, history);
+    void run(parentId, text, history, attachments);
   };
 
   const switchBranch = useMutation(
@@ -125,8 +142,8 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
 
   // A new Conversation arrives here with its first Message still to send.
   const sendPendingFirstMessage = useEffectEvent(() => {
-    const text = takePendingFirstMessage(conversation.id);
-    if (text) void send(text);
+    const pending = takePendingFirstMessage(conversation.id);
+    if (pending) void send(pending.text, pending.attachments);
   });
   useEffect(() => sendPendingFirstMessage(), [conversation.id]);
 
@@ -140,7 +157,8 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
               message={message}
               actions={{
                 streaming: streaming || switchBranch.isPending,
-                onEdit: (text) => startBranch(message.id, text),
+                model: conversation.model,
+                onEdit: (text, attachments) => startBranch(message.id, text, attachments),
                 onRegenerate: () => startBranch(message.id),
                 onSwitchBranch: (messageId) => switchBranch.mutate({ messageId }),
               }}
@@ -159,7 +177,12 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
         )}
         {blocked && <MissingCredentialsBanner message={blocked} />}
         <Composer
-          onSend={(text) => void send(text)}
+          onSend={(text) => {
+            void send(text, draft.uploaded);
+            draft.clear();
+          }}
+          attachments={<DraftAttachmentChips draft={draft} />}
+          attachmentsPending={draft.pending}
           onStop={
             stopRun.isPending
               ? undefined
@@ -169,7 +192,9 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
           streaming={streaming}
           // The next Message continues the Branch being switched to, so wait for it.
           disabled={!!blocked || switchBranch.isPending}
-        />
+        >
+          <AttachButton draft={draft} disabled={!!blocked} />
+        </Composer>
       </div>
     </div>
   );

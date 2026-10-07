@@ -4,7 +4,7 @@ import type { UIMessage } from "@tanstack/ai-react";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { MessageRow } from "@/components/chat/message-row";
-import type { MessageInfo } from "@/lib/chat";
+import type { AttachmentChip, MessageInfo } from "@/lib/chat";
 import { client } from "@/utils/orpc";
 
 const noindex = { name: "robots", content: "noindex, nofollow" };
@@ -30,12 +30,20 @@ export const Route = createFileRoute("/share/$token")({
 });
 
 function toUIMessages(messages: SharedConversation["messages"]): UIMessage[] {
-  return messages.map(({ id, role, parts, createdAt, model, status }) => ({
+  return messages.map(({ id, role, parts, attachments, createdAt, model, status }) => ({
     id,
     role,
     parts: parts as UIMessage["parts"],
     createdAt,
-    metadata: { model, status, error: null, errorReason: null } satisfies MessageInfo,
+    metadata: {
+      model,
+      status,
+      error: null,
+      errorReason: null,
+      attachments,
+    } satisfies MessageInfo & {
+      attachments: AttachmentChip[];
+    },
   }));
 }
 
@@ -63,7 +71,7 @@ function SharedConversationPage() {
           ))}
         </div>
         <footer className="mt-12 text-center text-xs text-muted-foreground">
-          Read-only snapshot. Files aren't shared.
+          Read-only snapshot. Attachments show as file names only; their contents aren't shared.
         </footer>
       </article>
     </div>
