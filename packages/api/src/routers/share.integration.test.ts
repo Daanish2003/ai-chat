@@ -4,6 +4,8 @@ import { getTestDb } from "@ai-chat/db/testing/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
+import { citationFor } from "../chat/citations";
+import { replySegments, sourcesOf } from "../chat/sources";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestClient, insertUser } from "../testing/router-client";
 
@@ -334,6 +336,46 @@ describe("share.get", () => {
       status: "error",
       createdAt: failed.createdAt,
     });
+  });
+
+  it("carries a reply's searches and cited links, so the page shows its Sources and citations", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "News?" });
+    const docs = { title: "TanStack AI", url: "https://tanstack.com/ai", snippet: "Docs" };
+    const blog = { title: "Blog", url: "https://example.com/blog", snippet: "Post" };
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "",
+      parts: storedParts([
+        {
+          type: "web_search",
+          toolCallId: "call-1",
+          query: "tanstack ai",
+          state: "done",
+          results: [docs, blog],
+        },
+        { type: "text", text: "It has lazy tools ([tanstack.com](https://tanstack.com/ai))." },
+      ]),
+      active: true,
+    });
+
+    const link = await client.share.upsert({ conversationId: conv.id });
+    const shared = await createTestClient().share.get({ token: link.token });
+    const parts = shared.messages[1]!.parts;
+
+    const sources = sourcesOf(parts);
+    expect(sources).toEqual([
+      { number: 1, ...docs },
+      { number: 2, ...blog },
+    ]);
+    expect(replySegments(parts)).toMatchObject([
+      { type: "searches", searches: [{ query: "tanstack ai", state: "done" }] },
+      { type: "text", content: "It has lazy tools ([tanstack.com](https://tanstack.com/ai))." },
+    ]);
+    expect(citationFor("https://tanstack.com/ai", sources)?.number).toBe(1);
   });
 });
 

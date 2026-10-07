@@ -10,6 +10,7 @@ import {
 import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
+import { citationPrompt } from "./citations";
 import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "./parts";
 import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
@@ -86,7 +87,13 @@ export function startRun(
           onChange: () => (changed = true),
         }),
       ];
-      const stream = chat({ adapter, messages, abortController, ...(tools && { tools }) });
+      // A reply that may search is asked to cite its Sources with markdown links.
+      const stream = chat({
+        adapter,
+        messages,
+        abortController,
+        ...(tools && { tools, systemPrompts: [citationPrompt] }),
+      });
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
         changed = true;
