@@ -502,3 +502,111 @@ describe("handleChat refuses", () => {
     expect(await messagesOf(deps, conv.id)).toEqual([]);
   });
 });
+
+/** `minutesAgo` minutes before now, so seeded Messages are older than the ones a send writes. */
+const ago = (minutesAgo: number) => new Date(Date.now() - minutesAgo * 60_000);
+
+/** Seeds "Hi" → "Hello!" as the Active Branch of the `setup` Conversation. */
+async function seedExchange(conversationId: string) {
+  const question = await insertMessage({
+    conversationId,
+    role: "user",
+    text: "Hi",
+    createdAt: ago(10),
+  });
+  const reply = await insertMessage({
+    conversationId,
+    parentId: question.id,
+    role: "assistant",
+    text: "Hello!",
+    model: "openai:gpt-5.6",
+    createdAt: ago(9),
+    active: true,
+  });
+  return { question, reply };
+}
+
+describe("handleChat Branches", () => {
+  it("edits a Message into a sibling Branch, keeping the old one", async () => {
+    const { deps, conv, fake, send } = await setup();
+    const { question, reply } = await seedExchange(conv.id);
+    const follow = await insertMessage({
+      conversationId: conv.id,
+      parentId: reply.id,
+      role: "user",
+      text: "Tell me more",
+      createdAt: ago(8),
+    });
+
+    // Editing "Tell me more" sends the command with its sibling's parent.
+    await (await send({ parentId: follow.parentId, text: "Tell me less" })).text();
+
+    const rows = await messagesOf(deps, conv.id);
+    expect(rows.map((row) => row.id)).toContain(follow.id);
+    const edited = rows.find((row) => row.searchText === "Tell me less");
+    expect(edited).toMatchObject({ role: "user", parentId: reply.id });
+    const newReply = rows.find((row) => row.parentId === edited!.id);
+    expect((await conversationRow(deps, conv.id)).activeLeafId).toBe(newReply!.id);
+    expect(fake.calls[0]?.messages).toEqual([
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hello!" },
+      { role: "user", content: "Tell me less" },
+    ]);
+    expect(question.parentId).toBeNull();
+  });
+
+  it("edits the first Message into a new root", async () => {
+    const { deps, conv, fake, send } = await setup();
+    const { question } = await seedExchange(conv.id);
+
+    await (await send({ parentId: null, text: "Hey" })).text();
+
+    const roots = (await messagesOf(deps, conv.id)).filter((row) => row.parentId === null);
+    expect(roots.map((row) => row.searchText)).toEqual(["Hi", "Hey"]);
+    expect(roots[0]!.id).toBe(question.id);
+    expect(fake.calls[0]?.messages).toEqual([{ role: "user", content: "Hey" }]);
+  });
+
+  it("regenerates a reply as a sibling assistant Message with the current Model", async () => {
+    const { deps, conv, fake, send } = await setup();
+    const { question, reply } = await seedExchange(conv.id);
+
+    const response = await send({ parentId: question.id, text: undefined });
+    await response.text();
+
+    expect(response.status).toBe(200);
+    const rows = await messagesOf(deps, conv.id);
+    expect(rows).toHaveLength(3);
+    const regenerated = rows.find((row) => row.id !== reply.id && row.role === "assistant");
+    expect(regenerated).toMatchObject({
+      parentId: question.id,
+      model: anthropicModel,
+      status: "complete",
+      parts: { parts: [{ type: "text", text: "Hello there!" }] },
+    });
+    expect(fake.calls[0]?.messages).toEqual([{ role: "user", content: "Hi" }]);
+    const after = await conversationRow(deps, conv.id);
+    expect(after.activeLeafId).toBe(regenerated!.id);
+    expect(after.model).toBe(anthropicModel);
+    expect(after.lastMessageAt.getTime()).toBeGreaterThan(conv.lastMessageAt.getTime());
+  });
+
+  it("refuses to regenerate without a parent with 400", async () => {
+    const { deps, conv, send } = await setup();
+
+    const response = await send({ parentId: null, text: undefined });
+
+    expect(response.status).toBe(400);
+    expect(await messagesOf(deps, conv.id)).toEqual([]);
+  });
+
+  it("refuses to regenerate under an assistant Message with 400", async () => {
+    const { deps, conv, send } = await setup();
+    const { reply } = await seedExchange(conv.id);
+
+    const response = await send({ parentId: reply.id, text: undefined });
+
+    expect(response.status).toBe(400);
+    expect(await messagesOf(deps, conv.id)).toHaveLength(2);
+  });
+});

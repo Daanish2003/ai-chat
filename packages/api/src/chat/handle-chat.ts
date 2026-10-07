@@ -49,8 +49,7 @@ export async function handleChat(
   );
   if (!parsed.success) return refuse(400, "Invalid chat command");
   const command = parsed.data;
-  // Later features: regenerate (no text), attachments and web search.
-  if (command.text === undefined) return refuse(400, "Regenerating isn't available yet");
+  // Later features: attachments and web search.
   if (command.attachmentIds.length > 0) return refuse(400, "Attachments aren't available yet");
 
   const owned = await findConversation(deps, userId, command.conversationId);
@@ -67,13 +66,18 @@ export async function handleChat(
   if (command.parentId && history.length === 0) {
     return refuse(400, "The parent Message is not in this Conversation");
   }
+  // A regenerate (no text) answers its parent again, so the parent must be the user's Message.
+  if (command.text === undefined && history.at(-1)?.role !== "user") {
+    return refuse(400, "Only a reply to your Message can be regenerated");
+  }
 
   // Everything that can fail runs before the Messages are written.
   const adapter = deps.adapterFor(model.id, credentials);
-  const userParts = storedParts([{ type: "text", text: command.text }]);
+  const userParts =
+    command.text === undefined ? undefined : storedParts([{ type: "text", text: command.text }]);
   const messages = toModelMessages([
     ...history.map((row) => ({ role: row.role, parts: parseStoredParts(row.parts) })),
-    { role: "user", parts: userParts },
+    ...(userParts ? [{ role: "user" as const, parts: userParts }] : []),
   ]);
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
@@ -94,20 +98,25 @@ export async function handleChat(
     if (running) return false;
 
     await tx.insert(message).values([
-      {
-        id: userMessageId,
-        conversationId: owned.id,
-        parentId: command.parentId,
-        role: "user",
-        parts: userParts,
-        searchText: searchTextOf(userParts),
-        status: "complete",
-        createdAt: now,
-      },
+      // An edit is a new user Message beside the one it replaces; a regenerate writes none.
+      ...(userParts
+        ? [
+            {
+              id: userMessageId,
+              conversationId: owned.id,
+              parentId: command.parentId,
+              role: "user" as const,
+              parts: userParts,
+              searchText: searchTextOf(userParts),
+              status: "complete" as const,
+              createdAt: now,
+            },
+          ]
+        : []),
       {
         id: assistantMessageId,
         conversationId: owned.id,
-        parentId: userMessageId,
+        parentId: userParts ? userMessageId : command.parentId,
         role: "assistant",
         parts: storedParts([]),
         model: model.id,
