@@ -12,7 +12,7 @@ import {
   setConversationModel,
   toClientMessage,
 } from "../chat/store";
-import { providerLabel } from "../credentials/services";
+import { addKeyMessage } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import { protectedProcedure } from "../index";
 import { uuidv7 } from "../lib/uuidv7";
@@ -77,9 +77,7 @@ export const conversationRouter = {
         });
       }
       if (!(await loadCredentials(context.deps, userId, model.provider))) {
-        throw new ORPCError("BAD_REQUEST", {
-          message: `Add an ${providerLabel(model.provider)} key or pick another Model`,
-        });
+        throw new ORPCError("BAD_REQUEST", { message: addKeyMessage(model.provider) });
       }
       const updated = await setConversationModel(context.deps, userId, input.id, model.id);
       if (!updated) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });

@@ -1,8 +1,11 @@
 import { Button, buttonVariants } from "@ai-chat/ui/components/button";
 import { cn } from "@ai-chat/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { MessagesSquareIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
 import { type ReactNode, useState } from "react";
+
+import { orpc } from "@/utils/orpc";
 
 import { ConversationPanel } from "./conversation-panel";
 import { TopBar } from "./top-bar";
@@ -10,6 +13,8 @@ import { TopBar } from "./top-bar";
 /** The signed-in layout: icon rail, collapsible Conversation panel, top bar, then the page. */
 export function AppShell({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(true);
+  const models = useQuery(orpc.models.list.queryOptions());
+  const noCredentials = models.data?.models.length === 0;
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -24,14 +29,26 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           ai
         </Link>
-        <Link
-          to="/c"
-          title="New Conversation"
-          aria-label="New Conversation"
-          className={buttonVariants({ variant: "ghost", size: "icon" })}
-        >
-          <PlusIcon />
-        </Link>
+        {noCredentials ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Add Provider credentials to start"
+            aria-label="New Conversation"
+            disabled
+          >
+            <PlusIcon />
+          </Button>
+        ) : (
+          <Link
+            to="/c"
+            title="New Conversation"
+            aria-label="New Conversation"
+            className={buttonVariants({ variant: "ghost", size: "icon" })}
+          >
+            <PlusIcon />
+          </Link>
+        )}
         {/* The ⌘K palette replaces this placeholder. */}
         <Button
           variant="ghost"

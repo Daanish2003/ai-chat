@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  availableModels,
-  messageInfo,
-  takePendingFirstMessage,
-  toUIMessages,
-  setPendingFirstMessage,
-} from "./chat";
+import { messageInfo, takePendingFirstMessage, toUIMessages, setPendingFirstMessage } from "./chat";
 
 const createdAt = new Date("2026-10-06T12:00:00Z");
 
@@ -68,19 +62,6 @@ describe("toUIMessages", () => {
       error: null,
       errorReason: null,
     });
-  });
-});
-
-describe("availableModels", () => {
-  it("offers only the Models of Providers the user has credentials for", () => {
-    const models = availableModels([{ service: "openai", hint: "…abcd", verified: true }]);
-
-    expect(models.length).toBeGreaterThan(0);
-    expect(models.every((model) => model.provider === "openai")).toBe(true);
-  });
-
-  it("offers nothing without credentials", () => {
-    expect(availableModels([])).toEqual([]);
   });
 });
 

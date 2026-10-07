@@ -6,9 +6,12 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "@/lib/conversation-list";
+import { missingCredentialsMessage } from "@/lib/model-picker";
+import { useNewConversationModel } from "@/lib/new-conversation-model";
 import { orpc } from "@/utils/orpc";
 
 import UserMenu from "../user-menu";
+import { ModelPicker } from "./model-picker";
 
 const pageTitles: Record<string, string> = {
   "/c": "New Conversation",
@@ -44,9 +47,65 @@ export function TopBar({
       ) : (
         <span className="px-2 text-sm text-muted-foreground">{pageTitles[pathname]}</span>
       )}
+      {(id || pathname === "/c") && <span className="text-muted-foreground">/</span>}
+      {id ? (
+        <ConversationModelPicker key={id} id={id} />
+      ) : (
+        pathname === "/c" && <NewConversationModelPicker />
+      )}
       <div className="flex-1" />
       <UserMenu />
     </header>
+  );
+}
+
+/** Switches the open Conversation's Model; the next Message and regenerate use it. */
+function ConversationModelPicker({ id }: { id: string }) {
+  const queryClient = useQueryClient();
+  const conversation = useQuery(orpc.conversation.get.queryOptions({ input: { id } }));
+  const models = useQuery(orpc.models.list.queryOptions());
+  const getKey = orpc.conversation.get.queryKey({ input: { id } });
+  const setModel = useMutation(
+    orpc.conversation.setModel.mutationOptions({
+      onMutate: ({ model }) => {
+        const previous = conversation.data?.model;
+        queryClient.setQueryData(getKey, (old) => old && { ...old, model });
+        return { previous };
+      },
+      onSuccess: () => void invalidateConversationList(queryClient),
+      onError: (error, _, context) => {
+        const previous = context?.previous;
+        if (previous) queryClient.setQueryData(getKey, (old) => old && { ...old, model: previous });
+        toast.error(error.message);
+      },
+    }),
+  );
+  const value = conversation.data?.model;
+
+  if (!value || !models.data) return null;
+  return (
+    <ModelPicker
+      value={value}
+      models={models.data.models}
+      invalid={missingCredentialsMessage(value, models.data.models) !== null}
+      onSelect={(model) => setModel.mutate({ id, model })}
+    />
+  );
+}
+
+/** Picks the Model a new Conversation will be created with. */
+function NewConversationModelPicker() {
+  const models = useQuery(orpc.models.list.queryOptions());
+  const { model, setModel } = useNewConversationModel();
+
+  if (!models.data) return null;
+  return (
+    <ModelPicker
+      value={model}
+      models={models.data.models}
+      invalid={model !== undefined && missingCredentialsMessage(model, models.data.models) !== null}
+      onSelect={(next) => void setModel(next)}
+    />
   );
 }
 

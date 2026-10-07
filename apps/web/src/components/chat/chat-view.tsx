@@ -5,15 +5,17 @@ import {
 } from "@ai-chat/ui/components/prompt-kit/chat-container";
 import { ScrollButton } from "@ai-chat/ui/components/prompt-kit/scroll-button";
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
+import { missingCredentialsMessage } from "@/lib/model-picker";
 import { orpc } from "@/utils/orpc";
 
 import { Composer } from "./composer";
 import { MessageRow } from "./message-row";
+import { MissingCredentialsBanner } from "./missing-credentials-banner";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
 
@@ -38,6 +40,11 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
   });
   const [sending, setSending] = useState(false);
   const streaming = sending || conversation.messages.some((m) => m.status === "streaming");
+  // The selected Model's Provider may have lost its credentials; the server re-checks on send.
+  const models = useQuery(orpc.models.list.queryOptions());
+  const blocked = models.data
+    ? missingCredentialsMessage(conversation.model, models.data.models)
+    : null;
 
   const send = async (text: string) => {
     setSending(true);
@@ -92,7 +99,8 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
             {error.message}
           </p>
         )}
-        <Composer onSend={(text) => void send(text)} disabled={streaming} />
+        {blocked && <MissingCredentialsBanner message={blocked} />}
+        <Composer onSend={(text) => void send(text)} disabled={streaming || !!blocked} />
       </div>
     </div>
   );

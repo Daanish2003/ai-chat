@@ -1,6 +1,4 @@
-import { curatedModels } from "@ai-chat/api/chat/models";
 import type { ClientMessage } from "@ai-chat/api/chat/store";
-import type { CredentialSummary } from "@ai-chat/api/credentials/store";
 import type { UIMessage } from "@tanstack/ai-react";
 
 /** What the server knows about a Message beyond its parts, kept in `UIMessage.metadata`. */
@@ -29,12 +27,6 @@ export function messageInfo(message: UIMessage): MessageInfo {
     error: info?.error ?? null,
     errorReason: info?.errorReason ?? null,
   };
-}
-
-/** The curated Models of the Providers the user has credentials for. */
-export function availableModels(credentials: CredentialSummary[]) {
-  const services = new Set(credentials.map((credential) => credential.service));
-  return curatedModels.filter((model) => services.has(model.provider));
 }
 
 /**
