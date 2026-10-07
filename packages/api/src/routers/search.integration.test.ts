@@ -60,6 +60,40 @@ describe("search.query", () => {
     expect(result.nextCursor).toBeNull();
   });
 
+  it("opening a hit on an inactive Branch shows the newest leaf below it", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
+    const hit = await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "An answer about otters",
+      createdAt: at(1),
+    });
+    const followUp = await insertMessage({
+      conversationId: conv.id,
+      parentId: hit.id,
+      role: "user",
+      text: "More please",
+      createdAt: at(2),
+    });
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Another answer",
+      createdAt: at(3),
+      active: true,
+    });
+
+    const [found] = (await client.search.query({ q: "otters" })).hits;
+    await client.conversation.switchBranch({ messageId: found!.messageId });
+
+    const { messages } = await client.conversation.get({ id: conv.id });
+    expect(messages.map((m) => m.id)).toEqual([question.id, hit.id, followUp.id]);
+  });
+
   it("never returns another user's Messages", async () => {
     const { client } = await signedIn();
     const other = await insertUser();

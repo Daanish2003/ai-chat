@@ -1,7 +1,7 @@
 import { Button } from "@ai-chat/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "@tanstack/react-router";
-import { PanelLeftIcon, PencilIcon } from "lucide-react";
+import { PanelLeftIcon, PencilIcon, SearchIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -24,9 +24,12 @@ const pageTitles: Record<string, string> = {
 export function TopBar({
   panelOpen,
   onOpenPanel,
+  onOpenSearch,
 }: {
   panelOpen: boolean;
   onOpenPanel: () => void;
+  /** Opens the ⌘K palette. */
+  onOpenSearch: () => void;
 }) {
   const { id } = useParams({ strict: false });
   const pathname = useLocation({ select: (location) => location.pathname.replace(/\/$/, "") });
@@ -55,6 +58,16 @@ export function TopBar({
         pathname === "/c" && <NewConversationModelPicker />
       )}
       <div className="flex-1" />
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-haspopup="dialog"
+        title="Search (⌘K / Ctrl+K)"
+        onClick={onOpenSearch}
+      >
+        <SearchIcon /> Search
+        <kbd className="border px-1 text-[10px] text-muted-foreground">⌘K</kbd>
+      </Button>
       {id && <ShareButton key={id} conversationId={id} />}
       <UserMenu />
     </header>

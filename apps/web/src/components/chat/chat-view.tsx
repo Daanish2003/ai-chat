@@ -18,6 +18,7 @@ import { orpc } from "@/utils/orpc";
 import { Composer } from "./composer";
 import { MessageRow } from "./message-row";
 import { MissingCredentialsBanner } from "./missing-credentials-banner";
+import { useFocusMessage } from "./use-focus-message";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
 
@@ -27,7 +28,17 @@ export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"
  * A run this page didn't start (the page was reloaded mid-reply) is followed by polling the
  * Active Branch until nothing is `streaming`.
  */
-export function ChatView({ conversation }: { conversation: ConversationData }) {
+export function ChatView({
+  conversation,
+  focusMessageId,
+  onFocused = () => {},
+}: {
+  conversation: ConversationData;
+  /** A search hit to land on: its Branch is shown, then it's scrolled to and highlighted. */
+  focusMessageId?: string;
+  /** Called once `focusMessageId` has been landed on (or couldn't be). */
+  onFocused?: () => void;
+}) {
   const queryClient = useQueryClient();
   // The server writes the new Messages before it streams, so the first chunk means "sent".
   const awaitingFirstChunk = useRef(false);
@@ -123,6 +134,14 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
     }),
   );
 
+  const highlighted = useFocusMessage({
+    target: focusMessageId,
+    onScreen: messages.map((message) => message.id),
+    activeBranch: conversation.messages.map((message) => message.id),
+    switchBranch: (messageId) => switchBranch.mutateAsync({ messageId }),
+    onFocused,
+  });
+
   // A new Conversation arrives here with its first Message still to send.
   const sendPendingFirstMessage = useEffectEvent(() => {
     const text = takePendingFirstMessage(conversation.id);
@@ -138,6 +157,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
             <MessageRow
               key={message.id}
               message={message}
+              highlighted={message.id === highlighted}
               actions={{
                 streaming: streaming || switchBranch.isPending,
                 onEdit: (text) => startBranch(message.id, text),
