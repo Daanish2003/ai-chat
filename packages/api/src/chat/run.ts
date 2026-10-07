@@ -10,6 +10,7 @@ import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps } from "../deps";
 import { createPartsBuilder, searchTextOf } from "./parts";
+import { titleConversation } from "./title";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -95,6 +96,10 @@ export function startRun(
       );
       deps.runs.delete(messageId);
       listener.close();
+      // The run ended `complete`: title its Conversation, fire-and-forget.
+      if (!timedOut && !abortController.signal.aborted && error === undefined) {
+        void titleConversation(deps, messageId);
+      }
     }
   })();
 

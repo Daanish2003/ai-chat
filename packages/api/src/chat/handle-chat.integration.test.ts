@@ -51,6 +51,8 @@ async function setup({
   const conv = await insertConversation(user, {
     model: "openai:gpt-5.6",
     lastMessageAt: new Date(Date.now() - 60_000),
+    // Titled, so no automatic title call takes the scripted adapter (see title.integration.test.ts).
+    title: "Test Conversation",
   });
   const send = (command: Partial<ChatCommand> = {}, as: TestUser | null = user) =>
     handleChat(
