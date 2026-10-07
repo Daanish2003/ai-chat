@@ -7,10 +7,10 @@ import {
   deleteConversation,
   findConversation,
   listConversations,
-  loadPath,
+  loadActiveBranch,
   renameConversation,
   setConversationModel,
-  toClientMessage,
+  switchBranch,
 } from "../chat/store";
 import { addKeyMessage } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
@@ -43,14 +43,31 @@ export const conversationRouter = {
   get: protectedProcedure.input(z.object({ id: z.uuid() })).handler(async ({ context, input }) => {
     const row = await findConversation(context.deps, context.session.user.id, input.id);
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
-    const path = await loadPath(context.deps, row.id, row.activeLeafId);
+    const messages = await loadActiveBranch(context.deps, row.id, row.activeLeafId);
     return {
       id: row.id,
       title: row.title,
       model: row.model,
-      messages: path.map(toClientMessage),
+      messages,
     };
   }),
+
+  /**
+   * Shows the Branch through `messageId`: the newest leaf under it becomes the Active Branch.
+   * Doesn't bump `lastMessageAt`. CONFLICT while a reply is streaming.
+   */
+  switchBranch: protectedProcedure
+    .input(z.object({ messageId: z.uuid() }))
+    .handler(async ({ context, input }) => {
+      const result = await switchBranch(context.deps, context.session.user.id, input.messageId);
+      if (result === "not_found")
+        throw new ORPCError("NOT_FOUND", { message: "Message not found" });
+      if (result === "streaming") {
+        throw new ORPCError("CONFLICT", {
+          message: "A reply is still streaming in this Conversation",
+        });
+      }
+    }),
 
   /** A manual rename from the top bar. Doesn't bump `lastMessageAt`. */
   rename: protectedProcedure

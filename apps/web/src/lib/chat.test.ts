@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  branchFrom,
   describeError,
   messageInfo,
+  messageSiblings,
   takePendingFirstMessage,
   toUIMessages,
   setPendingFirstMessage,
@@ -24,6 +26,7 @@ describe("toUIMessages", () => {
         error: null,
         errorReason: null,
         createdAt,
+        siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
       {
         id: "a",
@@ -35,6 +38,7 @@ describe("toUIMessages", () => {
         error: null,
         errorReason: null,
         createdAt,
+        siblings: { index: 1, count: 2, previousId: "a0", nextId: null },
       },
     ]);
 
@@ -44,14 +48,26 @@ describe("toUIMessages", () => {
         role: "user",
         parts: [{ type: "text", content: "Hi" }],
         createdAt,
-        metadata: { model: null, status: "complete", error: null, errorReason: null },
+        metadata: {
+          model: null,
+          status: "complete",
+          error: null,
+          errorReason: null,
+          siblings: { index: 0, count: 1, previousId: null, nextId: null },
+        },
       },
       {
         id: "a",
         role: "assistant",
         parts: [{ type: "text", content: "Hello" }],
         createdAt,
-        metadata: { model: "openai:gpt-5.6", status: "streaming", error: null, errorReason: null },
+        metadata: {
+          model: "openai:gpt-5.6",
+          status: "streaming",
+          error: null,
+          errorReason: null,
+          siblings: { index: 1, count: 2, previousId: "a0", nextId: null },
+        },
       },
     ]);
     expect(messageInfo(messages[1]!)).toEqual({
@@ -69,6 +85,68 @@ describe("toUIMessages", () => {
       error: null,
       errorReason: null,
     });
+  });
+});
+
+describe("messageSiblings", () => {
+  it("reads where the Message sits among its siblings", () => {
+    const [, reply] = toUIMessages([
+      {
+        id: "q",
+        parentId: null,
+        role: "user",
+        parts: [],
+        model: null,
+        status: "complete",
+        error: null,
+        errorReason: null,
+        createdAt,
+        siblings: { index: 0, count: 1, previousId: null, nextId: null },
+      },
+      {
+        id: "a",
+        parentId: "q",
+        role: "assistant",
+        parts: [],
+        model: null,
+        status: "complete",
+        error: null,
+        errorReason: null,
+        createdAt,
+        siblings: { index: 0, count: 3, previousId: null, nextId: "a2" },
+      },
+    ]);
+    expect(messageSiblings(reply!)).toEqual({ index: 0, count: 3, previousId: null, nextId: "a2" });
+  });
+
+  it("is 1 of 1 for a message useChat is streaming", () => {
+    expect(messageSiblings({ id: "x", role: "assistant", parts: [] })).toEqual({
+      index: 0,
+      count: 1,
+      previousId: null,
+      nextId: null,
+    });
+  });
+});
+
+describe("branchFrom", () => {
+  const shown = [
+    { id: "q1", role: "user" as const, parts: [] },
+    { id: "a1", role: "assistant" as const, parts: [] },
+    { id: "q2", role: "user" as const, parts: [] },
+    { id: "a2", role: "assistant" as const, parts: [] },
+  ];
+
+  it("edits a Message under the same parent as the original, keeping what came before", () => {
+    expect(branchFrom(shown, "q2")).toEqual({ parentId: "a1", history: shown.slice(0, 2) });
+  });
+
+  it("edits the first Message into a new root", () => {
+    expect(branchFrom(shown, "q1")).toEqual({ parentId: null, history: [] });
+  });
+
+  it("regenerates a reply under the Message it answered", () => {
+    expect(branchFrom(shown, "a2")).toEqual({ parentId: "q2", history: shown.slice(0, 3) });
   });
 });
 

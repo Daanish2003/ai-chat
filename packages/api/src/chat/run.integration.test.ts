@@ -17,17 +17,21 @@ describe("sweepInterruptedRuns", () => {
     const user = await insertUser();
     const first = await insertConversation(user);
     const second = await insertConversation(await insertUser());
+    // Before boot by the host's clock; the database's default `createdAt` can run ahead of it.
+    const createdAt = new Date(Date.now() - 60_000);
     const half = await insertMessage({
       conversationId: first.id,
       role: "assistant",
       text: "Half",
       status: "streaming",
+      createdAt,
     });
     const empty = await insertMessage({
       conversationId: second.id,
       role: "assistant",
       text: "",
       status: "streaming",
+      createdAt,
     });
 
     await sweepInterruptedRuns(createTestDeps());
