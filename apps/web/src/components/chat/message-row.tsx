@@ -60,10 +60,13 @@ export function MessageRow({
   message,
   userLabel = "You",
   actions,
+  highlighted = false,
 }: {
   message: UIMessage;
   userLabel?: string;
   actions?: MessageActions;
+  /** Marks the row as the search hit just opened. */
+  highlighted?: boolean;
 }) {
   const info = messageInfo(message);
   const text = plainText(message);
@@ -74,9 +77,11 @@ export function MessageRow({
 
   return (
     <div
+      data-message-id={message.id}
       className={cn(
-        "group relative flex gap-3 border-b border-border/50 px-6 py-4",
+        "group relative flex gap-3 border-b border-border/50 px-6 py-4 transition-colors duration-500",
         isUser && "bg-muted/30",
+        highlighted && "bg-primary/10 ring-1 ring-primary/40 ring-inset",
       )}
     >
       <div

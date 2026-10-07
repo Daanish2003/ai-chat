@@ -7,12 +7,14 @@ import { type ReactNode, useState } from "react";
 
 import { orpc } from "@/utils/orpc";
 
+import { CommandPalette } from "./command-palette";
 import { ConversationPanel } from "./conversation-panel";
 import { TopBar } from "./top-bar";
 
 /** The signed-in layout: icon rail, collapsible Conversation panel, top bar, then the page. */
 export function AppShell({ children }: { children: ReactNode }) {
   const [panelOpen, setPanelOpen] = useState(true);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const models = useQuery(orpc.models.list.queryOptions());
   const noCredentials = models.data?.models.length === 0;
 
@@ -49,13 +51,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             <PlusIcon />
           </Link>
         )}
-        {/* The ⌘K palette replaces this placeholder. */}
         <Button
           variant="ghost"
           size="icon"
-          title="Search (coming soon)"
+          title="Search (⌘K / Ctrl+K)"
           aria-label="Search"
-          disabled
+          aria-haspopup="dialog"
+          onClick={() => setPaletteOpen(true)}
         >
           <SearchIcon />
         </Button>
@@ -85,9 +87,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       {panelOpen && <ConversationPanel />}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar panelOpen={panelOpen} onOpenPanel={() => setPanelOpen(true)} />
+        <TopBar
+          panelOpen={panelOpen}
+          onOpenPanel={() => setPanelOpen(true)}
+          onOpenSearch={() => setPaletteOpen(true)}
+        />
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
       </div>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }
