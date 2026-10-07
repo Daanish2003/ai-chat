@@ -1,6 +1,4 @@
-import { curatedModels } from "@ai-chat/api/chat/models";
 import type { ClientMessage } from "@ai-chat/api/chat/store";
-import type { CredentialSummary } from "@ai-chat/api/credentials/store";
 import type { UIMessage } from "@tanstack/ai-react";
 
 /** What the server knows about a Message beyond its parts, kept in `UIMessage.metadata`. */
@@ -57,12 +55,6 @@ export function describeError({ error, errorReason }: MessageInfo) {
         ? "The reply was interrupted by a server restart."
         : (error ?? "Something went wrong.");
   return { text, keySettings: false };
-}
-
-/** The curated Models of the Providers the user has credentials for. */
-export function availableModels(credentials: CredentialSummary[]) {
-  const services = new Set(credentials.map((credential) => credential.service));
-  return curatedModels.filter((model) => services.has(model.provider));
 }
 
 /**

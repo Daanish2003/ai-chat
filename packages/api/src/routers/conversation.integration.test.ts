@@ -3,8 +3,12 @@ import { getTestDb } from "@ai-chat/db/testing/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
+import { handleChat } from "../chat/handle-chat";
+import { saveCredentials } from "../credentials/store";
 import { insertConversation, insertMessage } from "../testing/conversations";
-import { createTestClient, insertUser } from "../testing/router-client";
+import { createTestDeps } from "../testing/deps";
+import { createFakeAdapter, round, text } from "../testing/fake-adapter";
+import { createTestClient, insertUser, sessionFor } from "../testing/router-client";
 
 async function signedIn() {
   const user = await insertUser();
@@ -281,5 +285,133 @@ describe("conversation.delete", () => {
     await expect(client.conversation.delete({ id })).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
+  });
+});
+
+describe("conversation.setModel", () => {
+  async function withCredentials() {
+    const { user, client } = await signedIn();
+    for (const service of ["anthropic", "openai"] as const) {
+      await saveCredentials(createTestDeps(), user.id, {
+        service,
+        fields: { apiKey: `${service}-test-key` },
+        hint: "…-key",
+        verified: true,
+      });
+    }
+    return { user, client };
+  }
+
+  it("selects another Model without moving the Conversation in the list", async () => {
+    const { user, client } = await withCredentials();
+    const conv = await insertConversation(user, { model: "anthropic:claude-sonnet-5-5" });
+
+    await client.conversation.setModel({ id: conv.id, model: "openai:gpt-6-luna" });
+
+    await expect(client.conversation.get({ id: conv.id })).resolves.toMatchObject({
+      model: "openai:gpt-6-luna",
+    });
+    const [listed] = await client.conversation.list();
+    expect(listed).toMatchObject({ model: "openai:gpt-6-luna", lastMessageAt: conv.lastMessageAt });
+  });
+
+  it("refuses a Model that isn't available", async () => {
+    const { user, client } = await withCredentials();
+    const conv = await insertConversation(user);
+
+    await expect(
+      client.conversation.setModel({ id: conv.id, model: "openai:gpt-2" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("refuses a Model whose Provider the user has no credentials for", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+
+    await expect(
+      client.conversation.setModel({ id: conv.id, model: "openai:gpt-5.6" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(client.conversation.get({ id: conv.id })).resolves.toMatchObject({
+      model: conv.model,
+    });
+  });
+
+  it("can't change another user's Conversation, whatever the Model", async () => {
+    const { client } = await signedIn();
+    const conv = await insertConversation(await insertUser());
+
+    await expect(
+      client.conversation.setModel({ id: conv.id, model: "openai:gpt-5.6" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("rejects signed-out callers", async () => {
+    const conv = await insertConversation(await insertUser());
+
+    await expect(
+      createTestClient().conversation.setModel({ id: conv.id, model: "openai:gpt-5.6" }),
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("switches Model mid-Conversation: the next reply is written by the newly selected Model", async () => {
+    const user = await insertUser();
+    const fake = createFakeAdapter({
+      rounds: [round(text("From Claude")), round(text("From GPT"))],
+    });
+    const adapterModels: string[] = [];
+    const deps = createTestDeps({
+      adapterFor: (model) => {
+        adapterModels.push(model);
+        return fake.adapter;
+      },
+    });
+    for (const service of ["anthropic", "openai"] as const) {
+      await saveCredentials(deps, user.id, {
+        service,
+        fields: { apiKey: `${service}-test-key` },
+        hint: "…-key",
+        verified: true,
+      });
+    }
+    const client = createTestClient({ user, deps });
+    // What the client does: send with the Conversation's selected Model, continuing the Active Branch.
+    const sendNext = async (text: string) => {
+      const current = await client.conversation.get({ id });
+      const response = await handleChat(
+        new Request("http://localhost/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [],
+            forwardedProps: {
+              conversationId: id,
+              parentId: current.messages.at(-1)?.id ?? null,
+              text,
+              attachmentIds: [],
+              model: current.model,
+              webSearch: false,
+            },
+          }),
+        }),
+        sessionFor(user),
+        deps,
+      );
+      await response.text();
+    };
+    const { id } = await client.conversation.create({ model: "anthropic:claude-sonnet-5-5" });
+
+    await sendNext("First question");
+    await client.conversation.setModel({ id, model: "openai:gpt-5.6" });
+    await sendNext("Second question");
+
+    const result = await client.conversation.get({ id });
+    expect(adapterModels).toEqual(["anthropic:claude-sonnet-5-5", "openai:gpt-5.6"]);
+    expect(result.model).toBe("openai:gpt-5.6");
+    expect(result.messages.map((m) => [m.role, m.model, m.parts])).toEqual([
+      ["user", null, [{ type: "text", content: "First question" }]],
+      ["assistant", "anthropic:claude-sonnet-5-5", [{ type: "text", content: "From Claude" }]],
+      ["user", null, [{ type: "text", content: "Second question" }]],
+      ["assistant", "openai:gpt-5.6", [{ type: "text", content: "From GPT" }]],
+    ]);
   });
 });

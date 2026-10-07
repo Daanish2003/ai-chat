@@ -3,7 +3,7 @@ import { Button } from "@ai-chat/ui/components/button";
 import { Input } from "@ai-chat/ui/components/input";
 import { Label } from "@ai-chat/ui/components/label";
 import { cn } from "@ai-chat/ui/lib/utils";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -72,7 +72,7 @@ function ProviderRowItem({
   const queryClient = useQueryClient();
   const remove = useMutation(
     orpc.credentials.delete.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: orpc.credentials.key() }),
+      onSuccess: () => invalidateCredentials(queryClient),
       onError: (error) => toast.error(error.message),
     }),
   );
@@ -133,6 +133,14 @@ function ProviderRowItem({
   );
 }
 
+/** Saved or deleted credentials change the Key settings rows and which Models can be picked. */
+function invalidateCredentials(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: orpc.credentials.key() }),
+    queryClient.invalidateQueries({ queryKey: orpc.models.key() }),
+  ]);
+}
+
 function CredentialForm({ service, onDone }: { service: CredentialService; onDone: () => void }) {
   const form = credentialForms[service];
   const queryClient = useQueryClient();
@@ -142,7 +150,7 @@ function CredentialForm({ service, onDone }: { service: CredentialService; onDon
   const save = useMutation(
     orpc.credentials.save.mutationOptions({
       onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: orpc.credentials.key() });
+        await invalidateCredentials(queryClient);
         toast.success("Credentials checked and saved");
         onDone();
       },

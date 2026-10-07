@@ -11,10 +11,12 @@ import { toast } from "sonner";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
+import { missingCredentialsMessage } from "@/lib/models";
 import { orpc } from "@/utils/orpc";
 
 import { Composer } from "./composer";
 import { MessageRow } from "./message-row";
+import { MissingCredentialsBanner } from "./missing-credentials-banner";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
 
@@ -66,6 +68,12 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
     if (running) await stopRun.mutateAsync({ messageId: running.id });
   };
 
+  // The selected Model's Provider may have lost its credentials; the server re-checks on send.
+  const models = useQuery(orpc.models.list.queryOptions());
+  const blocked = models.data
+    ? missingCredentialsMessage(conversation.model, models.data.models)
+    : null;
+
   const send = async (text: string) => {
     setSending(true);
     awaitingFirstChunk.current = true;
@@ -116,6 +124,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
             {error.message}
           </p>
         )}
+        {blocked && <MissingCredentialsBanner message={blocked} />}
         <Composer
           onSend={(text) => void send(text)}
           onStop={
@@ -125,6 +134,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
                   stop().catch((caught: Error) => toast.error(`Stopping failed: ${caught.message}`))
           }
           streaming={streaming}
+          disabled={!!blocked}
         />
       </div>
     </div>

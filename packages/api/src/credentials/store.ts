@@ -27,11 +27,14 @@ export async function loadCredentials(
   return decryptCredentials(row.encrypted, encryptionOptions(deps, userId, service));
 }
 
-/** Hints of the user's credentials. Rows that no longer decrypt count as missing and are left out. */
+/**
+ * Hints of the user's credentials, in the order they were first added. Rows that no longer
+ * decrypt count as missing and are left out.
+ */
 export async function listCredentials(deps: Deps, userId: string): Promise<CredentialSummary[]> {
   const rows = await deps.db.query.userCredentials.findMany({
     where: { userId },
-    orderBy: { service: "asc" },
+    orderBy: { createdAt: "asc", service: "asc" },
   });
   return rows
     .filter((row) =>

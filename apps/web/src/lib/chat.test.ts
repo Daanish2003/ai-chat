@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  availableModels,
   describeError,
   messageInfo,
   takePendingFirstMessage,
@@ -120,19 +119,6 @@ describe("describeError", () => {
     expect(describeError(info({ error: "interrupted" })).text).toBe(
       "The reply was interrupted by a server restart.",
     );
-  });
-});
-
-describe("availableModels", () => {
-  it("offers only the Models of Providers the user has credentials for", () => {
-    const models = availableModels([{ service: "openai", hint: "…abcd", verified: true }]);
-
-    expect(models.length).toBeGreaterThan(0);
-    expect(models.every((model) => model.provider === "openai")).toBe(true);
-  });
-
-  it("offers nothing without credentials", () => {
-    expect(availableModels([])).toEqual([]);
   });
 });
 

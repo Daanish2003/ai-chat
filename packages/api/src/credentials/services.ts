@@ -69,6 +69,12 @@ export function providerLabel(service: string) {
   return providers.find((provider) => provider.id === service)?.label ?? service;
 }
 
+/** Why a Model can't be used: its Provider has no credentials. */
+export function addKeyMessage(service: string) {
+  const label = providerLabel(service);
+  return `Add ${/^[aeiou]/i.test(label) ? "an" : "a"} ${label} key or pick another Model`;
+}
+
 /** The masked hint the client sees instead of the key, e.g. "…abcd". */
 export function credentialHint(fields: { apiKey: string }) {
   return `…${fields.apiKey.slice(-4)}`;

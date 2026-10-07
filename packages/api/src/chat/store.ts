@@ -28,6 +28,16 @@ export async function renameConversation(deps: Deps, userId: string, id: string,
   return rows.length > 0;
 }
 
+/** Selects the user's Conversation's Model; `false` when it isn't theirs. Doesn't bump `lastMessageAt`. */
+export async function setConversationModel(deps: Deps, userId: string, id: string, model: string) {
+  const rows = await deps.db
+    .update(conversation)
+    .set({ model })
+    .where(ownConversation(userId, id))
+    .returning({ id: conversation.id });
+  return rows.length > 0;
+}
+
 /** Deletes the user's Conversation and, by cascade, its Messages; `false` when it isn't theirs. */
 export async function deleteConversation(deps: Deps, userId: string, id: string) {
   const rows = await deps.db

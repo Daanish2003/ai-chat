@@ -5,7 +5,7 @@ import { toServerSentEventsResponse } from "@tanstack/ai";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { providerLabel } from "../credentials/services";
+import { addKeyMessage } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
@@ -59,9 +59,7 @@ export async function handleChat(
   const model = findModel(command.model);
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const credentials = await loadCredentials(deps, userId, model.provider);
-  if (!credentials) {
-    return refuse(400, `Add an ${providerLabel(model.provider)} key or pick another Model`);
-  }
+  if (!credentials) return refuse(400, addKeyMessage(model.provider));
 
   const history = await loadPath(deps, owned.id, command.parentId);
   if (command.parentId && history.length === 0) {

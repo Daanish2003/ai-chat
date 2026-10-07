@@ -9,8 +9,11 @@ import {
   listConversations,
   loadPath,
   renameConversation,
+  setConversationModel,
   toClientMessage,
 } from "../chat/store";
+import { addKeyMessage } from "../credentials/services";
+import { loadCredentials } from "../credentials/store";
 import { protectedProcedure } from "../index";
 import { uuidv7 } from "../lib/uuidv7";
 
@@ -60,6 +63,27 @@ export const conversationRouter = {
         input.title,
       );
       if (!renamed) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }),
+
+  /** Selects the Model the next Message and regenerate use. Doesn't bump `lastMessageAt`. */
+  setModel: protectedProcedure
+    .input(z.object({ id: z.uuid(), model: z.string() }))
+    .handler(async ({ context, input }) => {
+      const userId = context.session.user.id;
+      if (!(await findConversation(context.deps, userId, input.id))) {
+        throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+      }
+      const model = findModel(input.model);
+      if (!model) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `"${input.model}" is not an available Model`,
+        });
+      }
+      if (!(await loadCredentials(context.deps, userId, model.provider))) {
+        throw new ORPCError("BAD_REQUEST", { message: addKeyMessage(model.provider) });
+      }
+      const updated = await setConversationModel(context.deps, userId, input.id, model.id);
+      if (!updated) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
     }),
 
   /** Deletes the Conversation for good; its Messages go with it (cascade). */
