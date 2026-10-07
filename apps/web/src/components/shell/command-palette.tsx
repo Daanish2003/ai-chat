@@ -1,3 +1,4 @@
+import { minSearchLength } from "@ai-chat/api/search/text";
 import { Dialog, DialogContent, DialogTitle } from "@ai-chat/ui/components/dialog";
 import { cn } from "@ai-chat/ui/lib/utils";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -115,10 +116,13 @@ function PaletteBody({
       input: (cursor: string | undefined) => ({ q: searched, cursor }),
       initialPageParam: undefined,
       getNextPageParam: (page) => page.nextCursor ?? undefined,
-      enabled: searched.length >= 2,
+      enabled: searched.length >= minSearchLength,
     }),
   );
-  const hits = searched.length >= 2 ? (search.data?.pages.flatMap((page) => page.hits) ?? []) : [];
+  const hits =
+    searched.length >= minSearchLength
+      ? (search.data?.pages.flatMap((page) => page.hits) ?? [])
+      : [];
 
   const recent: Item[] = recentConversations(conversations.data ?? [], q).map((c) => ({
     key: `conversation:${c.id}`,
@@ -128,6 +132,12 @@ function PaletteBody({
     hint: relativeTime(c.lastMessageAt),
     run: () => void navigate({ to: "/c/$id", params: { id: c.id } }),
   }));
+  const openHit = (hit: SearchHit) =>
+    navigate({
+      to: "/c/$id",
+      params: { id: hit.conversationId },
+      search: { message: hit.messageId },
+    });
 
   const inMessages: Item[] = hits.map((hit) => ({
     key: `message:${hit.messageId}`,
@@ -150,13 +160,6 @@ function PaletteBody({
       },
     });
   }
-
-  const openHit = (hit: SearchHit) =>
-    navigate({
-      to: "/c/$id",
-      params: { id: hit.conversationId },
-      search: { message: hit.messageId },
-    });
 
   const commands: Item[] = [
     {
@@ -220,7 +223,7 @@ function PaletteBody({
     return <RenameInput conversation={current} onDone={onClose} />;
   }
 
-  const searching = searched.length >= 2 && search.isPending;
+  const searching = searched.length >= minSearchLength && search.isPending;
   return (
     <>
       <input

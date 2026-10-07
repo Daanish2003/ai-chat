@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import { decodeCursor, searchMessages } from "../search/query";
+import { minSearchLength } from "../search/text";
 
 export const searchRouter = {
   /**
@@ -10,7 +11,12 @@ export const searchRouter = {
    * newest first, in pages of 50. Pass the previous page's `nextCursor` for the next one.
    */
   query: protectedProcedure
-    .input(z.object({ q: z.string().trim().min(2).max(200), cursor: z.string().optional() }))
+    .input(
+      z.object({
+        q: z.string().trim().min(minSearchLength).max(200),
+        cursor: z.string().optional(),
+      }),
+    )
     .handler(({ context, input }) => {
       const cursor = input.cursor === undefined ? undefined : decodeCursor(input.cursor);
       if (input.cursor !== undefined && !cursor) {

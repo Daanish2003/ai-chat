@@ -1,3 +1,6 @@
+/** The shortest query `search.query` accepts, and the palette sends. */
+export const minSearchLength = 2;
+
 /** Escapes `\`, `%` and `_` so user input matches literally inside a `LIKE`/`ILIKE` pattern. */
 export function escapeLike(input: string) {
   return input.replace(/[\\%_]/g, (char) => `\\${char}`);
