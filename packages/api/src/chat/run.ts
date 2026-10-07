@@ -1,3 +1,4 @@
+import { storedPartsSchema } from "@ai-chat/db/message-parts";
 import { message } from "@ai-chat/db/schema/chat";
 import {
   type AnyTextAdapter,
@@ -9,7 +10,7 @@ import {
 import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
-import { cancelRunningSearches, createPartsBuilder, parseStoredParts, searchTextOf } from "./parts";
+import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "./parts";
 import { createWebSearchTool } from "./web-search-tool";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
@@ -244,9 +245,16 @@ export async function sweepInterruptedRuns(deps: Pick<AppDeps, "db">, bootedAt =
     .where(and(eq(message.status, "streaming"), lt(message.createdAt, bootedAt)))
     .returning({ id: message.id, parts: message.parts });
   for (const row of swept) {
-    const parts = parseStoredParts(row.parts);
-    const closed = cancelRunningSearches(parts);
-    if (JSON.stringify(closed) === JSON.stringify(parts)) continue;
-    await deps.db.update(message).set({ parts: closed }).where(eq(message.id, row.id));
+    // A row that doesn't parse holds no running search, and mustn't stop the sweep.
+    const parsed = storedPartsSchema.safeParse(row.parts);
+    if (!parsed.success) continue;
+    const running = parsed.data.parts.some(
+      (part) => part.type === "web_search" && part.state === "running",
+    );
+    if (!running) continue;
+    await deps.db
+      .update(message)
+      .set({ parts: cancelRunningSearches(parsed.data) })
+      .where(eq(message.id, row.id));
   }
 }

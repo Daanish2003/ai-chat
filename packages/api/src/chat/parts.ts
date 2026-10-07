@@ -14,12 +14,7 @@ import {
 } from "@tanstack/ai";
 
 import type { SearchErrorReason, SearchResult } from "../deps";
-import {
-  searchErrorMessages,
-  searchLimitError,
-  type WebSearchOutput,
-  webSearchToolName,
-} from "./web-search";
+import { searchErrorMessages, type WebSearchOutput, webSearchToolName } from "./web-search";
 
 /**
  * The one boundary between stored Message parts (our versioned zod shape, ADR 0001) and
@@ -109,9 +104,9 @@ const finished = (part: WebSearchPart) => part.state === "done" || part.state ==
 
 /** What the Model read as the result of a finished search. */
 function searchOutput(part: WebSearchPart): WebSearchOutput {
-  return part.state === "error"
-    ? { error: searchErrorMessages[part.errorReason ?? "failed"] }
-    : { results: part.results };
+  if (part.state !== "error") return { results: part.results };
+  const reason = part.errorReason ?? "failed";
+  return { error: searchErrorMessages[reason], reason };
 }
 
 /** A finished search as text, for a request that doesn't offer the `web_search` tool. */
@@ -216,41 +211,6 @@ export function toUIParts(parts: StoredParts): MessagePart[] {
       ...(finished(part) && { output: searchOutput(part) }),
     };
   });
-}
-
-/**
- * The search a `useChat` part shows, whether it streamed in or came from `toUIParts`; `null`
- * for any other part, and for a call over the per-reply limit (it never searched).
- */
-export function webSearchOf(part: MessagePart): WebSearchPart | null {
-  if (part.type !== "tool-call" || part.name !== webSearchToolName) return null;
-  const output = part.output as Partial<{ results: SearchResult[]; error: string }> | undefined;
-  if (output?.error === searchLimitError) return null;
-
-  const search = { type: "web_search", toolCallId: part.id, query: queryOf(part) } as const;
-  if (Array.isArray(output?.results)) {
-    return { ...search, state: "done", results: output.results };
-  }
-  if (typeof output?.error === "string") {
-    const reason = (Object.keys(searchErrorMessages) as SearchErrorReason[]).find(
-      (key) => searchErrorMessages[key] === output.error,
-    );
-    return { ...search, state: "error", results: [], errorReason: reason ?? "failed" };
-  }
-  return { ...search, state: part.state === "error" ? "cancelled" : "running", results: [] };
-}
-
-function queryOf(part: Extract<MessagePart, { type: "tool-call" }>): string {
-  const input = (part.input ?? safeParse(part.arguments)) as { query?: unknown } | undefined;
-  return typeof input?.query === "string" ? input.query : "";
-}
-
-function safeParse(json: string): unknown {
-  try {
-    return JSON.parse(json);
-  } catch {
-    return undefined;
-  }
 }
 
 /** The plain text `message.searchText` holds: the text parts only. */

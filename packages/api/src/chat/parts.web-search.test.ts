@@ -9,8 +9,8 @@ import {
   searchTextOf,
   toModelMessages,
   toUIParts,
-  webSearchOf,
 } from "./parts";
+import { webSearchOf } from "./web-search";
 
 const result = (n: number) => ({
   title: `Result ${n}`,
@@ -139,7 +139,7 @@ describe("web searches to TanStack AI", () => {
       {
         role: "tool",
         toolCallId: "call-2",
-        content: JSON.stringify({ error: "Tavily rejected the API key" }),
+        content: JSON.stringify({ error: "Tavily rejected the API key", reason: "invalid_key" }),
       },
       { role: "assistant", content: "Lazy tools." },
     ]);
@@ -214,7 +214,11 @@ describe("web searches to TanStack AI", () => {
       output: { error: "search limit reached" },
     };
 
-    expect(webSearchOf(streaming)).toEqual(search({ query: "", state: "running", results: [] }));
+    const asked: MessagePart = { ...streaming, arguments: '{"query":"tanstack ai"}' };
+
+    // Not a search until its query has streamed in.
+    expect(webSearchOf(streaming)).toBeNull();
+    expect(webSearchOf(asked)).toEqual(search({ state: "running", results: [] }));
     // The 4th call never searched, so it isn't a search.
     expect(webSearchOf(limited)).toBeNull();
     expect(webSearchOf({ type: "text", content: "Hi" })).toBeNull();

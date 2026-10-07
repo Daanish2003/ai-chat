@@ -37,7 +37,7 @@ export function SearchToggle({ search }: { search: ReturnType<typeof useWebSearc
           if (search.available) search.setOn(!search.on);
         }}
         className={cn(
-          "inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs",
+          "inline-flex h-8 items-center gap-1 rounded-full px-2.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring",
           search.enabled ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-muted",
           !search.available && "cursor-not-allowed opacity-50 hover:bg-transparent",
         )}

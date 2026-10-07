@@ -125,6 +125,19 @@ describe("Tavily search client", () => {
     }
   });
 
+  it("gives up on a search Tavily doesn't answer in time, as reason failed", async () => {
+    const hanging = (async (_input: string | URL | Request, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      })) as typeof globalThis.fetch;
+
+    const error = await createTavilyClient(hanging, { timeoutMs: 20 })
+      .search("q", { apiKey: "tvly-test" })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toMatchObject({ name: "SearchError", reason: "failed" });
+  });
+
   it("passes the abort signal on to fetch", async () => {
     const { fetch, calls } = stubFetch(Response.json(tavilyResponse));
     const controller = new AbortController();

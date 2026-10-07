@@ -19,11 +19,16 @@ const tavilyResponseSchema = z.object({
 /**
  * Tavily's `/search` (basic depth) through `fetch`, with the user's Tool credential. HTTP
  * statuses become a `SearchError` reason: 401/403 a rejected key, 432/433 a used-up plan or
- * pay-as-you-go limit, anything else (and a network failure) `failed`.
+ * pay-as-you-go limit, anything else (a network failure, no answer within `timeoutMs`) `failed`.
  */
-export function createTavilyClient(fetch: typeof globalThis.fetch): SearchClient {
+export function createTavilyClient(
+  fetch: typeof globalThis.fetch,
+  { timeoutMs = 15_000 }: { timeoutMs?: number } = {},
+): SearchClient {
   return {
     async search(query, credentials, options) {
+      const timeout = AbortSignal.timeout(timeoutMs);
+      const signal = options?.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
       let response: Response;
       try {
         response = await fetch("https://api.tavily.com/search", {
@@ -33,7 +38,7 @@ export function createTavilyClient(fetch: typeof globalThis.fetch): SearchClient
             "content-type": "application/json",
           },
           body: JSON.stringify({ query, search_depth: "basic", max_results: maxSearchResults }),
-          signal: options?.signal,
+          signal,
         });
       } catch (caught) {
         throw new SearchError("failed", `Couldn't reach Tavily: ${String(caught)}`);

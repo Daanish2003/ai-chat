@@ -40,9 +40,11 @@ export function createWebSearchTool({
 }) {
   let searches = 0;
   return webSearchDefinition.server(async ({ query }, context): Promise<WebSearchOutput> => {
+    // TanStack AI passes the call's id to every server tool; the stored part is keyed by it.
+    const toolCallId = context?.toolCallId;
+    if (!toolCallId) throw new Error("web_search was called without a tool call id");
     if (searches >= maxSearchesPerReply) return { error: searchLimitError };
     searches++;
-    const toolCallId = context?.toolCallId ?? `${webSearchToolName}-${searches}`;
     parts.startSearch(toolCallId, query);
     onChange();
     try {
@@ -56,7 +58,7 @@ export function createWebSearchTool({
       if (context?.abortSignal?.aborted) throw caught;
       const errorReason = caught instanceof SearchError ? caught.reason : "failed";
       parts.finishSearch(toolCallId, { errorReason });
-      return { error: searchErrorMessages[errorReason] };
+      return { error: searchErrorMessages[errorReason], reason: errorReason };
     } finally {
       onChange();
     }

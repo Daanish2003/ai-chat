@@ -184,7 +184,7 @@ describe("the web_search tool", () => {
 
     expect(fake.calls[1]!.messages.at(-1)).toMatchObject({
       role: "tool",
-      content: JSON.stringify({ error: "Tavily rejected the API key" }),
+      content: JSON.stringify({ error: "Tavily rejected the API key", reason: "invalid_key" }),
     });
     expect(await replyOf(deps, conv.id)).toMatchObject({
       status: "complete",
@@ -306,6 +306,23 @@ describe("the web_search tool is not offered", () => {
 });
 
 describe("sweepInterruptedRuns", () => {
+  it("still sweeps a reply whose stored parts don't parse", async () => {
+    const conv = await insertConversation(await insertUser());
+    const row = await insertMessage({
+      conversationId: conv.id,
+      role: "assistant",
+      text: "",
+      status: "streaming",
+      createdAt: new Date(Date.now() - 60_000),
+      parts: { schemaVersion: 99 } as never,
+    });
+
+    await sweepInterruptedRuns(createTestDeps());
+
+    const [after] = await createTestDeps().db.select().from(message).where(eq(message.id, row.id));
+    expect(after).toMatchObject({ status: "error", error: "interrupted" });
+  });
+
   it("closes a search still running in an interrupted reply as cancelled", async () => {
     const conv = await insertConversation(await insertUser());
     const row = await insertMessage({
