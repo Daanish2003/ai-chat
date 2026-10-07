@@ -12,6 +12,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { TitleModelSelect } from "@/components/settings/title-model-select";
 import { type ProviderRow, type ProviderRowStatus, providerRows } from "@/lib/key-settings";
 import { orpc } from "@/utils/orpc";
 
@@ -49,6 +50,8 @@ function KeySettings() {
           ))}
         </ul>
       </section>
+
+      <TitleModelSelect />
     </main>
   );
 }

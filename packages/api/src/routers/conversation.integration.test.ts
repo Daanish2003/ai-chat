@@ -412,6 +412,8 @@ describe("conversation.setModel", () => {
       await response.text();
     };
     const { id } = await client.conversation.create({ model: "anthropic:claude-sonnet-5-5" });
+    // Titled, so no automatic title call takes the scripted adapter.
+    await client.conversation.rename({ id, title: "Switching Models" });
 
     await sendNext("First question");
     await client.conversation.setModel({ id, model: "openai:gpt-5.6" });
