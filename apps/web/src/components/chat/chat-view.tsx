@@ -12,11 +12,13 @@ import { toast } from "sonner";
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
 import { missingCredentialsMessage } from "@/lib/models";
+import { readSearchPreference } from "@/lib/web-search";
 import { orpc } from "@/utils/orpc";
 
 import { Composer } from "./composer";
 import { MessageRow } from "./message-row";
 import { MissingCredentialsBanner } from "./missing-credentials-banner";
+import { SearchToggle, useWebSearch } from "./search-toggle";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
 
@@ -73,6 +75,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
   const blocked = models.data
     ? missingCredentialsMessage(conversation.model, models.data.models)
     : null;
+  const search = useWebSearch(conversation.model);
 
   const send = async (text: string) => {
     setSending(true);
@@ -85,7 +88,8 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
           text,
           attachmentIds: [],
           model: conversation.model,
-          webSearch: false,
+          // Read now: a first Message is sent on mount, before the toggle's state has loaded.
+          webSearch: search.available && readSearchPreference(),
         },
       });
     } finally {
@@ -135,7 +139,9 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
           }
           streaming={streaming}
           disabled={!!blocked}
-        />
+        >
+          <SearchToggle search={search} />
+        </Composer>
       </div>
     </div>
   );

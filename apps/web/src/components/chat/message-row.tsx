@@ -1,4 +1,5 @@
 import { findModel } from "@ai-chat/api/chat/models";
+import { webSearchOf } from "@ai-chat/api/chat/parts";
 import { Loader } from "@ai-chat/ui/components/prompt-kit/loader";
 import { Markdown } from "@ai-chat/ui/components/prompt-kit/markdown";
 import { SystemMessage } from "@ai-chat/ui/components/prompt-kit/system-message";
@@ -8,6 +9,8 @@ import { Link } from "@tanstack/react-router";
 import { BotIcon, UserIcon } from "lucide-react";
 
 import { describeError, messageInfo, type MessageInfo } from "@/lib/chat";
+
+import { SearchRow } from "./search-row";
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
@@ -52,10 +55,10 @@ export function MessageRow({ message }: { message: UIMessage }) {
           <p className="max-w-[80ch] text-sm whitespace-pre-wrap">{text}</p>
         ) : (
           <>
-            {text && (
-              <Markdown className="prose prose-sm max-w-[80ch] dark:prose-invert">{text}</Markdown>
+            <AssistantParts parts={message.parts} />
+            {info.status === "streaming" && !text && !message.parts.some(webSearchOf) && (
+              <Loader variant="typing" size="sm" />
             )}
-            {info.status === "streaming" && !text && <Loader variant="typing" size="sm" />}
             {info.status === "stopped" && (
               <span className="text-xs text-muted-foreground italic">Stopped</span>
             )}
@@ -65,6 +68,21 @@ export function MessageRow({ message }: { message: UIMessage }) {
       </div>
     </div>
   );
+}
+
+/** A reply's text and web searches, in stream order. */
+function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
+  return parts.map((part, index) => {
+    if (part.type === "text") {
+      return part.content ? (
+        <Markdown key={index} className="prose prose-sm max-w-[80ch] dark:prose-invert">
+          {part.content}
+        </Markdown>
+      ) : null;
+    }
+    const search = webSearchOf(part);
+    return search ? <SearchRow key={search.toolCallId} search={search} /> : null;
+  });
 }
 
 /** Why the reply ended in `error`, with a way to fix a rejected key. */
