@@ -11,6 +11,7 @@ import {
 import { Composer } from "@/components/chat/composer";
 import { MissingCredentialsBanner } from "@/components/chat/missing-credentials-banner";
 import { NoCredentials } from "@/components/chat/no-credentials";
+import { SearchToggle, useWebSearch } from "@/components/chat/search-toggle";
 import { Welcome } from "@/components/chat/welcome";
 import { setPendingFirstMessage } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
@@ -35,6 +36,7 @@ function NewConversation() {
     models.data && model ? missingCredentialsMessage(model, models.data.models) : null;
   const disabled = !model || !!blocked || create.isPending;
   const draft = useAttachmentDraft(model);
+  const search = useWebSearch(model);
 
   const start = async (text: string) => {
     if (!model) return;
@@ -65,6 +67,7 @@ function NewConversation() {
           attachmentsPending={draft.pending}
         >
           <AttachButton draft={draft} disabled={!model || !!blocked} />
+          <SearchToggle search={search} />
         </Composer>
       </div>
     </div>

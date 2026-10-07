@@ -82,6 +82,11 @@ const checkRequests: Record<
     invalidKeyStatuses: [],
     unreachable: `Couldn't reach Ollama at ${host}. Under Docker, use http://host.docker.internal:11434.`,
   }),
+  // The usage endpoint authenticates the key without spending a search credit.
+  tavily: ({ apiKey }) => ({
+    url: "https://api.tavily.com/usage",
+    headers: bearer(apiKey),
+  }),
 };
 
 /**

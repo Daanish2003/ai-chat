@@ -1,5 +1,6 @@
 import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
 import { findModel } from "@ai-chat/api/chat/models";
+import { webSearchOf } from "@ai-chat/api/chat/web-search";
 import { Button } from "@ai-chat/ui/components/button";
 import { Loader } from "@ai-chat/ui/components/prompt-kit/loader";
 import { Markdown } from "@ai-chat/ui/components/prompt-kit/markdown";
@@ -39,6 +40,8 @@ import {
   DraftAttachmentChips,
   useAttachmentDraft,
 } from "./attachments";
+
+import { SearchRow } from "./search-row";
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
@@ -161,10 +164,8 @@ export function MessageRow({
             {thinking && (
               <Thinking text={thinking} inProgress={info.status === "streaming" && !text} />
             )}
-            {text && (
-              <Markdown className="prose prose-sm max-w-[80ch] dark:prose-invert">{text}</Markdown>
-            )}
-            {info.status === "streaming" && !text && !thinking && (
+            <AssistantParts parts={message.parts} />
+            {info.status === "streaming" && !thinking && waitingForText(message.parts) && (
               <Loader variant="typing" size="sm" />
             )}
             {info.status === "stopped" && (
@@ -338,6 +339,35 @@ function EditBox({
       </p>
     </div>
   );
+}
+
+/** A reply's text and web searches, in stream order. */
+function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
+  return parts.map((part, index) => {
+    if (part.type === "text") {
+      return part.content ? (
+        <Markdown key={index} className="prose prose-sm max-w-[80ch] dark:prose-invert">
+          {part.content}
+        </Markdown>
+      ) : null;
+    }
+    const search = webSearchOf(part);
+    return search ? <SearchRow key={search.toolCallId} search={search} /> : null;
+  });
+}
+
+/**
+ * A streaming reply shows the typing loader until text arrives: before its first token, and
+ * after a finished search. A running search shows its own spinner instead.
+ */
+function waitingForText(parts: UIMessage["parts"]) {
+  const shown = parts.filter((part) =>
+    part.type === "text" ? part.content !== "" : webSearchOf(part) !== null,
+  );
+  const last = shown.at(-1);
+  if (!last) return true;
+  if (last.type === "text") return false;
+  return webSearchOf(last)?.state !== "running";
 }
 
 /** Why the reply ended in `error`, with a way to fix a rejected key. */

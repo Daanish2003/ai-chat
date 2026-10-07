@@ -318,6 +318,18 @@ describe("attachments in provider history", () => {
     ]);
   });
 
+  it("sends attachments the same way when web search is on", () => {
+    expect(toModelMessages([question([notes])], { webSearch: true })).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", content: "notes.md\n```\n# Notes\nhi\n```" },
+          { type: "text", content: "What is this?" },
+        ],
+      },
+    ]);
+  });
+
   it("keeps plain text content for a Message without attachments", () => {
     expect(toModelMessages([question([])], { reads: { images: true, pdfs: true } })).toEqual([
       { role: "user", content: "What is this?" },

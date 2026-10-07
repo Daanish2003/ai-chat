@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { attachmentsForSend } from "../attachments/send";
 import { linkAttachments, lockAttachments } from "../attachments/store";
-import { addKeyMessage } from "../credentials/services";
+import { addKeyMessage, tavilyService } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
@@ -68,6 +68,9 @@ export async function handleChat(
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const credentials = await loadCredentials(deps, userId, model.provider);
   if (!credentials) return refuse(400, addKeyMessage(model.provider));
+  // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
+  const searchCredentials =
+    command.webSearch && model.tools ? await loadCredentials(deps, userId, tavilyService) : null;
 
   const history = await loadPath(deps, owned.id, command.parentId);
   if (command.parentId && history.length === 0) {
@@ -101,7 +104,11 @@ export async function handleChat(
         ? [{ role: "user" as const, parts: userParts, attachments: attachments.added }]
         : []),
     ],
-    { provider: model.provider, reads: { images: model.images, pdfs: model.pdfs } },
+    {
+      provider: model.provider,
+      webSearch: searchCredentials !== null,
+      reads: { images: model.images, pdfs: model.pdfs },
+    },
   );
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
@@ -162,6 +169,11 @@ export async function handleChat(
   }
   if (started === "attachment_gone") return refuse(404, "Attachment not found");
 
-  const chunks = startRun(deps, { messageId: assistantMessageId, adapter, messages });
+  const chunks = startRun(deps, {
+    messageId: assistantMessageId,
+    adapter,
+    messages,
+    webSearch: searchCredentials ?? undefined,
+  });
   return toServerSentEventsResponse(chunks);
 }
