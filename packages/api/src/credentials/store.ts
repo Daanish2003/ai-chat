@@ -40,6 +40,19 @@ export async function listCredentials(deps: Deps, userId: string): Promise<Crede
     .map(({ service, hint, verified }) => ({ service, hint, verified }));
 }
 
+/** The services the user has working credentials for, in the order they were first added. */
+export async function listCredentialedServices(deps: Deps, userId: string): Promise<string[]> {
+  const rows = await deps.db.query.userCredentials.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc", service: "asc" },
+  });
+  return rows
+    .filter((row) =>
+      decryptCredentials(row.encrypted, encryptionOptions(deps, userId, row.service)),
+    )
+    .map((row) => row.service);
+}
+
 /** Inserts or replaces the user's credentials for `service`. */
 export async function saveCredentials(
   deps: Deps,

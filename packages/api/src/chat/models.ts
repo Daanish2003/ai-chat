@@ -44,3 +44,16 @@ export const curatedModels: CuratedModel[] = [
 export function findModel(id: string): CuratedModel | undefined {
   return curatedModels.find((model) => model.id === id);
 }
+
+/** The Model a new Conversation starts on when the Provider is the first one the user added. */
+const providerDefaults: Partial<Record<ProviderId, string>> = {
+  anthropic: "anthropic:claude-sonnet-5-5",
+  openai: "openai:gpt-5.6",
+};
+
+/** The code default Model of `provider`: its chosen default, else its first curated Model. */
+export function defaultModelFor(provider: ProviderId): string | undefined {
+  return (
+    providerDefaults[provider] ?? curatedModels.find((model) => model.provider === provider)?.id
+  );
+}
