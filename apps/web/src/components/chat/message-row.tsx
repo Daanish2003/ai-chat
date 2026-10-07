@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { describeError, messageBranch, messageInfo, type MessageInfo } from "@/lib/chat";
+import { describeError, messageSiblings, messageInfo, type MessageInfo } from "@/lib/chat";
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
@@ -154,7 +154,7 @@ function BranchArrows({
   disabled: boolean;
   onSwitch: (messageId: string) => void;
 }) {
-  const { index, count, previousId, nextId } = messageBranch(message);
+  const { index, count, previousId, nextId } = messageSiblings(message);
   if (count < 2) return null;
   return (
     <span className="inline-flex items-center gap-0.5 text-xs text-muted-foreground tabular-nums">

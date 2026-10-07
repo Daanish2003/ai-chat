@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { AppDeps } from "../deps";
-import { type Branch, branchOf, newestLeaf, pathTo } from "./branches";
+import { type SiblingPosition, siblingPosition, newestLeaf, pathTo } from "./branches";
 import { parseStoredParts, toUIParts } from "./parts";
 
 type Deps = Pick<AppDeps, "db">;
@@ -107,7 +107,7 @@ export async function loadActiveBranch(
   const rows = await loadMessages(deps, conversationId);
   return pathTo(rows, leafId).map((row) => ({
     ...toClientMessage(row),
-    branch: branchOf(rows, row),
+    siblings: siblingPosition(rows, row),
   }));
 }
 
@@ -164,5 +164,5 @@ export function toClientMessage(row: MessageRow) {
 
 export type ClientMessage = ReturnType<typeof toClientMessage>;
 
-/** A Message of the Active Branch as `conversation.get` returns it, with its ‹ n/m › Branch. */
-export type ActiveBranchMessage = ClientMessage & { branch: Branch };
+/** A Message of the Active Branch as `conversation.get` returns it, with its ‹ n/m › position. */
+export type ActiveBranchMessage = ClientMessage & { siblings: SiblingPosition };

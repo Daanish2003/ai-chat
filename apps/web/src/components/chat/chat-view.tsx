@@ -103,7 +103,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
   const send = (text: string) => run(conversation.messages.at(-1)?.id ?? null, text);
 
   /** Edit (with `text`) or regenerate `messageId` into a new Branch beside it. */
-  const branch = (messageId: string, text?: string) => {
+  const startBranch = (messageId: string, text?: string) => {
     const { parentId, history } = branchFrom(messages, messageId);
     void run(parentId, text, history);
   };
@@ -131,8 +131,8 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
               key={message.id}
               message={message}
               streaming={streaming || switchBranch.isPending}
-              onEdit={(text) => branch(message.id, text)}
-              onRegenerate={() => branch(message.id)}
+              onEdit={(text) => startBranch(message.id, text)}
+              onRegenerate={() => startBranch(message.id)}
               onSwitchBranch={(messageId) => switchBranch.mutate({ messageId })}
             />
           ))}
@@ -156,6 +156,8 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
                   stop().catch((caught: Error) => toast.error(`Stopping failed: ${caught.message}`))
           }
           streaming={streaming}
+          // The next Message continues the Branch being switched to, so wait for it.
+          disabled={switchBranch.isPending}
         />
       </div>
     </div>

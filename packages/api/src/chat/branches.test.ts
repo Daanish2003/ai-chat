@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { branchOf, newestLeaf, pathTo } from "./branches";
+import { siblingPosition, newestLeaf, pathTo } from "./branches";
 
 /** A Message tree node created `minute` minutes into the Conversation. */
 function node(id: string, parentId: string | null, minute: number) {
@@ -39,15 +39,15 @@ describe("pathTo", () => {
   });
 });
 
-describe("branchOf", () => {
+describe("siblingPosition", () => {
   it("counts a Message's siblings, oldest first, and names its neighbours", () => {
-    expect(branchOf(tree, tree[1]!)).toEqual({
+    expect(siblingPosition(tree, tree[1]!)).toEqual({
       index: 0,
       count: 2,
       previousId: null,
       nextId: "a1b",
     });
-    expect(branchOf(tree, node("a1b", "q1", 4))).toEqual({
+    expect(siblingPosition(tree, node("a1b", "q1", 4))).toEqual({
       index: 1,
       count: 2,
       previousId: "a1",
@@ -56,7 +56,7 @@ describe("branchOf", () => {
   });
 
   it("treats the roots as siblings", () => {
-    expect(branchOf(tree, tree[7]!)).toEqual({
+    expect(siblingPosition(tree, tree[7]!)).toEqual({
       index: 1,
       count: 2,
       previousId: "q1",
@@ -65,7 +65,7 @@ describe("branchOf", () => {
   });
 
   it("is 1 of 1 for a Message without siblings", () => {
-    expect(branchOf(tree, tree[3]!)).toEqual({
+    expect(siblingPosition(tree, tree[3]!)).toEqual({
       index: 0,
       count: 1,
       previousId: null,
@@ -75,7 +75,7 @@ describe("branchOf", () => {
 
   it("orders siblings created at the same moment by id", () => {
     const tied = [node("r", null, 0), node("b", "r", 1), node("a", "r", 1)];
-    expect(branchOf(tied, tied[1]!)).toMatchObject({ index: 1, previousId: "a" });
+    expect(siblingPosition(tied, tied[1]!)).toMatchObject({ index: 1, previousId: "a" });
   });
 });
 

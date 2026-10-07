@@ -1,5 +1,5 @@
 import { curatedModels } from "@ai-chat/api/chat/models";
-import type { Branch } from "@ai-chat/api/chat/branches";
+import type { SiblingPosition } from "@ai-chat/api/chat/branches";
 import type { ActiveBranchMessage, ClientMessage } from "@ai-chat/api/chat/store";
 import type { CredentialSummary } from "@ai-chat/api/credentials/store";
 import type { UIMessage } from "@tanstack/ai-react";
@@ -10,22 +10,22 @@ export type MessageInfo = Pick<ClientMessage, "model" | "status" | "error" | "er
 /** `useChat` messages from the Active Branch (`conversation.get`). */
 export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
   return messages.map(
-    ({ id, role, parts, createdAt, model, status, error, errorReason, branch }) => ({
+    ({ id, role, parts, createdAt, model, status, error, errorReason, siblings }) => ({
       id,
       role,
       parts: parts as UIMessage["parts"],
       createdAt,
-      metadata: { model, status, error, errorReason, branch } satisfies MessageInfo & {
-        branch: Branch;
+      metadata: { model, status, error, errorReason, siblings } satisfies MessageInfo & {
+        siblings: SiblingPosition;
       },
     }),
   );
 }
 
 /** Where the Message sits among its siblings, for the ‹ n/m › arrows; 1 of 1 while it streams. */
-export function messageBranch(message: UIMessage): Branch {
-  const info = message.metadata as { branch?: Branch } | undefined;
-  return info?.branch ?? { index: 0, count: 1, previousId: null, nextId: null };
+export function messageSiblings(message: UIMessage): SiblingPosition {
+  const info = message.metadata as { siblings?: SiblingPosition } | undefined;
+  return info?.siblings ?? { index: 0, count: 1, previousId: null, nextId: null };
 }
 
 /**

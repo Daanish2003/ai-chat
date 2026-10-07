@@ -66,7 +66,7 @@ describe("conversation.get", () => {
         error: null,
         errorReason: null,
         createdAt: question.createdAt,
-        branch: { index: 0, count: 1, previousId: null, nextId: null },
+        siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
       {
         id: reply.id,
@@ -78,7 +78,7 @@ describe("conversation.get", () => {
         error: null,
         errorReason: null,
         createdAt: reply.createdAt,
-        branch: { index: 1, count: 2, previousId: older.id, nextId: null },
+        siblings: { index: 1, count: 2, previousId: older.id, nextId: null },
       },
     ]);
   });
@@ -328,7 +328,7 @@ describe("conversation.switchBranch", () => {
 
     const result = await client.conversation.get({ id: conv.id });
     expect(result.messages.map((m) => m.id)).toEqual([q1.id, a1.id, q2b.id, a2b.id]);
-    expect(result.messages.map((m) => m.branch)).toEqual([
+    expect(result.messages.map((m) => m.siblings)).toEqual([
       { index: 0, count: 1, previousId: null, nextId: null },
       { index: 0, count: 2, previousId: null, nextId: expect.any(String) },
       { index: 1, count: 2, previousId: expect.any(String), nextId: null },

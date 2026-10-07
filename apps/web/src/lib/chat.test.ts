@@ -5,7 +5,7 @@ import {
   branchFrom,
   describeError,
   messageInfo,
-  messageBranch,
+  messageSiblings,
   takePendingFirstMessage,
   toUIMessages,
   setPendingFirstMessage,
@@ -27,7 +27,7 @@ describe("toUIMessages", () => {
         error: null,
         errorReason: null,
         createdAt,
-        branch: { index: 0, count: 1, previousId: null, nextId: null },
+        siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
       {
         id: "a",
@@ -39,7 +39,7 @@ describe("toUIMessages", () => {
         error: null,
         errorReason: null,
         createdAt,
-        branch: { index: 1, count: 2, previousId: "a0", nextId: null },
+        siblings: { index: 1, count: 2, previousId: "a0", nextId: null },
       },
     ]);
 
@@ -54,7 +54,7 @@ describe("toUIMessages", () => {
           status: "complete",
           error: null,
           errorReason: null,
-          branch: { index: 0, count: 1, previousId: null, nextId: null },
+          siblings: { index: 0, count: 1, previousId: null, nextId: null },
         },
       },
       {
@@ -67,7 +67,7 @@ describe("toUIMessages", () => {
           status: "streaming",
           error: null,
           errorReason: null,
-          branch: { index: 1, count: 2, previousId: "a0", nextId: null },
+          siblings: { index: 1, count: 2, previousId: "a0", nextId: null },
         },
       },
     ]);
@@ -89,7 +89,7 @@ describe("toUIMessages", () => {
   });
 });
 
-describe("messageBranch", () => {
+describe("messageSiblings", () => {
   it("reads where the Message sits among its siblings", () => {
     const [, reply] = toUIMessages([
       {
@@ -102,7 +102,7 @@ describe("messageBranch", () => {
         error: null,
         errorReason: null,
         createdAt,
-        branch: { index: 0, count: 1, previousId: null, nextId: null },
+        siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
       {
         id: "a",
@@ -114,14 +114,14 @@ describe("messageBranch", () => {
         error: null,
         errorReason: null,
         createdAt,
-        branch: { index: 0, count: 3, previousId: null, nextId: "a2" },
+        siblings: { index: 0, count: 3, previousId: null, nextId: "a2" },
       },
     ]);
-    expect(messageBranch(reply!)).toEqual({ index: 0, count: 3, previousId: null, nextId: "a2" });
+    expect(messageSiblings(reply!)).toEqual({ index: 0, count: 3, previousId: null, nextId: "a2" });
   });
 
   it("is 1 of 1 for a message useChat is streaming", () => {
-    expect(messageBranch({ id: "x", role: "assistant", parts: [] })).toEqual({
+    expect(messageSiblings({ id: "x", role: "assistant", parts: [] })).toEqual({
       index: 0,
       count: 1,
       previousId: null,

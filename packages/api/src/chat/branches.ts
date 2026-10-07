@@ -22,7 +22,7 @@ export function pathTo<T extends TreeNode>(nodes: T[], leafId: string | null): T
 }
 
 /** Where a Message sits among its siblings (same parent; the roots are siblings too). */
-export type Branch = {
+export type SiblingPosition = {
   /** 0-based, oldest first. */
   index: number;
   count: number;
@@ -30,7 +30,7 @@ export type Branch = {
   nextId: string | null;
 };
 
-export function branchOf(nodes: TreeNode[], node: TreeNode): Branch {
+export function siblingPosition(nodes: TreeNode[], node: TreeNode): SiblingPosition {
   const siblings = nodes.filter((other) => other.parentId === node.parentId).sort(compareAge);
   const index = siblings.findIndex((other) => other.id === node.id);
   return {

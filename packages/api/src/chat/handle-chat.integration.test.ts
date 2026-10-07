@@ -640,6 +640,6 @@ describe("handleChat Branches", () => {
       [{ type: "text", content: "And then?" }],
       [{ type: "text", content: "Hello there!" }],
     ]);
-    expect(after.messages[1]?.branch).toMatchObject({ index: 0, count: 2 });
+    expect(after.messages[1]?.siblings).toMatchObject({ index: 0, count: 2 });
   });
 });
