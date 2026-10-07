@@ -82,6 +82,16 @@ export async function listConversations(deps: Deps, userId: string) {
   }));
 }
 
+/** The Message, or `undefined` when it doesn't exist or is in someone else's Conversation. */
+export async function findMessage(deps: Deps, userId: string, id: string) {
+  const [row] = await deps.db
+    .select({ message })
+    .from(message)
+    .innerJoin(conversation, eq(conversation.id, message.conversationId))
+    .where(and(eq(message.id, id), eq(conversation.userId, userId)));
+  return row?.message;
+}
+
 /** The Messages from a root down to `leafId`, oldest first. Empty without a leaf. */
 export async function loadPath(
   deps: Deps,

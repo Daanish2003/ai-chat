@@ -5,8 +5,9 @@ import {
 } from "@ai-chat/ui/components/prompt-kit/chat-container";
 import { ScrollButton } from "@ai-chat/ui/components/prompt-kit/scroll-button";
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
@@ -24,6 +25,8 @@ const connection = fetchServerSentEvents("/api/chat");
 /**
  * One Conversation's Active Branch and composer. `useChat` is the truth while a run streams;
  * when it ends, the Active Branch is refetched and replaces `useChat`'s messages (ADR 0002).
+ * A run this page didn't start (the page was reloaded mid-reply) is followed by polling the
+ * Active Branch until nothing is `streaming`.
  */
 export function ChatView({ conversation }: { conversation: ConversationData }) {
   const queryClient = useQueryClient();
@@ -39,7 +42,32 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
     },
   });
   const [sending, setSending] = useState(false);
-  const streaming = sending || conversation.messages.some((m) => m.status === "streaming");
+  const serverStreaming = conversation.messages.some((m) => m.status === "streaming");
+  const streaming = sending || serverStreaming;
+  const conversationQuery = orpc.conversation.get.queryOptions({ input: { id: conversation.id } });
+  const fetchConversation = () => queryClient.fetchQuery({ ...conversationQuery, staleTime: 0 });
+
+  // Updates `conversation` (the route reads the same query) about every second.
+  const polling = !sending && serverStreaming;
+  useQuery({ ...conversationQuery, enabled: polling, refetchInterval: polling ? 1_000 : false });
+  const wasPolling = useRef(false);
+  const showServerMessages = useEffectEvent((messages: ConversationData["messages"]) => {
+    if (sending) return;
+    setMessages(toUIMessages(messages));
+    // A run this page was polling just ended, so its Conversation panel row changed.
+    if (wasPolling.current && !polling) void invalidateConversationList(queryClient);
+    wasPolling.current = polling;
+  });
+  useEffect(() => showServerMessages(conversation.messages), [conversation.messages]);
+
+  const stopRun = useMutation(orpc.chat.stop.mutationOptions());
+  const stop = async () => {
+    // A reply sent from this page only has `useChat`'s id; the server's is on the Active Branch.
+    const fresh = await fetchConversation();
+    const running = fresh.messages.find((m) => m.status === "streaming");
+    if (running) await stopRun.mutateAsync({ messageId: running.id });
+  };
+
   // The selected Model's Provider may have lost its credentials; the server re-checks on send.
   const models = useQuery(orpc.models.list.queryOptions());
   const blocked = models.data
@@ -62,10 +90,7 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
       });
     } finally {
       try {
-        const fresh = await queryClient.fetchQuery({
-          ...orpc.conversation.get.queryOptions({ input: { id: conversation.id } }),
-          staleTime: 0,
-        });
+        const fresh = await fetchConversation();
         setMessages(toUIMessages(fresh.messages));
       } finally {
         setSending(false);
@@ -100,7 +125,17 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
           </p>
         )}
         {blocked && <MissingCredentialsBanner message={blocked} />}
-        <Composer onSend={(text) => void send(text)} disabled={streaming || !!blocked} />
+        <Composer
+          onSend={(text) => void send(text)}
+          onStop={
+            stopRun.isPending
+              ? undefined
+              : () =>
+                  stop().catch((caught: Error) => toast.error(`Stopping failed: ${caught.message}`))
+          }
+          streaming={streaming}
+          disabled={!!blocked}
+        />
       </div>
     </div>
   );
