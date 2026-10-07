@@ -6,7 +6,7 @@ import { saveCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestDeps } from "../testing/deps";
-import { createFakeAdapter, round, runError, text } from "../testing/fake-adapter";
+import { createFakeAdapter, round, runError, text, thinking } from "../testing/fake-adapter";
 import { createTestClient, insertUser, sessionFor, type TestUser } from "../testing/router-client";
 import { type ChatCommand, handleChat } from "./handle-chat";
 
@@ -641,5 +641,63 @@ describe("handleChat Branches", () => {
       [{ type: "text", content: "Hello there!" }],
     ]);
     expect(after.messages[1]?.siblings).toMatchObject({ index: 0, count: 2 });
+  });
+});
+
+describe("handleChat thinking", () => {
+  /** A first send whose reply thinks before it answers, then a follow-up on `model`. */
+  async function thinkThenFollowUp(model: string) {
+    const ctx = await setup({
+      rounds: [round(thinking("Pondering", " hard."), text("Hello!")), round(text("Sure."))],
+    });
+    await saveCredentials(ctx.deps, ctx.user.id, {
+      service: "openai",
+      fields: { apiKey: "sk-openai-test-key" },
+      hint: "…-key",
+      verified: true,
+    });
+    const body = await (await ctx.send()).text();
+    const [, reply] = await messagesOf(ctx.deps, ctx.conv.id);
+    await (await ctx.send({ parentId: reply!.id, text: "Go on", model })).text();
+    return { ...ctx, body, reply: reply! };
+  }
+
+  it("streams the model's thinking and saves it as a thinking part, kept out of searchText", async () => {
+    const { body, reply } = await thinkThenFollowUp(anthropicModel);
+
+    expect(body).toContain("REASONING_MESSAGE_CONTENT");
+    expect(reply).toMatchObject({
+      parts: {
+        schemaVersion: 1,
+        parts: [
+          { type: "thinking", text: "Pondering hard." },
+          { type: "text", text: "Hello!" },
+        ],
+      },
+      searchText: "Hello!",
+      status: "complete",
+    });
+  });
+
+  it("sends the thinking back to the same Provider", async () => {
+    const { fake } = await thinkThenFollowUp(anthropicModel);
+
+    expect(fake.calls[1]?.messages).toEqual([
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hello!", thinking: [{ content: "Pondering hard." }] },
+      { role: "user", content: "Go on" },
+    ]);
+  });
+
+  it("strips the thinking when the Provider changed, keeping it stored", async () => {
+    const { deps, fake, reply } = await thinkThenFollowUp("openai:gpt-5.6");
+
+    expect(fake.calls[1]?.messages).toEqual([
+      { role: "user", content: "Hi" },
+      { role: "assistant", content: "Hello!" },
+      { role: "user", content: "Go on" },
+    ]);
+    const [stored] = await deps.db.select().from(message).where(eq(message.id, reply.id));
+    expect(stored?.parts).toEqual(reply.parts);
   });
 });
