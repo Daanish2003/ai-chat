@@ -2,6 +2,11 @@ import { findModel } from "@ai-chat/api/chat/models";
 import { Button } from "@ai-chat/ui/components/button";
 import { Loader } from "@ai-chat/ui/components/prompt-kit/loader";
 import { Markdown } from "@ai-chat/ui/components/prompt-kit/markdown";
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningTrigger,
+} from "@ai-chat/ui/components/prompt-kit/reasoning";
 import { SystemMessage } from "@ai-chat/ui/components/prompt-kit/system-message";
 import { Textarea } from "@ai-chat/ui/components/textarea";
 import { cn } from "@ai-chat/ui/lib/utils";
@@ -23,6 +28,14 @@ import { describeError, messageSiblings, messageInfo, type MessageInfo } from "@
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
+}
+
+/** The model's thinking; a redacted block has no text to show. */
+function thinkingText(message: UIMessage) {
+  return message.parts
+    .map((part) => (part.type === "thinking" ? part.content : ""))
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 type MessageActions = {
@@ -54,6 +67,7 @@ export function MessageRow({
 }) {
   const info = messageInfo(message);
   const text = plainText(message);
+  const thinking = thinkingText(message);
   const isUser = message.role === "user";
   const model = info.model ? (findModel(info.model)?.label ?? info.model) : null;
   const [editing, setEditing] = useState(false);
@@ -112,10 +126,15 @@ export function MessageRow({
           <p className="max-w-[80ch] text-sm whitespace-pre-wrap">{text}</p>
         ) : (
           <>
+            {thinking && (
+              <Thinking text={thinking} thinking={info.status === "streaming" && !text} />
+            )}
             {text && (
               <Markdown className="prose prose-sm max-w-[80ch] dark:prose-invert">{text}</Markdown>
             )}
-            {info.status === "streaming" && !text && <Loader variant="typing" size="sm" />}
+            {info.status === "streaming" && !text && !thinking && (
+              <Loader variant="typing" size="sm" />
+            )}
             {info.status === "stopped" && (
               <span className="text-xs text-muted-foreground italic">Stopped</span>
             )}
@@ -152,6 +171,23 @@ export function MessageRow({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The model's thinking as a collapsed "Thought for…" block (prompt-kit Reasoning). It opens while
+ * the model is still thinking and folds away once the answer starts.
+ */
+function Thinking({ text, thinking }: { text: string; thinking: boolean }) {
+  return (
+    <Reasoning isStreaming={thinking} className="max-w-[80ch]">
+      <ReasoningTrigger className="text-xs text-muted-foreground">
+        {thinking ? "Thinking…" : "Thought for a few seconds"}
+      </ReasoningTrigger>
+      <ReasoningContent markdown className="mt-2 border-l-2 pl-3 text-xs">
+        {text}
+      </ReasoningContent>
+    </Reasoning>
   );
 }
 
