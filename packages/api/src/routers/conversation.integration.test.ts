@@ -156,7 +156,17 @@ describe("conversation.list", () => {
       lastMessageAt: conv.lastMessageAt,
       preview: "Partial answer",
       hasError: true,
+      shared: false,
     });
+  });
+
+  it("flags a Conversation that has a Shared link", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+    await insertMessage({ conversationId: conv.id, role: "user", text: "Hi", active: true });
+    await client.share.upsert({ conversationId: conv.id });
+
+    await expect(client.conversation.list()).resolves.toMatchObject([{ shared: true }]);
   });
 
   it("previews the question while its reply hasn't written any text yet", async () => {
