@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { maxAttachmentBytes } from "../attachments/kinds";
+import { deleteOrphanAttachments, lockAttachments } from "../attachments/store";
 import { insertAttachment, linkTestAttachments } from "../testing/attachments";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestClient, insertUser } from "../testing/router-client";
@@ -92,5 +93,29 @@ describe("attachment.upload", () => {
       [freshOrphan.id, oldLinked.id, uploaded.id].toSorted(),
     );
     expect(left.map((row) => row.id)).not.toContain(oldOrphan.id);
+  });
+
+  it("leaves an old attachment alone while a send that links it holds it", async () => {
+    const user = await insertUser();
+    const linking = await insertAttachment(user, {
+      createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000),
+    });
+    const db = getTestDb();
+    let locked!: () => void;
+    let finishSend!: () => void;
+    const lockTaken = new Promise<void>((resolve) => (locked = resolve));
+    const send = db.transaction(async (tx) => {
+      expect(await lockAttachments(tx, user.id, [linking.id])).toBe(true);
+      locked();
+      await new Promise<void>((resolve) => (finishSend = resolve));
+    });
+    await lockTaken;
+
+    await deleteOrphanAttachments({ db }, new Date());
+    finishSend();
+    await send;
+
+    const left = await db.select({ id: attachment.id }).from(attachment);
+    expect(left.map((row) => row.id)).toEqual([linking.id]);
   });
 });

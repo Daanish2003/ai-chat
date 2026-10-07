@@ -53,10 +53,14 @@ export async function saveAttachment(
   });
 }
 
-/** Deletes attachments created before `before` that no Message uses; their bytes go with them. */
+/**
+ * Deletes attachments created before `before` that no Message uses; their bytes go with them.
+ * Skips attachments a send has locked (`lockAttachments`), which are about to be linked.
+ */
 export async function deleteOrphanAttachments(deps: Deps, before: Date) {
-  await deps.db
-    .delete(attachment)
+  const orphans = deps.db
+    .select({ id: attachment.id })
+    .from(attachment)
     .where(
       and(
         lt(attachment.createdAt, before),
@@ -67,7 +71,23 @@ export async function deleteOrphanAttachments(deps: Deps, before: Date) {
             .where(eq(messageAttachment.attachmentId, attachment.id)),
         ),
       ),
-    );
+    )
+    .for("update", { skipLocked: true });
+  await deps.db.delete(attachment).where(inArray(attachment.id, orphans));
+}
+
+/**
+ * Locks the user's attachments against the orphan cleanup for the rest of the send's
+ * transaction; `false` when one is gone (deleted, or never theirs).
+ */
+export async function lockAttachments(tx: Tx, userId: string, ids: string[]) {
+  if (ids.length === 0) return true;
+  const rows = await tx
+    .select({ id: attachment.id })
+    .from(attachment)
+    .where(and(inArray(attachment.id, ids), eq(attachment.userId, userId)))
+    .for("key share");
+  return rows.length === ids.length;
 }
 
 /** The ones of `ids` that `userId` uploaded, in the order of `ids`. */

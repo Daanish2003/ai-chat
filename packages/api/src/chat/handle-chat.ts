@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { attachmentsForSend } from "../attachments/send";
-import { linkAttachments } from "../attachments/store";
+import { linkAttachments, lockAttachments } from "../attachments/store";
 import { addKeyMessage } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
@@ -119,7 +119,9 @@ export async function handleChat(
       .from(message)
       .where(and(eq(message.conversationId, owned.id), eq(message.status, "streaming")))
       .limit(1);
-    if (running) return false;
+    if (running) return "streaming";
+    // Holds the attachments against the orphan cleanup until they're linked.
+    if (!(await lockAttachments(tx, userId, attachmentIds))) return "attachment_gone";
 
     await tx.insert(message).values([
       // An edit is a new user Message beside the one it replaces; a regenerate writes none.
@@ -153,9 +155,12 @@ export async function handleChat(
       .update(conversation)
       .set({ activeLeafId: assistantMessageId, lastMessageAt: now, model: model.id })
       .where(eq(conversation.id, owned.id));
-    return true;
+    return "started";
   });
-  if (!started) return refuse(409, "A reply is still streaming in this Conversation");
+  if (started === "streaming") {
+    return refuse(409, "A reply is still streaming in this Conversation");
+  }
+  if (started === "attachment_gone") return refuse(404, "Attachment not found");
 
   const chunks = startRun(deps, { messageId: assistantMessageId, adapter, messages });
   return toServerSentEventsResponse(chunks);
