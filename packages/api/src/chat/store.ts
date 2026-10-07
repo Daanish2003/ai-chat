@@ -1,4 +1,5 @@
 import { conversation, message, type MessageRow } from "@ai-chat/db/schema/chat";
+import { sharedLink } from "@ai-chat/db/schema/share";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
@@ -38,7 +39,10 @@ export async function setConversationModel(deps: Deps, userId: string, id: strin
   return rows.length > 0;
 }
 
-/** Deletes the user's Conversation and, by cascade, its Messages; `false` when it isn't theirs. */
+/**
+ * Deletes the user's Conversation and, by cascade, its Messages and Shared link; `false` when it
+ * isn't theirs.
+ */
 export async function deleteConversation(deps: Deps, userId: string, id: string) {
   const rows = await deps.db
     .delete(conversation)
@@ -57,6 +61,7 @@ const leafParent = alias(message, "leaf_parent");
  * The user's Conversations for the Conversation panel, newest Message first, each with a one-line
  * preview of its Active Branch's last Message and whether that Message ended in an error. A reply
  * that hasn't written any text yet previews the Message it answers.
+ * `shared` says whether the Conversation has a Shared link.
  */
 export async function listConversations(deps: Deps, userId: string) {
   const rows = await deps.db
@@ -69,10 +74,12 @@ export async function listConversations(deps: Deps, userId: string) {
         string | null
       >`left(coalesce(nullif(${leaf.searchText}, ''), ${leafParent.searchText}), ${previewLength})`,
       lastStatus: leaf.status,
+      shared: sql<boolean>`${sharedLink.token} is not null`,
     })
     .from(conversation)
     .leftJoin(leaf, eq(leaf.id, conversation.activeLeafId))
     .leftJoin(leafParent, eq(leafParent.id, leaf.parentId))
+    .leftJoin(sharedLink, eq(sharedLink.conversationId, conversation.id))
     .where(eq(conversation.userId, userId))
     .orderBy(desc(conversation.lastMessageAt), desc(conversation.id));
   return rows.map(({ preview, lastStatus, ...row }) => ({

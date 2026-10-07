@@ -10,6 +10,7 @@ import { missingCredentialsMessage } from "@/lib/models";
 import { useNewConversationModel } from "@/lib/new-conversation-model";
 import { orpc } from "@/utils/orpc";
 
+import { ShareButton } from "../share/share-dialog";
 import UserMenu from "../user-menu";
 import { ModelPicker } from "./model-picker";
 
@@ -54,6 +55,7 @@ export function TopBar({
         pathname === "/c" && <NewConversationModelPicker />
       )}
       <div className="flex-1" />
+      {id && <ShareButton key={id} conversationId={id} />}
       <UserMenu />
     </header>
   );

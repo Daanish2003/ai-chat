@@ -13,8 +13,17 @@ function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
 }
 
-/** One full-width Message row: avatar, header, then the text (Markdown for the assistant). */
-export function MessageRow({ message }: { message: UIMessage }) {
+/**
+ * One full-width Message row: avatar, header, then the text (Markdown for the assistant).
+ * `userLabel` names the user's Messages ("You" in the user's own Conversation).
+ */
+export function MessageRow({
+  message,
+  userLabel = "You",
+}: {
+  message: UIMessage;
+  userLabel?: string;
+}) {
   const info = messageInfo(message);
   const text = plainText(message);
   const isUser = message.role === "user";
@@ -32,7 +41,7 @@ export function MessageRow({ message }: { message: UIMessage }) {
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-center gap-2 text-xs">
-          <span className="font-medium">{isUser ? "You" : "Assistant"}</span>
+          <span className="font-medium">{isUser ? userLabel : "Assistant"}</span>
           {!isUser && model && (
             <span className="border px-1.5 py-0.5 text-[10px] text-muted-foreground">{model}</span>
           )}
