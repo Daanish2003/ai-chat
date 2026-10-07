@@ -9,7 +9,7 @@ import { addKeyMessage } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
-import { findModel } from "./models";
+import { resolveModel } from "./available-models";
 import { parseStoredParts, searchTextOf, toModelMessages } from "./parts";
 import { startRun } from "./run";
 import { findConversation, loadPath } from "./store";
@@ -56,7 +56,7 @@ export async function handleChat(
   const owned = await findConversation(deps, userId, command.conversationId);
   if (!owned) return refuse(404, "Conversation not found");
 
-  const model = findModel(command.model);
+  const model = await resolveModel(deps, userId, command.model);
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const credentials = await loadCredentials(deps, userId, model.provider);
   if (!credentials) return refuse(400, addKeyMessage(model.provider));

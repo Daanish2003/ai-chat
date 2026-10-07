@@ -1,4 +1,8 @@
-import { type CredentialService, credentialForms } from "@ai-chat/api/credentials/services";
+import {
+  type CredentialService,
+  credentialForms,
+  type SaveCredentialsInput,
+} from "@ai-chat/api/credentials/services";
 import { Button } from "@ai-chat/ui/components/button";
 import { Input } from "@ai-chat/ui/components/input";
 import { Label } from "@ai-chat/ui/components/label";
@@ -149,9 +153,9 @@ function CredentialForm({ service, onDone }: { service: CredentialService; onDon
   );
   const save = useMutation(
     orpc.credentials.save.mutationOptions({
-      onSuccess: async () => {
+      onSuccess: async (saved) => {
         await invalidateCredentials(queryClient);
-        toast.success("Credentials checked and saved");
+        toast.success(saved.verified ? "Credentials checked and saved" : "Saved, not verified");
         onDone();
       },
     }),
@@ -163,7 +167,8 @@ function CredentialForm({ service, onDone }: { service: CredentialService; onDon
       className="space-y-3 pl-5"
       onSubmit={(event) => {
         event.preventDefault();
-        save.mutate({ service, fields: { apiKey: values.apiKey ?? "" } });
+        // The server validates the fields against the service's schema.
+        save.mutate({ service, fields: values } as SaveCredentialsInput);
       }}
     >
       <p className="text-xs text-muted-foreground">{form.helpText}</p>
@@ -174,7 +179,7 @@ function CredentialForm({ service, onDone }: { service: CredentialService; onDon
             <Label htmlFor={id}>{field.label}</Label>
             <Input
               id={id}
-              type="password"
+              type={field.visible ? "text" : "password"}
               autoComplete="off"
               placeholder={field.placeholder}
               value={values[field.name] ?? ""}

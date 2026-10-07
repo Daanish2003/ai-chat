@@ -2,7 +2,7 @@ import { conversation } from "@ai-chat/db/schema/chat";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { findModel } from "../chat/models";
+import { resolveModel } from "../chat/available-models";
 import {
   deleteConversation,
   findConversation,
@@ -22,7 +22,7 @@ export const conversationRouter = {
   create: protectedProcedure
     .input(z.object({ model: z.string() }))
     .handler(async ({ context, input }) => {
-      if (!findModel(input.model)) {
+      if (!(await resolveModel(context.deps, context.session.user.id, input.model))) {
         throw new ORPCError("BAD_REQUEST", {
           message: `"${input.model}" is not an available Model`,
         });
@@ -73,7 +73,7 @@ export const conversationRouter = {
       if (!(await findConversation(context.deps, userId, input.id))) {
         throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
       }
-      const model = findModel(input.model);
+      const model = await resolveModel(context.deps, userId, input.model);
       if (!model) {
         throw new ORPCError("BAD_REQUEST", {
           message: `"${input.model}" is not an available Model`,

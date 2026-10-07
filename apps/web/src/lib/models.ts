@@ -1,9 +1,11 @@
-import { type CuratedModel, findModel } from "@ai-chat/api/chat/models";
+import { type CuratedModel, findModel, isLiveListProvider } from "@ai-chat/api/chat/models";
 import { addKeyMessage, providers } from "@ai-chat/api/credentials/services";
 
 export type ModelGroup = {
   provider: CuratedModel["provider"];
   label: string;
+  /** The group is the Provider's live list (OpenRouter, Ollama), not a curated one. */
+  live: boolean;
   models: CuratedModel[];
 };
 
@@ -16,7 +18,9 @@ export function modelGroups(models: CuratedModel[], search: string): ModelGroup[
       (model) =>
         model.provider === id && (providerMatches || model.label.toLowerCase().includes(query)),
     );
-    return matching.length > 0 ? [{ provider: id, label, models: matching }] : [];
+    return matching.length > 0
+      ? [{ provider: id, label, live: isLiveListProvider(id), models: matching }]
+      : [];
   });
 }
 
@@ -26,6 +30,11 @@ export function modelGroups(models: CuratedModel[], search: string): ModelGroup[
  */
 export function missingCredentialsMessage(selected: string, available: CuratedModel[]) {
   if (available.some((model) => model.id === selected)) return null;
-  const model = findModel(selected);
-  return model ? addKeyMessage(model.provider) : "Pick another Model";
+  const prefix = selected.slice(0, selected.indexOf(":"));
+  const provider =
+    findModel(selected)?.provider ?? (isLiveListProvider(prefix) ? prefix : undefined);
+  // A live-listed Model can leave its list while the Provider still has credentials.
+  return provider && !available.some((model) => model.provider === provider)
+    ? addKeyMessage(provider)
+    : "Pick another Model";
 }

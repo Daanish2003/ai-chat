@@ -6,6 +6,7 @@ import { saveCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestDeps } from "../testing/deps";
+import { liveModelsFetch } from "../testing/live-models";
 import { createFakeAdapter, round, runError, text } from "../testing/fake-adapter";
 import { createTestClient, insertUser, sessionFor, type TestUser } from "../testing/router-client";
 import { type ChatCommand, handleChat } from "./handle-chat";
@@ -500,5 +501,43 @@ describe("handleChat refuses", () => {
 
     expect(response.status).toBe(400);
     expect(await messagesOf(deps, conv.id)).toEqual([]);
+  });
+});
+
+describe("handleChat with live-listed Models", () => {
+  it("streams a reply from a Model installed on the user's Ollama host", async () => {
+    const live = liveModelsFetch({ ollama: ["qwen3:8b"] });
+    const { user, deps, adapterCalls, conv, send } = await setup({ deps: { fetch: live.fetch } });
+    await saveCredentials(deps, user.id, {
+      service: "ollama",
+      fields: { host: "http://ollama.test:11434" },
+      hint: "http://ollama.test:11434",
+      verified: true,
+    });
+
+    const response = await send({ model: "ollama:qwen3:8b" });
+    await response.text();
+
+    expect(response.status).toBe(200);
+    expect(adapterCalls).toEqual([
+      { model: "ollama:qwen3:8b", credentials: { host: "http://ollama.test:11434" } },
+    ]);
+    expect(await conversationRow(deps, conv.id)).toMatchObject({ model: "ollama:qwen3:8b" });
+  });
+
+  it("refuses an OpenRouter Model that isn't on the live list with 400", async () => {
+    const live = liveModelsFetch({ openRouter: ["openai/gpt-5.5"] });
+    const { user, deps, adapterCalls, send } = await setup({ deps: { fetch: live.fetch } });
+    await saveCredentials(deps, user.id, {
+      service: "openrouter",
+      fields: { apiKey: "sk-or-test" },
+      hint: "…test",
+      verified: true,
+    });
+
+    const response = await send({ model: "openrouter:openai/gpt-4o" });
+
+    expect(response.status).toBe(400);
+    expect(adapterCalls).toEqual([]);
   });
 });

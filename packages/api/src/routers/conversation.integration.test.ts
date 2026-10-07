@@ -8,6 +8,7 @@ import { saveCredentials } from "../credentials/store";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestDeps } from "../testing/deps";
 import { createFakeAdapter, round, text } from "../testing/fake-adapter";
+import { liveModelsFetch } from "../testing/live-models";
 import { createTestClient, insertUser, sessionFor } from "../testing/router-client";
 
 async function signedIn() {
@@ -413,5 +414,61 @@ describe("conversation.setModel", () => {
       ["user", null, [{ type: "text", content: "Second question" }]],
       ["assistant", "openai:gpt-5.6", [{ type: "text", content: "From GPT" }]],
     ]);
+  });
+});
+
+describe("live-listed Models", () => {
+  async function withOpenRouter(openRouter: string[]) {
+    const user = await insertUser();
+    const deps = createTestDeps({ fetch: liveModelsFetch({ openRouter }).fetch });
+    await saveCredentials(deps, user.id, {
+      service: "openrouter",
+      fields: { apiKey: "sk-or-test" },
+      hint: "…test",
+      verified: true,
+    });
+    return { user, client: createTestClient({ user, deps }) };
+  }
+
+  it("creates a Conversation on a Model from OpenRouter's live list", async () => {
+    const { client } = await withOpenRouter(["anthropic/claude-sonnet-5.5"]);
+
+    const { id } = await client.conversation.create({
+      model: "openrouter:anthropic/claude-sonnet-5.5",
+    });
+
+    await expect(client.conversation.get({ id })).resolves.toMatchObject({
+      model: "openrouter:anthropic/claude-sonnet-5.5",
+    });
+  });
+
+  it("refuses an OpenRouter Model that isn't on the live list", async () => {
+    const { client } = await withOpenRouter(["anthropic/claude-sonnet-5.5"]);
+
+    await expect(
+      client.conversation.create({ model: "openrouter:openai/gpt-4o" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("selects a Model installed on the user's Ollama host", async () => {
+    const user = await insertUser();
+    const deps = createTestDeps({ fetch: liveModelsFetch({ ollama: ["qwen3:8b"] }).fetch });
+    await saveCredentials(deps, user.id, {
+      service: "ollama",
+      fields: { host: "http://ollama.test:11434" },
+      hint: "http://ollama.test:11434",
+      verified: true,
+    });
+    const client = createTestClient({ user, deps });
+    const conv = await insertConversation(user);
+
+    await client.conversation.setModel({ id: conv.id, model: "ollama:qwen3:8b" });
+
+    await expect(client.conversation.get({ id: conv.id })).resolves.toMatchObject({
+      model: "ollama:qwen3:8b",
+    });
+    await expect(
+      client.conversation.setModel({ id: conv.id, model: "ollama:llama3.2:latest" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
