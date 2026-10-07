@@ -51,27 +51,15 @@ export function Composer({
       />
       <PromptInputActions className="justify-between px-1 pt-1">
         <div className="flex items-center gap-1">{children}</div>
-        {streaming ? (
-          <Button
-            size="icon"
-            className="rounded-full"
-            disabled={!onStop}
-            onClick={onStop}
-            aria-label="Stop"
-          >
-            <SquareIcon className="fill-current" />
-          </Button>
-        ) : (
-          <Button
-            size="icon"
-            className="rounded-full"
-            disabled={!canSend}
-            onClick={submit}
-            aria-label="Send"
-          >
-            <ArrowUpIcon />
-          </Button>
-        )}
+        <Button
+          size="icon"
+          className="rounded-full"
+          disabled={streaming ? !onStop : !canSend}
+          onClick={streaming ? onStop : submit}
+          aria-label={streaming ? "Stop" : "Send"}
+        >
+          {streaming ? <SquareIcon className="fill-current" /> : <ArrowUpIcon />}
+        </Button>
       </PromptInputActions>
     </PromptInput>
   );

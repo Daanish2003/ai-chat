@@ -308,7 +308,47 @@ describe("handleChat", () => {
   });
 });
 
+/** An adapter that sends some text, then hangs and ignores the abort signal (like Ollama's). */
+function deafAdapter() {
+  const fake = createFakeAdapter({ rounds: [] });
+  return {
+    ...fake.adapter,
+    chatStream: async function* () {
+      yield* round(text("Hello")).slice(0, 3);
+      await new Promise(() => {});
+    },
+  };
+}
+
 describe("chat.stop", () => {
+  it("stops reading an adapter that ignores the abort signal", async () => {
+    const { user, deps, conv, send } = await setup({ deps: { adapterFor: deafAdapter } });
+    const response = await send();
+    const [, reply] = await messagesOf(deps, conv.id);
+    await expect.poll(() => deps.runs.has(reply!.id)).toBe(true);
+
+    await createTestClient({ user, deps }).chat.stop({ messageId: reply!.id });
+
+    await response.text();
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "stopped",
+      parts: { parts: [{ type: "text", text: "Hello" }] },
+    });
+  });
+
+  it("times out an adapter that ignores the abort signal", async () => {
+    const { deps, conv, send } = await setup({
+      deps: { adapterFor: deafAdapter, limits: { snapshotIntervalMs: 20, runCapMs: 100 } },
+    });
+
+    await (await send()).text();
+
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "error",
+      error: "timed out",
+    });
+  });
+
   it("aborts the run, which ends stopped and keeps the text that arrived", async () => {
     const { user, deps, conv, fake, send } = await setup({ manual: true });
     const response = await send();

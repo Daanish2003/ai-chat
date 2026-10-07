@@ -32,7 +32,7 @@ export function messageInfo(message: UIMessage): MessageInfo {
 }
 
 /** What to tell the user about a Message that ended in `error`, and whether to link Key settings. */
-export function errorMessage({ error, errorReason }: MessageInfo) {
+export function describeError({ error, errorReason }: MessageInfo) {
   switch (errorReason) {
     case "invalid_key":
       return { text: "The Provider rejected your API key.", keySettings: true };
@@ -42,7 +42,12 @@ export function errorMessage({ error, errorReason }: MessageInfo) {
         keySettings: false,
       };
     case "provider_error":
-      return { text: `The Provider returned an error: ${error}`, keySettings: false };
+      return {
+        text: error
+          ? `The Provider returned an error: ${error}`
+          : "The Provider returned an error.",
+        keySettings: false,
+      };
   }
   // Errors with no reason are the run's own guards (ADR 0002).
   const text =

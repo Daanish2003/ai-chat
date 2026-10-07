@@ -7,7 +7,7 @@ import type { UIMessage } from "@tanstack/ai-react";
 import { Link } from "@tanstack/react-router";
 import { BotIcon, UserIcon } from "lucide-react";
 
-import { errorMessage, messageInfo, type MessageInfo } from "@/lib/chat";
+import { describeError, messageInfo, type MessageInfo } from "@/lib/chat";
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
@@ -69,7 +69,7 @@ export function MessageRow({ message }: { message: UIMessage }) {
 
 /** Why the reply ended in `error`, with a way to fix a rejected key. */
 function ErrorMessage({ info }: { info: MessageInfo }) {
-  const { text, keySettings } = errorMessage(info);
+  const { text, keySettings } = describeError(info);
   return (
     <SystemMessage variant="error" fill role="alert" className="max-w-[80ch] rounded-none">
       {text}

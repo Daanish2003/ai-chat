@@ -41,7 +41,7 @@ describe("sweepInterruptedRuns", () => {
     expect(await rowOf(empty.id)).toMatchObject({ status: "error", error: "interrupted" });
   });
 
-  it("leaves Messages that ended, and runs still going in this process, alone", async () => {
+  it("leaves Messages that ended, and Messages from after boot, alone", async () => {
     const user = await insertUser();
     const conv = await insertConversation(user);
     const done = await insertMessage({ conversationId: conv.id, role: "assistant", text: "Done" });
@@ -51,16 +51,16 @@ describe("sweepInterruptedRuns", () => {
       text: "Sto",
       status: "stopped",
     });
+    const bootedAt = new Date();
     const live = await insertMessage({
       conversationId: conv.id,
       role: "assistant",
       text: "Li",
       status: "streaming",
+      createdAt: new Date(bootedAt.getTime() + 1),
     });
-    const deps = createTestDeps();
-    deps.runs.set(live.id, new AbortController());
 
-    await sweepInterruptedRuns(deps);
+    await sweepInterruptedRuns(createTestDeps(), bootedAt);
 
     expect(await rowOf(done.id)).toMatchObject({ status: "complete", error: null });
     expect(await rowOf(stopped.id)).toMatchObject({ status: "stopped", error: null });

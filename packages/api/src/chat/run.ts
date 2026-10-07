@@ -6,13 +6,14 @@ import {
   type ModelMessage,
   type StreamChunk,
 } from "@tanstack/ai";
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps } from "../deps";
 import { createPartsBuilder, searchTextOf } from "./parts";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
+type ProviderError = { message: string; code?: string };
 
 /**
  * Runs one assistant Message (ADR 0002). The run drains `chat()` to the end on its own,
@@ -58,15 +59,17 @@ export function startRun(
 
   let timedOut = false;
   const capTimer = setTimeout(() => {
+    // A run that was stopped but hasn't ended yet stays stopped.
+    if (abortController.signal.aborted) return;
     timedOut = true;
     abortController.abort();
   }, deps.limits.runCapMs);
 
   void (async () => {
-    let error: { message: string; code?: string } | undefined;
+    let error: ProviderError | undefined;
     try {
       const stream = chat({ adapter, messages, abortController });
-      for await (const chunk of stream) {
+      for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
         changed = true;
         if (chunk.type === EventType.RUN_ERROR) {
@@ -98,8 +101,29 @@ export function startRun(
   return listener.chunks;
 }
 
+/**
+ * The stream's chunks until the signal aborts. Some adapters ignore the signal (Ollama's), so
+ * the run stops reading instead of waiting for them, and leaves the stream behind.
+ */
+async function* untilAborted<T>(stream: AsyncIterable<T>, signal: AbortSignal) {
+  const iterator = stream[Symbol.asyncIterator]();
+  const aborted = new Promise<"aborted">((resolve) => {
+    if (signal.aborted) resolve("aborted");
+    signal.addEventListener("abort", () => resolve("aborted"), { once: true });
+  });
+  while (true) {
+    const next = await Promise.race([iterator.next(), aborted]);
+    if (next === "aborted") {
+      void iterator.return?.()?.catch(() => {});
+      return;
+    }
+    if (next.done) return;
+    yield next.value;
+  }
+}
+
 /** A thrown Provider error as a `RUN_ERROR` would report it: its message, and its code or status. */
-function thrownError(caught: unknown): { message: string; code?: string } {
+function thrownError(caught: unknown): ProviderError {
   const { code, status } = (typeof caught === "object" && caught !== null ? caught : {}) as {
     code?: unknown;
     status?: unknown;
@@ -119,12 +143,9 @@ function errorReasonOf(code: string | undefined): MessageErrorReason {
     case "401":
     case "403":
     case "invalid_api_key":
-    case "authentication_error":
-    case "permission_error":
       return "invalid_key";
     case "429":
     case "rate_limit_exceeded":
-    case "rate_limit_error":
     case "insufficient_quota":
       return "rate_limited";
     default:
@@ -195,18 +216,13 @@ function createChunkChannel() {
 }
 
 /**
- * Run at server start (ADR 0002): a `streaming` Message whose run isn't going in this process
- * was cut off by a restart, so it ends as `error` "interrupted".
+ * Run at server start (ADR 0002): every `streaming` Message from before `bootedAt` was cut off by
+ * a restart, so it ends as `error` "interrupted".
  */
-export async function sweepInterruptedRuns(deps: Pick<AppDeps, "db" | "runs">) {
-  const live = [...deps.runs.keys()];
+export async function sweepInterruptedRuns(deps: Pick<AppDeps, "db">, bootedAt = new Date()) {
+  // Only Messages from before boot: a run started meanwhile is going, not interrupted.
   await deps.db
     .update(message)
     .set({ status: "error", error: "interrupted" })
-    .where(
-      and(
-        eq(message.status, "streaming"),
-        live.length > 0 ? notInArray(message.id, live) : undefined,
-      ),
-    );
+    .where(and(eq(message.status, "streaming"), lt(message.createdAt, bootedAt)));
 }

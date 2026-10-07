@@ -7,6 +7,7 @@ import { ScrollButton } from "@ai-chat/ui/components/prompt-kit/scroll-button";
 import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useState } from "react";
+import { toast } from "sonner";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { orpc } from "@/utils/orpc";
@@ -102,7 +103,12 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
         )}
         <Composer
           onSend={(text) => void send(text)}
-          onStop={stopRun.isPending ? undefined : () => void stop()}
+          onStop={
+            stopRun.isPending
+              ? undefined
+              : () =>
+                  stop().catch((caught: Error) => toast.error(`Stopping failed: ${caught.message}`))
+          }
           streaming={streaming}
         />
       </div>

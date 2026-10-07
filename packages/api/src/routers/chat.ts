@@ -1,9 +1,8 @@
-import { conversation, message } from "@ai-chat/db/schema/chat";
 import { ORPCError } from "@orpc/server";
-import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { stopRun } from "../chat/run";
+import { findMessage } from "../chat/store";
 import { protectedProcedure } from "../index";
 
 export const chatRouter = {
@@ -14,13 +13,7 @@ export const chatRouter = {
   stop: protectedProcedure
     .input(z.object({ messageId: z.uuid() }))
     .handler(async ({ context, input }) => {
-      const [owned] = await context.deps.db
-        .select({ id: message.id })
-        .from(message)
-        .innerJoin(conversation, eq(conversation.id, message.conversationId))
-        .where(
-          and(eq(message.id, input.messageId), eq(conversation.userId, context.session.user.id)),
-        );
+      const owned = await findMessage(context.deps, context.session.user.id, input.messageId);
       if (!owned) throw new ORPCError("NOT_FOUND", { message: "Message not found" });
       await stopRun(context.deps, owned.id);
     }),
