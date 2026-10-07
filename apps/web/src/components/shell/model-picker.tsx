@@ -37,7 +37,9 @@ export function ModelPicker({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const selected = value ? findModel(value) : undefined;
+  const selected = value
+    ? (models.find((model) => model.id === value) ?? findModel(value))
+    : undefined;
   const groups = modelGroups(models, search);
 
   return (
@@ -82,6 +84,7 @@ export function ModelPicker({
             <div key={group.provider} role="group" aria-label={group.label} className="py-1">
               <div className="px-2.5 py-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">
                 {group.label}
+                {group.live && <span className="ml-1.5 normal-case">· live list</span>}
               </div>
               {group.models.map((model) => (
                 <button

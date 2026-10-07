@@ -5,6 +5,9 @@ allowBuilds:
   esbuild: true
   sharp: true
   lefthook: true
+  "@google/genai": false
+  "@openrouter/sdk": false
+  protobufjs: false
 catalog:
   zod: ^4.5.4
   typescript: ^6.0.3
