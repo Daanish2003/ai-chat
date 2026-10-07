@@ -10,6 +10,7 @@ import { createTestDeps } from "../testing/deps";
 import { createFakeAdapter, round, text, toolCall } from "../testing/fake-adapter";
 import { createFakeSearchClient } from "../testing/fake-search-client";
 import { createTestClient, insertUser, sessionFor } from "../testing/router-client";
+import { citationPrompt } from "./citations";
 import { type ChatCommand, handleChat } from "./handle-chat";
 import { curatedModels } from "./models";
 import { sweepInterruptedRuns } from "./run";
@@ -303,6 +304,24 @@ describe("the web_search tool is not offered", () => {
 
       expect(offeredTools(fake)).toEqual([]);
     });
+  });
+});
+
+describe("the citation prompt", () => {
+  it("asks the Model to cite with markdown links when it may search", async () => {
+    const { fake, send } = await setup({ rounds: [round(text("Sure."))] });
+
+    await (await send()).text();
+
+    expect(fake.calls[0]!.systemPrompts).toEqual([citationPrompt]);
+  });
+
+  it("is left out when the Model can't search", async () => {
+    const { fake, send } = await setup({ rounds: [round(text("Sure."))] });
+
+    await (await send({ webSearch: false })).text();
+
+    expect(fake.calls[0]!.systemPrompts ?? []).toEqual([]);
   });
 });
 

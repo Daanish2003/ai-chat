@@ -1,3 +1,4 @@
+import { numberSources } from "@ai-chat/api/chat/sources";
 import type { WebSearchPart } from "@ai-chat/db/message-parts";
 import { useEffect, useState } from "react";
 
@@ -91,6 +92,25 @@ export function describeSearch(search: WebSearchPart) {
       };
     }
   }
+}
+
+/**
+ * The one line a row of back-to-back searches shows: a single search's own line, the search
+ * still running, the last failure when none finished (`failed`), or "Searched 3 times · 12
+ * sources" counting distinct Sources.
+ */
+export function describeSearches(searches: WebSearchPart[]) {
+  const keySettings = searches.some((search) => describeSearch(search).keySettings);
+  const running = searches.find((search) => search.state === "running");
+  const failed = searches.every(
+    (search) => search.state === "error" || search.state === "cancelled",
+  );
+  if (searches.length === 1 || running || failed) {
+    return { text: describeSearch(running ?? searches.at(-1)!).text, keySettings, failed };
+  }
+  const count = numberSources(searches).length;
+  const sources = count === 0 ? "no sources" : `${count} ${count === 1 ? "source" : "sources"}`;
+  return { text: `Searched ${searches.length} times · ${sources}`, keySettings, failed };
 }
 
 /** A result's domain for display: the hostname without `www.`. */

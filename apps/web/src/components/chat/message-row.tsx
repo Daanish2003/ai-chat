@@ -1,5 +1,6 @@
 import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
 import { findModel } from "@ai-chat/api/chat/models";
+import { replySegments, sourcesOf } from "@ai-chat/api/chat/sources";
 import { webSearchOf } from "@ai-chat/api/chat/web-search";
 import { Button } from "@ai-chat/ui/components/button";
 import { Loader } from "@ai-chat/ui/components/prompt-kit/loader";
@@ -42,6 +43,7 @@ import {
 } from "./attachments";
 
 import { SearchRow } from "./search-row";
+import { replyComponents, ReplySources } from "./source-chips";
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
@@ -341,19 +343,29 @@ function EditBox({
   );
 }
 
-/** A reply's text and web searches, in stream order. */
+/**
+ * A reply's text and web searches, in stream order. Back-to-back searches share one row; links
+ * to the reply's Sources render as their numbered citation chips.
+ */
 function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
-  return parts.map((part, index) => {
-    if (part.type === "text") {
-      return part.content ? (
-        <Markdown key={index} className="prose prose-sm max-w-[80ch] dark:prose-invert">
-          {part.content}
-        </Markdown>
-      ) : null;
-    }
-    const search = webSearchOf(part);
-    return search ? <SearchRow key={search.toolCallId} search={search} /> : null;
-  });
+  const sources = sourcesOf(parts);
+  return (
+    <ReplySources value={sources}>
+      {replySegments(parts).map((segment) =>
+        segment.type === "text" ? (
+          <Markdown
+            key={segment.key}
+            className="prose prose-sm max-w-[80ch] dark:prose-invert"
+            components={replyComponents}
+          >
+            {segment.content}
+          </Markdown>
+        ) : (
+          <SearchRow key={segment.key} searches={segment.searches} sources={sources} />
+        ),
+      )}
+    </ReplySources>
+  );
 }
 
 /**
