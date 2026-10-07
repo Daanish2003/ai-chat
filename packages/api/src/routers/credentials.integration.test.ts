@@ -143,14 +143,69 @@ describe("credentials", () => {
     expect(provider.urls).toEqual([]);
   });
 
-  it("refuses a Provider whose credentials can't be saved yet", async () => {
+  it("refuses a service that isn't a Provider or Tool", async () => {
     const { client, provider } = await signedIn(200);
 
     await expect(
-      // @ts-expect-error gemini is not a credential service yet
-      client.credentials.save({ service: "gemini", fields: { apiKey: "AIza-key" } }),
+      // @ts-expect-error not a credential service
+      client.credentials.save({ service: "acme", fields: { apiKey: "acme-key" } }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(provider.urls).toEqual([]);
+  });
+
+  it("saves Bedrock credentials as not verified, without a check", async () => {
+    const { client, provider, user, deps } = await signedIn(200);
+
+    const saved = await client.credentials.save({
+      service: "bedrock",
+      fields: { apiKey: "ABSK-bedrock-key-wxyz", region: "us-west-2" },
+    });
+
+    expect(saved).toEqual({ service: "bedrock", hint: "…wxyz", verified: false });
+    expect(provider.urls).toEqual([]);
+    expect(await client.credentials.list()).toEqual([
+      { service: "bedrock", hint: "…wxyz", verified: false },
+    ]);
+    await expect(loadCredentials(deps, user.id, "bedrock")).resolves.toEqual({
+      apiKey: "ABSK-bedrock-key-wxyz",
+      region: "us-west-2",
+    });
+  });
+
+  it("checks and saves Cloudflare credentials with the account id", async () => {
+    const { client, provider, user, deps } = await signedIn(200);
+
+    await client.credentials.save({
+      service: "cloudflare",
+      fields: { accountId: "acc123", apiKey: "cf-token-9876" },
+    });
+
+    expect(provider.urls).toEqual([
+      "https://api.cloudflare.com/client/v4/accounts/acc123/ai/models/search?per_page=1",
+    ]);
+    expect(await client.credentials.list()).toEqual([
+      { service: "cloudflare", hint: "…9876", verified: true },
+    ]);
+    await expect(loadCredentials(deps, user.id, "cloudflare")).resolves.toEqual({
+      accountId: "acc123",
+      apiKey: "cf-token-9876",
+    });
+  });
+
+  it("checks that the Ollama host is reachable and shows the host as the hint", async () => {
+    const { client, provider } = await signedIn(200);
+
+    const saved = await client.credentials.save({
+      service: "ollama",
+      fields: { host: "http://host.docker.internal:11434/" },
+    });
+
+    expect(saved).toEqual({
+      service: "ollama",
+      hint: "http://host.docker.internal:11434",
+      verified: true,
+    });
+    expect(provider.urls).toEqual(["http://host.docker.internal:11434/api/tags"]);
   });
 
   it("treats credentials that no longer decrypt as missing", async () => {
