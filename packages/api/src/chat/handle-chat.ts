@@ -5,6 +5,8 @@ import { toServerSentEventsResponse } from "@tanstack/ai";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { attachmentsForSend } from "../attachments/send";
+import { linkAttachments } from "../attachments/store";
 import { addKeyMessage } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
@@ -24,6 +26,11 @@ export const chatCommandSchema = z.object({
   parentId: z.uuid().nullable(),
   /** The user's text. Without it the command is a regenerate. */
   text: z.string().trim().min(1).optional(),
+  /**
+   * The new Message's attachments, uploaded first through `attachment.upload`. On an edit this
+   * is the whole list: the client carries the edited Message's attachments over. A regenerate
+   * takes none; it leaves its user Message's attachments alone.
+   */
   attachmentIds: z.array(z.uuid()).default([]),
   /** `"provider:model"` */
   model: z.string(),
@@ -49,8 +56,10 @@ export async function handleChat(
   );
   if (!parsed.success) return refuse(400, "Invalid chat command");
   const command = parsed.data;
-  // Later features: attachments and web search.
-  if (command.attachmentIds.length > 0) return refuse(400, "Attachments aren't available yet");
+  const attachmentIds = [...new Set(command.attachmentIds)];
+  if (command.text === undefined && attachmentIds.length > 0) {
+    return refuse(400, "A regenerate can't add attachments; edit the Message instead");
+  }
 
   const owned = await findConversation(deps, userId, command.conversationId);
   if (!owned) return refuse(404, "Conversation not found");
@@ -68,6 +77,13 @@ export async function handleChat(
   if (command.text === undefined && history.at(-1)?.role !== "user") {
     return refuse(400, "Only a reply to your Message can be regenerated");
   }
+  const attachments = await attachmentsForSend(deps, {
+    userId,
+    model,
+    attachmentIds,
+    history,
+  });
+  if (attachments.error) return refuse(attachments.error.status, attachments.error.message);
 
   // Everything that can fail runs before the Messages are written.
   const adapter = deps.adapterFor(model.id, credentials);
@@ -79,10 +95,13 @@ export async function handleChat(
         role: row.role,
         parts: parseStoredParts(row.parts),
         model: row.model,
+        attachments: attachments.ofHistory(row),
       })),
-      ...(userParts ? [{ role: "user" as const, parts: userParts }] : []),
+      ...(userParts
+        ? [{ role: "user" as const, parts: userParts, attachments: attachments.added }]
+        : []),
     ],
-    { provider: model.provider },
+    { provider: model.provider, reads: { images: model.images, pdfs: model.pdfs } },
   );
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
@@ -129,6 +148,7 @@ export async function handleChat(
         createdAt: new Date(now.getTime() + 1),
       },
     ]);
+    if (userParts) await linkAttachments(tx, userMessageId, attachmentIds);
     await tx
       .update(conversation)
       .set({ activeLeafId: assistantMessageId, lastMessageAt: now, model: model.id })

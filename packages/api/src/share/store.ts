@@ -6,8 +6,9 @@ import { and, eq } from "drizzle-orm";
 
 import { parseStoredParts, toUIParts } from "../chat/parts";
 import { loadPath } from "../chat/store";
+import { attachmentsOfMessages } from "../attachments/store";
 import type { AppDeps } from "../deps";
-import { redactForShare } from "./redact";
+import { redactAttachmentsForShare, redactForShare } from "./redact";
 
 type Deps = Pick<AppDeps, "db">;
 type Db = Deps["db"];
@@ -123,13 +124,17 @@ export async function deleteSharedLink(deps: Deps, userId: string, conversationI
 
 /**
  * What anyone with the token sees: the frozen title, the share date and the shared Branch, with
- * thinking and file contents stripped and no author or error details. `undefined` for an unknown
+ * thinking and file contents stripped (attachments are filename chips) and no author or error details. `undefined` for an unknown
  * token.
  */
 export async function loadSharedConversation(deps: Deps, token: string) {
   const [link] = await deps.db.select().from(sharedLink).where(eq(sharedLink.token, token));
   if (!link) return undefined;
   const path = await loadPath(deps, link.conversationId, link.leafMessageId);
+  const attachments = await attachmentsOfMessages(
+    deps,
+    path.map((row) => row.id),
+  );
   return {
     title: link.title,
     sharedAt: link.updatedAt,
@@ -137,6 +142,7 @@ export async function loadSharedConversation(deps: Deps, token: string) {
       id: row.id,
       role: row.role,
       parts: redactForShare(toUIParts(parseStoredParts(row.parts))),
+      attachments: redactAttachmentsForShare(attachments.get(row.id) ?? []),
       model: row.model,
       status: row.status,
       createdAt: row.createdAt,
