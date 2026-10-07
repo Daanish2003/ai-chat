@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { invalidateConversationList } from "@/lib/conversation-list";
 import { orpc } from "@/utils/orpc";
 
+import { ShareButton } from "../share/share-dialog";
 import UserMenu from "../user-menu";
 
 const pageTitles: Record<string, string> = {
@@ -45,6 +46,7 @@ export function TopBar({
         <span className="px-2 text-sm text-muted-foreground">{pageTitles[pathname]}</span>
       )}
       <div className="flex-1" />
+      {id && <ShareButton key={id} conversationId={id} />}
       <UserMenu />
     </header>
   );
