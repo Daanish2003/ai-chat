@@ -127,7 +127,7 @@ export function MessageRow({
         ) : (
           <>
             {thinking && (
-              <Thinking text={thinking} thinking={info.status === "streaming" && !text} />
+              <Thinking text={thinking} inProgress={info.status === "streaming" && !text} />
             )}
             {text && (
               <Markdown className="prose prose-sm max-w-[80ch] dark:prose-invert">{text}</Markdown>
@@ -178,11 +178,12 @@ export function MessageRow({
  * The model's thinking as a collapsed "Thought for…" block (prompt-kit Reasoning). It opens while
  * the model is still thinking and folds away once the answer starts.
  */
-function Thinking({ text, thinking }: { text: string; thinking: boolean }) {
+function Thinking({ text, inProgress }: { text: string; inProgress: boolean }) {
+  // No duration is stored, so the label stays approximate (as in the prototype).
   return (
-    <Reasoning isStreaming={thinking} className="max-w-[80ch]">
+    <Reasoning isStreaming={inProgress} className="max-w-[80ch]">
       <ReasoningTrigger className="text-xs text-muted-foreground">
-        {thinking ? "Thinking…" : "Thought for a few seconds"}
+        {inProgress ? "Thinking…" : "Thought for a few seconds"}
       </ReasoningTrigger>
       <ReasoningContent markdown className="mt-2 border-l-2 pl-3 text-xs">
         {text}

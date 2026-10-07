@@ -6,6 +6,8 @@ import {
 } from "@ai-chat/db/message-parts";
 import { EventType, type MessagePart, type ModelMessage, type StreamChunk } from "@tanstack/ai";
 
+import { providerOf } from "./models";
+
 /**
  * The one boundary between stored Message parts (our versioned zod shape, ADR 0001) and
  * TanStack AI. A TanStack AI upgrade only needs this module checked.
@@ -84,9 +86,6 @@ function textOf(parts: StoredParts, separator: string) {
     .map((part) => part.text)
     .join(separator);
 }
-
-/** The Provider of a `"provider:model"` id. */
-const providerOf = (model: string) => model.split(":")[0];
 
 /**
  * Provider history for `provider`, oldest first. Messages without any text are left out.
