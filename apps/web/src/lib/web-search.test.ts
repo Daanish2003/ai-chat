@@ -1,7 +1,7 @@
 import type { WebSearchPart } from "@ai-chat/db/message-parts";
 import { describe, expect, it } from "vitest";
 
-import { describeSearch, domainOf, searchToggle } from "./web-search";
+import { describeSearch, describeSearches, domainOf, searchToggle } from "./web-search";
 
 const search = (fields: Partial<WebSearchPart>): WebSearchPart => ({
   type: "web_search",
@@ -70,6 +70,42 @@ describe("describeSearch", () => {
     expect(describeSearch(search({ state: "error", errorReason: "failed" })).text).toBe(
       "Search failed.",
     );
+  });
+});
+
+describe("describeSearches", () => {
+  const page = (n: number) => ({
+    title: `Page ${n}`,
+    url: `https://example.com/${n}`,
+    snippet: "…",
+  });
+
+  it("reads like a single search's line for one search", () => {
+    expect(describeSearches([search({ results: [result] })]).text).toBe(
+      'Searched "tanstack ai" · 1 source',
+    );
+  });
+
+  it("counts back-to-back searches and their distinct Sources", () => {
+    expect(
+      describeSearches([
+        search({ query: "one", results: [page(1), page(2)] }),
+        search({ query: "two", results: [page(2), page(3)] }),
+        search({ query: "three", state: "error", errorReason: "failed" }),
+      ]),
+    ).toEqual({ text: "Searched 3 times · 3 sources", keySettings: false });
+    expect(describeSearches([search({}), search({ query: "two" })]).text).toBe(
+      "Searched 2 times · no sources",
+    );
+  });
+
+  it("shows the search still running, and Key settings when any key was rejected", () => {
+    expect(
+      describeSearches([
+        search({ query: "one", state: "error", errorReason: "invalid_key" }),
+        search({ query: "two", state: "running" }),
+      ]),
+    ).toEqual({ text: 'Searching the web for "two"…', keySettings: true });
   });
 });
 

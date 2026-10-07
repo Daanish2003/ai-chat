@@ -69,21 +69,21 @@ const MemoizedMarkdownBlock = memo(
     );
   },
   function propsAreEqual(prevProps, nextProps) {
-    return prevProps.content === nextProps.content;
+    return prevProps.content === nextProps.content && prevProps.components === nextProps.components;
   },
 );
 
 MemoizedMarkdownBlock.displayName = "MemoizedMarkdownBlock";
 
-function MarkdownComponent({
-  children,
-  id,
-  className,
-  components = INITIAL_COMPONENTS,
-}: MarkdownProps) {
+function MarkdownComponent({ children, id, className, components: overrides }: MarkdownProps) {
   const generatedId = useId();
   const blockId = id ?? generatedId;
   const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children]);
+  // Overrides (a link renderer, say) keep the code block renderers. Pass a stable object.
+  const components = useMemo(
+    () => (overrides ? { ...INITIAL_COMPONENTS, ...overrides } : INITIAL_COMPONENTS),
+    [overrides],
+  );
 
   return (
     <div className={className}>
