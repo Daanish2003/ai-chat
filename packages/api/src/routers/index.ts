@@ -5,12 +5,16 @@ import { chatRouter } from "./chat";
 import { conversationRouter } from "./conversation";
 import { credentialsRouter } from "./credentials";
 import { modelsRouter } from "./models";
+import { settingsRouter } from "./settings";
+import { shareRouter } from "./share";
 
 export const appRouter = {
   chat: chatRouter,
   conversation: conversationRouter,
   credentials: credentialsRouter,
   models: modelsRouter,
+  settings: settingsRouter,
+  share: shareRouter,
   healthCheck: publicProcedure.handler(() => {
     return "OK";
   }),

@@ -2,14 +2,16 @@ import { Button } from "@ai-chat/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useParams } from "@tanstack/react-router";
 import { PanelLeftIcon, PencilIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "@/lib/conversation-list";
 import { missingCredentialsMessage } from "@/lib/models";
 import { useNewConversationModel } from "@/lib/new-conversation-model";
+import { awaitingTitle, titleWaitMs } from "@/lib/title";
 import { orpc } from "@/utils/orpc";
 
+import { ShareButton } from "../share/share-dialog";
 import UserMenu from "../user-menu";
 import { ModelPicker } from "./model-picker";
 
@@ -54,6 +56,7 @@ export function TopBar({
         pathname === "/c" && <NewConversationModelPicker />
       )}
       <div className="flex-1" />
+      {id && <ShareButton key={id} conversationId={id} />}
       <UserMenu />
     </header>
   );
@@ -114,7 +117,26 @@ function NewConversationModelPicker() {
 
 function ConversationTitle({ id }: { id: string }) {
   const queryClient = useQueryClient();
-  const conversation = useQuery(orpc.conversation.get.queryOptions({ input: { id } }));
+  // The automatic title is written just after a reply completes: check for it for a while.
+  const awaitingSince = useRef<number | undefined>(undefined);
+  const conversation = useQuery({
+    ...orpc.conversation.get.queryOptions({ input: { id } }),
+    refetchInterval: (query) => {
+      if (!awaitingTitle(query.state.data)) {
+        awaitingSince.current = undefined;
+        return false;
+      }
+      awaitingSince.current ??= Date.now();
+      return Date.now() - awaitingSince.current < titleWaitMs ? 1_000 : false;
+    },
+  });
+  // A title arriving for an untitled Conversation also changes its Conversation panel row.
+  const loadedTitle = conversation.data?.title;
+  const previousTitle = useRef(loadedTitle);
+  useEffect(() => {
+    if (previousTitle.current === null && loadedTitle) void invalidateConversationList(queryClient);
+    previousTitle.current = loadedTitle;
+  }, [loadedTitle, queryClient]);
   const [renaming, setRenaming] = useState(false);
   const rename = useMutation(
     orpc.conversation.rename.mutationOptions({

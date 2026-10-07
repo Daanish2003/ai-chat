@@ -99,3 +99,129 @@ describe("checkCredentials for OpenAI", () => {
     });
   });
 });
+
+describe("checkCredentials for the other Providers", () => {
+  it.each([
+    {
+      service: "gemini",
+      url: "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
+      header: ["x-goog-api-key", "key-good"],
+    },
+    {
+      service: "openrouter",
+      url: "https://openrouter.ai/api/v1/key",
+      header: ["authorization", "Bearer key-good"],
+    },
+    {
+      service: "mistral",
+      url: "https://api.mistral.ai/v1/models",
+      header: ["authorization", "Bearer key-good"],
+    },
+    {
+      service: "groq",
+      url: "https://api.groq.com/openai/v1/models",
+      header: ["authorization", "Bearer key-good"],
+    },
+    {
+      service: "grok",
+      url: "https://api.x.ai/v1/models",
+      header: ["authorization", "Bearer key-good"],
+    },
+    {
+      service: "byteplus",
+      url: "https://ark.ap-southeast.bytepluses.com/api/v3/models",
+      header: ["authorization", "Bearer key-good"],
+    },
+    {
+      service: "vercel-gateway",
+      url: "https://ai-gateway.vercel.sh/v1/credits",
+      header: ["authorization", "Bearer key-good"],
+    },
+  ] as const)("checks $service with $url", async ({ service, url, header }) => {
+    const { fetch, calls } = stubFetch(() => json(200));
+
+    const result = await checkCredentials(service, { apiKey: "key-good" }, fetch);
+
+    expect(result).toEqual({ status: "verified" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(url);
+    expect(calls[0]?.headers.get(header[0])).toBe(header[1]);
+  });
+
+  it("rejects a key Gemini answers 400 to as invalid, since that is how it refuses keys", async () => {
+    const { fetch } = stubFetch(() => json(400, { error: { status: "INVALID_ARGUMENT" } }));
+
+    const result = await checkCredentials("gemini", { apiKey: "AIza-typo" }, fetch);
+
+    expect(result).toEqual({
+      status: "rejected",
+      reason: "invalid_key",
+      message: "Google Gemini rejected this API key.",
+    });
+  });
+
+  it("checks a Cloudflare token against the account's Workers AI models", async () => {
+    const { fetch, calls } = stubFetch(() => json(200, { success: true }));
+
+    const result = await checkCredentials(
+      "cloudflare",
+      { accountId: "acc123", apiKey: "cf-token" },
+      fetch,
+    );
+
+    expect(result).toEqual({ status: "verified" });
+    expect(calls[0]?.url).toBe(
+      "https://api.cloudflare.com/client/v4/accounts/acc123/ai/models/search?per_page=1",
+    );
+    expect(calls[0]?.headers.get("authorization")).toBe("Bearer cf-token");
+  });
+
+  it("checks that the Ollama host is reachable by listing its installed Models", async () => {
+    const { fetch, calls } = stubFetch(() => json(200, { models: [] }));
+
+    const result = await checkCredentials("ollama", { host: "http://localhost:11434" }, fetch);
+
+    expect(result).toEqual({ status: "verified" });
+    expect(calls[0]?.url).toBe("http://localhost:11434/api/tags");
+    expect(calls[0]?.headers.get("authorization")).toBeNull();
+  });
+
+  it("explains an unreachable Ollama host, with the Docker hint", async () => {
+    const { fetch } = stubFetch(() => {
+      throw new TypeError("fetch failed");
+    });
+
+    const result = await checkCredentials("ollama", { host: "http://localhost:11434" }, fetch);
+
+    expect(result).toEqual({
+      status: "rejected",
+      reason: "provider_error",
+      message:
+        "Couldn't reach Ollama at http://localhost:11434. Under Docker, use http://host.docker.internal:11434.",
+    });
+  });
+
+  it("doesn't treat an Ollama 401 as a rejected key, since Ollama has none", async () => {
+    const { fetch } = stubFetch(() => json(401));
+
+    const result = await checkCredentials("ollama", { host: "http://localhost:11434" }, fetch);
+
+    expect(result).toMatchObject({ status: "rejected", reason: "provider_error" });
+  });
+
+  it.each(["llmgateway", "lovable", "bedrock"] as const)(
+    "saves %s credentials as not verified without calling the Provider",
+    async (service) => {
+      const { fetch, calls } = stubFetch(() => json(200));
+
+      const result = await checkCredentials(
+        service,
+        { apiKey: "key-good", region: "us-east-1" },
+        fetch,
+      );
+
+      expect(result).toEqual({ status: "unverified" });
+      expect(calls).toEqual([]);
+    },
+  );
+});

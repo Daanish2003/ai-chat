@@ -11,6 +11,7 @@ import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
 import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "./parts";
+import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
@@ -113,6 +114,10 @@ export function startRun(
       );
       deps.runs.delete(messageId);
       listener.close();
+      // The run ended `complete`: title its Conversation, fire-and-forget.
+      if (!timedOut && !abortController.signal.aborted && error === undefined) {
+        void titleConversation(deps, messageId);
+      }
     }
   })();
 

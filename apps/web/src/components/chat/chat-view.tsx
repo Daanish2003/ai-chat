@@ -4,12 +4,13 @@ import {
   ChatContainerRoot,
 } from "@ai-chat/ui/components/prompt-kit/chat-container";
 import { ScrollButton } from "@ai-chat/ui/components/prompt-kit/scroll-button";
-import { fetchServerSentEvents, useChat } from "@tanstack/ai-react";
+import type { ChatCommand } from "@ai-chat/api/chat/handle-chat";
+import { fetchServerSentEvents, type UIMessage, useChat } from "@tanstack/ai-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
+import { branchFrom, takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
 import { missingCredentialsMessage } from "@/lib/models";
 import { readSearchPreference } from "@/lib/web-search";
@@ -22,8 +23,6 @@ import { SearchToggle, useWebSearch } from "./search-toggle";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
 
-const connection = fetchServerSentEvents("/api/chat");
-
 /**
  * One Conversation's Active Branch and composer. `useChat` is the truth while a run streams;
  * when it ends, the Active Branch is refetched and replaces `useChat`'s messages (ADR 0002).
@@ -34,7 +33,13 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
   const queryClient = useQueryClient();
   // The server writes the new Messages before it streams, so the first chunk means "sent".
   const awaitingFirstChunk = useRef(false);
-  const { messages, sendMessage, setMessages, error } = useChat({
+  // The command for the next request. `reload` (regenerate) takes no body, so every command
+  // rides in the connection's body instead.
+  const command = useRef<ChatCommand>(undefined);
+  const [connection] = useState(() =>
+    fetchServerSentEvents("/api/chat", () => ({ body: command.current })),
+  );
+  const { messages, sendMessage, reload, setMessages, error } = useChat({
     connection,
     initialMessages: toUIMessages(conversation.messages),
     onChunk: () => {
@@ -77,21 +82,25 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
     : null;
   const search = useWebSearch(conversation.model);
 
-  const send = async (text: string) => {
+  /**
+   * Runs a command under `parentId`: a send or an edit with `text`, a regenerate without.
+   * A new Branch replaces what's on screen with `history`, the Messages above the new ones.
+   */
+  const run = async (parentId: string | null, text?: string, history?: UIMessage[]) => {
     setSending(true);
     awaitingFirstChunk.current = true;
+    command.current = {
+      conversationId: conversation.id,
+      parentId,
+      text,
+      attachmentIds: [],
+      model: conversation.model,
+      // Read now: a first Message is sent on mount, before the toggle's state has loaded.
+      webSearch: search.available && readSearchPreference(),
+    };
     try {
-      await sendMessage(text, {
-        body: {
-          conversationId: conversation.id,
-          parentId: conversation.messages.at(-1)?.id ?? null,
-          text,
-          attachmentIds: [],
-          model: conversation.model,
-          // Read now: a first Message is sent on mount, before the toggle's state has loaded.
-          webSearch: search.available && readSearchPreference(),
-        },
-      });
+      if (history) setMessages(history);
+      await (text === undefined ? reload() : sendMessage(text));
     } finally {
       try {
         const fresh = await fetchConversation();
@@ -102,6 +111,21 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
       }
     }
   };
+
+  const send = (text: string) => run(conversation.messages.at(-1)?.id ?? null, text);
+
+  /** Edit (with `text`) or regenerate `messageId` into a new Branch beside it. */
+  const startBranch = (messageId: string, text?: string) => {
+    const { parentId, history } = branchFrom(messages, messageId);
+    void run(parentId, text, history);
+  };
+
+  const switchBranch = useMutation(
+    orpc.conversation.switchBranch.mutationOptions({
+      onSuccess: () => fetchConversation(),
+      onError: (caught) => toast.error(`Switching Branch failed: ${caught.message}`),
+    }),
+  );
 
   // A new Conversation arrives here with its first Message still to send.
   const sendPendingFirstMessage = useEffectEvent(() => {
@@ -115,7 +139,16 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
       <ChatContainerRoot className="relative min-h-0 flex-1">
         <ChatContainerContent className="py-2">
           {messages.map((message) => (
-            <MessageRow key={message.id} message={message} />
+            <MessageRow
+              key={message.id}
+              message={message}
+              actions={{
+                streaming: streaming || switchBranch.isPending,
+                onEdit: (text) => startBranch(message.id, text),
+                onRegenerate: () => startBranch(message.id),
+                onSwitchBranch: (messageId) => switchBranch.mutate({ messageId }),
+              }}
+            />
           ))}
         </ChatContainerContent>
         <div className="absolute right-6 bottom-3">
@@ -138,7 +171,8 @@ export function ChatView({ conversation }: { conversation: ConversationData }) {
                   stop().catch((caught: Error) => toast.error(`Stopping failed: ${caught.message}`))
           }
           streaming={streaming}
-          disabled={!!blocked}
+          // The next Message continues the Branch being switched to, so wait for it.
+          disabled={!!blocked || switchBranch.isPending}
         >
           <SearchToggle search={search} />
         </Composer>

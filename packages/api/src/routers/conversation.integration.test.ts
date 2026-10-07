@@ -1,4 +1,4 @@
-import { message } from "@ai-chat/db/schema/chat";
+import { conversation, message } from "@ai-chat/db/schema/chat";
 import { getTestDb } from "@ai-chat/db/testing/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,7 @@ import { saveCredentials } from "../credentials/store";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestDeps } from "../testing/deps";
 import { createFakeAdapter, round, text } from "../testing/fake-adapter";
+import { liveModelsFetch } from "../testing/live-models";
 import { createTestClient, insertUser, sessionFor } from "../testing/router-client";
 
 async function signedIn() {
@@ -43,7 +44,7 @@ describe("conversation.get", () => {
     const { user, client } = await signedIn();
     const conv = await insertConversation(user);
     const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
-    await insertMessage({
+    const older = await insertMessage({
       conversationId: conv.id,
       parentId: question.id,
       role: "assistant",
@@ -70,6 +71,7 @@ describe("conversation.get", () => {
         error: null,
         errorReason: null,
         createdAt: question.createdAt,
+        siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
       {
         id: reply.id,
@@ -81,6 +83,7 @@ describe("conversation.get", () => {
         error: null,
         errorReason: null,
         createdAt: reply.createdAt,
+        siblings: { index: 1, count: 2, previousId: older.id, nextId: null },
       },
     ]);
   });
@@ -160,7 +163,17 @@ describe("conversation.list", () => {
       lastMessageAt: conv.lastMessageAt,
       preview: "Partial answer",
       hasError: true,
+      shared: false,
     });
+  });
+
+  it("flags a Conversation that has a Shared link", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+    await insertMessage({ conversationId: conv.id, role: "user", text: "Hi", active: true });
+    await client.share.upsert({ conversationId: conv.id });
+
+    await expect(client.conversation.list()).resolves.toMatchObject([{ shared: true }]);
   });
 
   it("previews the question while its reply hasn't written any text yet", async () => {
@@ -399,6 +412,8 @@ describe("conversation.setModel", () => {
       await response.text();
     };
     const { id } = await client.conversation.create({ model: "anthropic:claude-sonnet-5-5" });
+    // Titled, so no automatic title call takes the scripted adapter.
+    await client.conversation.rename({ id, title: "Switching Models" });
 
     await sendNext("First question");
     await client.conversation.setModel({ id, model: "openai:gpt-5.6" });
@@ -413,5 +428,145 @@ describe("conversation.setModel", () => {
       ["user", null, [{ type: "text", content: "Second question" }]],
       ["assistant", "openai:gpt-5.6", [{ type: "text", content: "From GPT" }]],
     ]);
+  });
+});
+
+describe("conversation.switchBranch", () => {
+  /** `minute` minutes into a fixed morning, so Branch order doesn't depend on any clock. */
+  const at = (minute: number) => new Date(Date.UTC(2026, 9, 1, 9, minute));
+
+  /**
+   * q1 ─ a1 ─ q2 ─ a2          (q2b edits q2; a2b is the newest leaf under a1)
+   *    │     └ q2b ─ a2b
+   *    └ a1b                    (regenerated a1, active)
+   */
+  async function branchyConversation() {
+    const { user, client } = await signedIn();
+    const lastMessageAt = at(30);
+    const conv = await insertConversation(user, { lastMessageAt });
+    const add = (minute: number, role: "user" | "assistant", parentId: string | null) =>
+      insertMessage({
+        conversationId: conv.id,
+        parentId,
+        role,
+        text: `minute ${minute}`,
+        createdAt: at(minute),
+      });
+    const q1 = await add(0, "user", null);
+    const a1 = await add(1, "assistant", q1.id);
+    const q2 = await add(2, "user", a1.id);
+    const a2 = await add(3, "assistant", q2.id);
+    const q2b = await add(4, "user", a1.id);
+    const a2b = await add(5, "assistant", q2b.id);
+    const a1b = await add(6, "assistant", q1.id);
+    await getTestDb()
+      .update(conversation)
+      .set({ activeLeafId: a1b.id })
+      .where(eq(conversation.id, conv.id));
+    return { user, client, conv, lastMessageAt, q1, a1, q2, a2, q2b, a2b, a1b };
+  }
+
+  it("makes the newest leaf under the sibling active, without bumping lastMessageAt", async () => {
+    const { client, conv, lastMessageAt, q1, a1, q2b, a2b } = await branchyConversation();
+
+    await client.conversation.switchBranch({ messageId: a1.id });
+
+    const result = await client.conversation.get({ id: conv.id });
+    expect(result.messages.map((m) => m.id)).toEqual([q1.id, a1.id, q2b.id, a2b.id]);
+    expect(result.messages.map((m) => m.siblings)).toEqual([
+      { index: 0, count: 1, previousId: null, nextId: null },
+      { index: 0, count: 2, previousId: null, nextId: expect.any(String) },
+      { index: 1, count: 2, previousId: expect.any(String), nextId: null },
+      { index: 0, count: 1, previousId: null, nextId: null },
+    ]);
+    const [row] = await getTestDb().select().from(conversation).where(eq(conversation.id, conv.id));
+    expect(row?.lastMessageAt).toEqual(lastMessageAt);
+  });
+
+  it("lands on the Message itself when it has no children", async () => {
+    const { client, conv, q2, a2 } = await branchyConversation();
+
+    await client.conversation.switchBranch({ messageId: q2.id });
+
+    const result = await client.conversation.get({ id: conv.id });
+    expect(result.messages.at(-1)?.id).toBe(a2.id);
+  });
+
+  it("refuses while a reply is streaming in the Conversation", async () => {
+    const { client, conv, a1, a1b } = await branchyConversation();
+    await getTestDb().update(message).set({ status: "streaming" }).where(eq(message.id, a1b.id));
+
+    await expect(client.conversation.switchBranch({ messageId: a1.id })).rejects.toMatchObject({
+      code: "CONFLICT",
+    });
+    const result = await client.conversation.get({ id: conv.id });
+    expect(result.messages.at(-1)?.id).toBe(a1b.id);
+  });
+
+  it("can't switch another user's Conversation", async () => {
+    const { conv, a1, a1b } = await branchyConversation();
+    const other = await signedIn();
+
+    await expect(
+      other.client.conversation.switchBranch({ messageId: a1.id }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    const [row] = await getTestDb().select().from(conversation).where(eq(conversation.id, conv.id));
+    expect(row?.activeLeafId).toBe(a1b.id);
+  });
+});
+
+describe("live-listed Models", () => {
+  async function withOpenRouter(openRouter: string[]) {
+    const user = await insertUser();
+    const deps = createTestDeps({ fetch: liveModelsFetch({ openRouter }).fetch });
+    await saveCredentials(deps, user.id, {
+      service: "openrouter",
+      fields: { apiKey: "sk-or-test" },
+      hint: "…test",
+      verified: true,
+    });
+    return { user, client: createTestClient({ user, deps }) };
+  }
+
+  it("creates a Conversation on a Model from OpenRouter's live list", async () => {
+    const { client } = await withOpenRouter(["anthropic/claude-sonnet-5.5"]);
+
+    const { id } = await client.conversation.create({
+      model: "openrouter:anthropic/claude-sonnet-5.5",
+    });
+
+    await expect(client.conversation.get({ id })).resolves.toMatchObject({
+      model: "openrouter:anthropic/claude-sonnet-5.5",
+    });
+  });
+
+  it("refuses an OpenRouter Model that isn't on the live list", async () => {
+    const { client } = await withOpenRouter(["anthropic/claude-sonnet-5.5"]);
+
+    await expect(
+      client.conversation.create({ model: "openrouter:openai/gpt-4o" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("selects a Model installed on the user's Ollama host", async () => {
+    const user = await insertUser();
+    const deps = createTestDeps({ fetch: liveModelsFetch({ ollama: ["qwen3:8b"] }).fetch });
+    await saveCredentials(deps, user.id, {
+      service: "ollama",
+      fields: { host: "http://ollama.test:11434" },
+      hint: "http://ollama.test:11434",
+      verified: true,
+    });
+    const client = createTestClient({ user, deps });
+    const conv = await insertConversation(user);
+
+    await client.conversation.setModel({ id: conv.id, model: "ollama:qwen3:8b" });
+
+    await expect(client.conversation.get({ id: conv.id })).resolves.toMatchObject({
+      model: "ollama:qwen3:8b",
+    });
+    await expect(
+      client.conversation.setModel({ id: conv.id, model: "ollama:llama3.2:latest" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

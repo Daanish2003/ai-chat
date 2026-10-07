@@ -1,8 +1,10 @@
 import { conversation, message, type MessageRow } from "@ai-chat/db/schema/chat";
+import { sharedLink } from "@ai-chat/db/schema/share";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import type { AppDeps } from "../deps";
+import { type SiblingPosition, siblingPosition, newestLeaf, pathTo } from "./branches";
 import { parseStoredParts, toUIParts } from "./parts";
 
 type Deps = Pick<AppDeps, "db">;
@@ -38,7 +40,10 @@ export async function setConversationModel(deps: Deps, userId: string, id: strin
   return rows.length > 0;
 }
 
-/** Deletes the user's Conversation and, by cascade, its Messages; `false` when it isn't theirs. */
+/**
+ * Deletes the user's Conversation and, by cascade, its Messages and Shared link; `false` when it
+ * isn't theirs.
+ */
 export async function deleteConversation(deps: Deps, userId: string, id: string) {
   const rows = await deps.db
     .delete(conversation)
@@ -57,6 +62,7 @@ const leafParent = alias(message, "leaf_parent");
  * The user's Conversations for the Conversation panel, newest Message first, each with a one-line
  * preview of its Active Branch's last Message and whether that Message ended in an error. A reply
  * that hasn't written any text yet previews the Message it answers.
+ * `shared` says whether the Conversation has a Shared link.
  */
 export async function listConversations(deps: Deps, userId: string) {
   const rows = await deps.db
@@ -69,10 +75,12 @@ export async function listConversations(deps: Deps, userId: string) {
         string | null
       >`left(coalesce(nullif(${leaf.searchText}, ''), ${leafParent.searchText}), ${previewLength})`,
       lastStatus: leaf.status,
+      shared: sql<boolean>`${sharedLink.token} is not null`,
     })
     .from(conversation)
     .leftJoin(leaf, eq(leaf.id, conversation.activeLeafId))
     .leftJoin(leafParent, eq(leafParent.id, leaf.parentId))
+    .leftJoin(sharedLink, eq(sharedLink.conversationId, conversation.id))
     .where(eq(conversation.userId, userId))
     .orderBy(desc(conversation.lastMessageAt), desc(conversation.id));
   return rows.map(({ preview, lastStatus, ...row }) => ({
@@ -99,16 +107,61 @@ export async function loadPath(
   leafId: string | null,
 ): Promise<MessageRow[]> {
   if (!leafId) return [];
-  const rows = await deps.db
-    .select()
-    .from(message)
-    .where(eq(message.conversationId, conversationId));
-  const byId = new Map(rows.map((row) => [row.id, row]));
-  const path: MessageRow[] = [];
-  for (let row = byId.get(leafId); row; row = row.parentId ? byId.get(row.parentId) : undefined) {
-    path.push(row);
-  }
-  return path.reverse();
+  return pathTo(await loadMessages(deps, conversationId), leafId);
+}
+
+function loadMessages(deps: Deps, conversationId: string) {
+  return deps.db.select().from(message).where(eq(message.conversationId, conversationId));
+}
+
+/** The Active Branch for the client, each Message with where it sits among its siblings. */
+export async function loadActiveBranch(
+  deps: Deps,
+  conversationId: string,
+  leafId: string | null,
+): Promise<ActiveBranchMessage[]> {
+  if (!leafId) return [];
+  const rows = await loadMessages(deps, conversationId);
+  return pathTo(rows, leafId).map((row) => ({
+    ...toClientMessage(row),
+    siblings: siblingPosition(rows, row),
+  }));
+}
+
+/**
+ * Makes the newest leaf under the user's Message the Active Branch. Doesn't bump
+ * `lastMessageAt`. Refused while a reply streams, like every other change to the Branch.
+ */
+export async function switchBranch(
+  deps: Deps,
+  userId: string,
+  messageId: string,
+): Promise<"switched" | "not_found" | "streaming"> {
+  const target = await findMessage(deps, userId, messageId);
+  if (!target) return "not_found";
+  return deps.db.transaction(async (tx) => {
+    // Queues behind a send's transaction, which holds the same lock (see `handleChat`).
+    await tx
+      .select({ id: conversation.id })
+      .from(conversation)
+      .where(eq(conversation.id, target.conversationId))
+      .for("update");
+    const nodes = await tx
+      .select({
+        id: message.id,
+        parentId: message.parentId,
+        createdAt: message.createdAt,
+        status: message.status,
+      })
+      .from(message)
+      .where(eq(message.conversationId, target.conversationId));
+    if (nodes.some((node) => node.status === "streaming")) return "streaming";
+    await tx
+      .update(conversation)
+      .set({ activeLeafId: newestLeaf(nodes, target.id) })
+      .where(eq(conversation.id, target.conversationId));
+    return "switched";
+  });
 }
 
 /** A Message as the client sees it, with `useChat` parts. */
@@ -127,3 +180,6 @@ export function toClientMessage(row: MessageRow) {
 }
 
 export type ClientMessage = ReturnType<typeof toClientMessage>;
+
+/** A Message of the Active Branch as `conversation.get` returns it, with its ‹ n/m › position. */
+export type ActiveBranchMessage = ClientMessage & { siblings: SiblingPosition };

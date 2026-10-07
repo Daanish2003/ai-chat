@@ -9,7 +9,7 @@ import { addKeyMessage, tavilyService } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
-import { findModel } from "./models";
+import { resolveModel } from "./available-models";
 import { parseStoredParts, searchTextOf, toModelMessages } from "./parts";
 import { startRun } from "./run";
 import { findConversation, loadPath } from "./store";
@@ -49,14 +49,13 @@ export async function handleChat(
   );
   if (!parsed.success) return refuse(400, "Invalid chat command");
   const command = parsed.data;
-  // Later features: regenerate (no text), attachments and web search.
-  if (command.text === undefined) return refuse(400, "Regenerating isn't available yet");
+  // A later feature: attachments.
   if (command.attachmentIds.length > 0) return refuse(400, "Attachments aren't available yet");
 
   const owned = await findConversation(deps, userId, command.conversationId);
   if (!owned) return refuse(404, "Conversation not found");
 
-  const model = findModel(command.model);
+  const model = await resolveModel(deps, userId, command.model);
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const credentials = await loadCredentials(deps, userId, model.provider);
   if (!credentials) return refuse(400, addKeyMessage(model.provider));
@@ -68,16 +67,25 @@ export async function handleChat(
   if (command.parentId && history.length === 0) {
     return refuse(400, "The parent Message is not in this Conversation");
   }
+  // A regenerate (no text) answers its parent again, so the parent must be the user's Message.
+  if (command.text === undefined && history.at(-1)?.role !== "user") {
+    return refuse(400, "Only a reply to your Message can be regenerated");
+  }
 
   // Everything that can fail runs before the Messages are written.
   const adapter = deps.adapterFor(model.id, credentials);
-  const userParts = storedParts([{ type: "text", text: command.text }]);
+  const userParts =
+    command.text === undefined ? undefined : storedParts([{ type: "text", text: command.text }]);
   const messages = toModelMessages(
     [
-      ...history.map((row) => ({ role: row.role, parts: parseStoredParts(row.parts) })),
-      { role: "user", parts: userParts },
+      ...history.map((row) => ({
+        role: row.role,
+        parts: parseStoredParts(row.parts),
+        model: row.model,
+      })),
+      ...(userParts ? [{ role: "user" as const, parts: userParts }] : []),
     ],
-    { webSearch: searchCredentials !== null },
+    { provider: model.provider, webSearch: searchCredentials !== null },
   );
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
@@ -98,20 +106,25 @@ export async function handleChat(
     if (running) return false;
 
     await tx.insert(message).values([
-      {
-        id: userMessageId,
-        conversationId: owned.id,
-        parentId: command.parentId,
-        role: "user",
-        parts: userParts,
-        searchText: searchTextOf(userParts),
-        status: "complete",
-        createdAt: now,
-      },
+      // An edit is a new user Message beside the one it replaces; a regenerate writes none.
+      ...(userParts
+        ? [
+            {
+              id: userMessageId,
+              conversationId: owned.id,
+              parentId: command.parentId,
+              role: "user" as const,
+              parts: userParts,
+              searchText: searchTextOf(userParts),
+              status: "complete" as const,
+              createdAt: now,
+            },
+          ]
+        : []),
       {
         id: assistantMessageId,
         conversationId: owned.id,
-        parentId: userMessageId,
+        parentId: userParts ? userMessageId : command.parentId,
         role: "assistant",
         parts: storedParts([]),
         model: model.id,

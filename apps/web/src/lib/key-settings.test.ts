@@ -3,17 +3,15 @@ import { describe, expect, it } from "vitest";
 import { providerRows } from "./key-settings";
 
 describe("providerRows", () => {
-  it("lists all 14 Providers, with only Anthropic and OpenAI available", () => {
+  it("lists all 14 Providers, every one available", () => {
     const rows = providerRows([]);
 
     expect(rows).toHaveLength(14);
-    expect(rows.filter((row) => row.status !== "coming_soon").map((row) => row.id)).toEqual([
-      "anthropic",
-      "openai",
-    ]);
+    expect(rows.filter((row) => row.status === "coming_soon")).toEqual([]);
     expect(rows.find((row) => row.id === "gemini")).toMatchObject({
       label: "Google Gemini",
-      status: "coming_soon",
+      status: "missing",
+      service: "gemini",
     });
   });
 

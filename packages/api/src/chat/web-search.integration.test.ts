@@ -64,7 +64,8 @@ async function setup({
       verified: true,
     });
   }
-  const conv = await insertConversation(user);
+  // Titled, so a complete run doesn't call the adapter again to title it (#26).
+  const conv = await insertConversation(user, { title: "Web search" });
   const send = (command: Partial<ChatCommand> = {}) =>
     handleChat(
       new Request("http://localhost/api/chat", {

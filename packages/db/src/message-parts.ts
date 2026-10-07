@@ -7,6 +7,17 @@ import { z } from "zod";
 
 export const textPartSchema = z.object({ type: z.literal("text"), text: z.string() });
 
+/**
+ * A model's thinking. `signature` is the Provider's opaque reasoning artefact, sent back only to
+ * the same Provider; a `redacted` block (Anthropic `redacted_thinking`) has no text, only that.
+ */
+export const thinkingPartSchema = z.object({
+  type: z.literal("thinking"),
+  text: z.string(),
+  signature: z.string().optional(),
+  redacted: z.boolean().optional(),
+});
+
 export const searchResultSchema = z.object({
   title: z.string(),
   url: z.string(),
@@ -24,7 +35,11 @@ export const webSearchPartSchema = z.object({
   errorReason: z.enum(["invalid_key", "quota_exhausted", "failed"]).optional(),
 });
 
-export const storedPartSchema = z.discriminatedUnion("type", [textPartSchema, webSearchPartSchema]);
+export const storedPartSchema = z.discriminatedUnion("type", [
+  textPartSchema,
+  thinkingPartSchema,
+  webSearchPartSchema,
+]);
 
 export const storedPartsSchema = z.object({
   schemaVersion: z.literal(1),

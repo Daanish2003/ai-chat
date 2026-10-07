@@ -3,7 +3,7 @@ import { findModel } from "@ai-chat/api/chat/models";
 import { Button } from "@ai-chat/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Trash2Icon } from "lucide-react";
+import { Share2Icon, Trash2Icon } from "lucide-react";
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "@/lib/conversation-list";
@@ -56,7 +56,8 @@ function ConversationRow({ conversation }: { conversation: ConversationSummary }
   );
 
   const confirmDelete = () => {
-    if (window.confirm(`Delete "${title}"? This can't be undone.`)) {
+    const sharedNote = conversation.shared ? " This also deletes its Shared link." : "";
+    if (window.confirm(`Delete "${title}"?${sharedNote} This can't be undone.`)) {
       remove.mutate({ id: conversation.id });
     }
   };
@@ -85,6 +86,9 @@ function ConversationRow({ conversation }: { conversation: ConversationSummary }
         </p>
         <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
           <span>{findModel(conversation.model)?.label ?? conversation.model}</span>
+          {conversation.shared && (
+            <Share2Icon aria-label="Shared" className="size-3 shrink-0 text-primary" />
+          )}
           {conversation.hasError && <span className="text-destructive">error</span>}
         </div>
       </Link>

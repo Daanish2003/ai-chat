@@ -1,18 +1,41 @@
-import type { ClientMessage } from "@ai-chat/api/chat/store";
+import type { SiblingPosition } from "@ai-chat/api/chat/branches";
+import type { ActiveBranchMessage, ClientMessage } from "@ai-chat/api/chat/store";
 import type { UIMessage } from "@tanstack/ai-react";
 
 /** What the server knows about a Message beyond its parts, kept in `UIMessage.metadata`. */
 export type MessageInfo = Pick<ClientMessage, "model" | "status" | "error" | "errorReason">;
 
 /** `useChat` messages from the Active Branch (`conversation.get`). */
-export function toUIMessages(messages: ClientMessage[]): UIMessage[] {
-  return messages.map(({ id, role, parts, createdAt, model, status, error, errorReason }) => ({
-    id,
-    role,
-    parts: parts as UIMessage["parts"],
-    createdAt,
-    metadata: { model, status, error, errorReason } satisfies MessageInfo,
-  }));
+export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
+  return messages.map(
+    ({ id, role, parts, createdAt, model, status, error, errorReason, siblings }) => ({
+      id,
+      role,
+      parts: parts as UIMessage["parts"],
+      createdAt,
+      metadata: { model, status, error, errorReason, siblings } satisfies MessageInfo & {
+        siblings: SiblingPosition;
+      },
+    }),
+  );
+}
+
+/** Where the Message sits among its siblings, for the ‹ n/m › arrows; 1 of 1 while it streams. */
+export function messageSiblings(message: UIMessage): SiblingPosition {
+  const info = message.metadata as { siblings?: SiblingPosition } | undefined;
+  return info?.siblings ?? { index: 0, count: 1, previousId: null, nextId: null };
+}
+
+/**
+ * Editing or regenerating `messageId` starts a new Branch beside it: the command goes under the
+ * same parent, and the messages shown before it stay while the new reply streams.
+ */
+export function branchFrom<T extends { id: string }>(messages: T[], messageId: string) {
+  const history = messages.slice(
+    0,
+    messages.findIndex((message) => message.id === messageId),
+  );
+  return { parentId: history.at(-1)?.id ?? null, history };
 }
 
 /**

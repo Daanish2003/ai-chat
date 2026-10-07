@@ -1,3 +1,4 @@
+import { storedParts } from "@ai-chat/db/message-parts";
 import { EventType, type StreamChunk } from "@tanstack/ai";
 import { describe, expect, it } from "vitest";
 
@@ -20,6 +21,19 @@ const textDelta = (messageId: string, delta: string): StreamChunk => ({
   type: EventType.TEXT_MESSAGE_CONTENT,
   messageId,
   delta,
+  timestamp: at,
+});
+const reasoningDelta = (messageId: string, delta: string): StreamChunk => ({
+  type: EventType.REASONING_MESSAGE_CONTENT,
+  messageId,
+  delta,
+  timestamp: at,
+});
+const reasoningSignature = (entityId: string, encryptedValue: string): StreamChunk => ({
+  type: EventType.REASONING_ENCRYPTED_VALUE,
+  subtype: "message",
+  entityId,
+  encryptedValue,
   timestamp: at,
 });
 const runStarted: StreamChunk = {
@@ -54,6 +68,29 @@ describe("stored parts from a stream", () => {
   it("leaves out a text message that never got any text", () => {
     expect(build([textStart("a"), textStart("b"), textDelta("b", "Hi")]).parts).toEqual([
       { type: "text", text: "Hi" },
+    ]);
+  });
+
+  it("collects thinking into a thinking part before the text", () => {
+    const chunks = [
+      reasoningDelta("r", "Let me "),
+      reasoningDelta("r", "think."),
+      reasoningSignature("r", "sig-1"),
+      textStart("a"),
+      textDelta("a", "Answer"),
+    ];
+
+    expect(build(chunks).parts).toEqual([
+      { type: "thinking", text: "Let me think.", signature: "sig-1" },
+      { type: "text", text: "Answer" },
+    ]);
+  });
+
+  it("keeps a redacted thinking block as its opaque data", () => {
+    const id = "redacted_thinking-1";
+
+    expect(build([reasoningSignature(id, "opaque")]).parts).toEqual([
+      { type: "thinking", text: "", signature: "opaque", redacted: true },
     ]);
   });
 
@@ -112,10 +149,66 @@ describe("stored parts to TanStack AI", () => {
     ]);
   });
 
+  describe("thinking", () => {
+    const history = [
+      { role: "user" as const, parts: storedParts([{ type: "text", text: "Hi" }]) },
+      {
+        role: "assistant" as const,
+        model: "anthropic:claude-sonnet-5-5",
+        parts: storedParts([
+          { type: "thinking", text: "They said hi.", signature: "sig-1" },
+          { type: "thinking", text: "", signature: "opaque", redacted: true },
+          { type: "text", text: "Hello!" },
+        ]),
+      },
+      {
+        role: "assistant" as const,
+        model: "anthropic:claude-sonnet-5-5",
+        parts: storedParts([{ type: "thinking", text: "Cut off before any text." }]),
+      },
+    ];
+
+    it("goes back to the Provider that wrote it, with its signature", () => {
+      expect(toModelMessages(history, { provider: "anthropic" })).toEqual([
+        { role: "user", content: "Hi" },
+        {
+          role: "assistant",
+          content: "Hello!",
+          thinking: [
+            { content: "They said hi.", signature: "sig-1" },
+            { content: "", signature: "opaque", redacted: true },
+          ],
+        },
+      ]);
+    });
+
+    it("is stripped when the Provider changed, leaving stored history as it was", () => {
+      const stored = structuredClone(history);
+
+      expect(toModelMessages(history, { provider: "openai" })).toEqual([
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: "Hello!" },
+      ]);
+      expect(history).toEqual(stored);
+    });
+  });
+
   it("gives useChat text parts", () => {
     const parts = { schemaVersion: 1 as const, parts: [{ type: "text" as const, text: "Hi" }] };
 
     expect(toUIParts(parts)).toEqual([{ type: "text", content: "Hi" }]);
+  });
+
+  it("gives useChat thinking parts, without the Provider's signature", () => {
+    const parts = storedParts([
+      { type: "thinking", text: "Hmm.", signature: "sig-1" },
+      { type: "text", text: "Hi" },
+    ]);
+
+    expect(toUIParts(parts)).toEqual([
+      { type: "thinking", content: "Hmm." },
+      { type: "text", content: "Hi" },
+    ]);
   });
 });
 

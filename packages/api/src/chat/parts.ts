@@ -14,6 +14,7 @@ import {
 } from "@tanstack/ai";
 
 import type { SearchErrorReason, SearchResult } from "../deps";
+import { providerOf } from "./models";
 import { searchErrorMessages, type WebSearchOutput, webSearchToolName } from "./web-search";
 
 /**
@@ -21,12 +22,25 @@ import { searchErrorMessages, type WebSearchOutput, webSearchToolName } from "./
  * TanStack AI. A TanStack AI upgrade only needs this module checked.
  */
 
-export type StoredMessage = { role: "user" | "assistant"; parts: StoredParts };
+export type StoredMessage = {
+  role: "user" | "assistant";
+  parts: StoredParts;
+  /** `"provider:model"` of the Model that wrote an assistant Message. */
+  model?: string | null;
+};
 
 /** Validates parts read from the database. Throws on an unknown schema version or part. */
 export function parseStoredParts(json: unknown): StoredParts {
   return storedPartsSchema.parse(json);
 }
+
+type ThinkingPart = Extract<StoredPart, { type: "thinking" }>;
+
+/**
+ * TanStack AI marks a redacted thinking block (Anthropic `redacted_thinking`) by this reasoning
+ * message id prefix; it doesn't export the check.
+ */
+const redactedThinkingIdPrefix = "redacted_thinking-";
 
 /** How a search ended: its results, or why it failed. */
 export type SearchOutcome = { results: SearchResult[] } | { errorReason: SearchErrorReason };
@@ -38,6 +52,18 @@ export type SearchOutcome = { results: SearchResult[] } | { errorReason: SearchE
 export function createPartsBuilder() {
   const parts: StoredPart[] = [];
   let textMessageId: string | undefined;
+  // Thinking by reasoning message id: its signature arrives after its text.
+  const thinking = new Map<string, ThinkingPart>();
+  const thinkingPart = (messageId: string) => {
+    let part = thinking.get(messageId);
+    if (!part) {
+      part = { type: "thinking", text: "" };
+      if (messageId.startsWith(redactedThinkingIdPrefix)) part.redacted = true;
+      thinking.set(messageId, part);
+      parts.push(part);
+    }
+    return part;
+  };
   const runningSearch = (toolCallId: string) =>
     parts.find(
       (part): part is WebSearchPart =>
@@ -46,6 +72,18 @@ export function createPartsBuilder() {
 
   return {
     add(chunk: StreamChunk) {
+      if (chunk.type === EventType.REASONING_MESSAGE_CONTENT && chunk.delta) {
+        thinkingPart(chunk.messageId).text += chunk.delta;
+        return;
+      }
+      if (
+        chunk.type === EventType.REASONING_ENCRYPTED_VALUE &&
+        chunk.subtype === "message" &&
+        chunk.encryptedValue
+      ) {
+        thinkingPart(chunk.entityId).signature = chunk.encryptedValue;
+        return;
+      }
       if (chunk.type !== EventType.TEXT_MESSAGE_CONTENT || !chunk.delta) return;
       const last = parts.at(-1);
       if (last?.type === "text" && chunk.messageId === textMessageId) {
@@ -151,7 +189,7 @@ function withToolCalls({ role, parts }: StoredMessage): ModelMessage[] {
     if (part.type === "text") {
       if (searches.length > 0) flush();
       content += part.text;
-    } else if (finished(part)) {
+    } else if (part.type === "web_search" && finished(part)) {
       // A search without a result (running, cancelled) is an unmatched tool call: left out.
       searches.push(part);
     }
@@ -169,7 +207,7 @@ function withPlaceholders({ role, parts }: StoredMessage): ModelMessage[] {
       if (lastWasText) pieces[pieces.length - 1] += part.text;
       else pieces.push(part.text);
       lastWasText = true;
-    } else if (finished(part)) {
+    } else if (part.type === "web_search" && finished(part)) {
       pieces.push(searchPlaceholder(part));
       lastWasText = false;
     }
@@ -179,21 +217,38 @@ function withPlaceholders({ role, parts }: StoredMessage): ModelMessage[] {
 }
 
 /**
- * Provider history, oldest first. Messages without any text are left out. Stored searches
- * replay as `web_search` tool calls when this request offers the tool, else as short text
- * placeholders (a Model without tools, or Search off). Stored history is never rewritten.
+ * Provider history for `provider`, oldest first. Messages without any text are left out.
+ * Thinking goes back only to the Provider that wrote it (on the Message's first turn); another
+ * Provider can't read it. Stored searches replay as `web_search` tool calls when this request
+ * offers the tool (`webSearch`), else as short text placeholders (a Model without tools, or
+ * Search off). Stored history is never rewritten.
  */
 export function toModelMessages(
   history: StoredMessage[],
-  { webSearch = false }: { webSearch?: boolean } = {},
+  { provider, webSearch = false }: { provider?: string; webSearch?: boolean } = {},
 ): ModelMessage[] {
-  return history.flatMap(webSearch ? withToolCalls : withPlaceholders);
+  return history.flatMap((stored) => {
+    const messages = webSearch ? withToolCalls(stored) : withPlaceholders(stored);
+    const [first] = messages;
+    if (!first) return [];
+    const { parts, model } = stored;
+    const sameProvider = provider !== undefined && model && providerOf(model) === provider;
+    const thinking = sameProvider
+      ? parts.parts
+          .filter((part) => part.type === "thinking")
+          .map(({ text, signature, redacted }) => ({ content: text, signature, redacted }))
+      : [];
+    if (thinking.length > 0) messages[0] = { ...first, thinking };
+    return messages;
+  });
 }
 
 /** `UIMessage` parts for `useChat`. A search is a `web_search` tool call, as it streams. */
 export function toUIParts(parts: StoredParts): MessagePart[] {
   return parts.parts.map((part): MessagePart => {
     if (part.type === "text") return { type: "text", content: part.text };
+    // The signature is only for the Provider; the client never needs it.
+    if (part.type === "thinking") return { type: "thinking", content: part.text };
     const input = { query: part.query };
     return {
       type: "tool-call",
