@@ -39,3 +39,7 @@ _Avoid_: Search key, Provider credentials (those are for Providers only)
 **Shared link**:
 A public, read-only snapshot of a Conversation's Active Branch taken at the moment it is shared. A Conversation has at most one; sharing again moves it to the current Active Branch under the same link. It disappears when its Conversation is deleted.
 _Avoid_: Share, public chat, permalink
+
+**Attachment**:
+A file (image, PDF or text file) a user uploads and attaches to their Message. It is never copied: editing a Message carries its Attachments over to the new Branch, where the user can remove some or add more; regenerating a reply leaves them as they were. A Shared link shows only each Attachment's file name and type.
+_Avoid_: Upload, file part, document

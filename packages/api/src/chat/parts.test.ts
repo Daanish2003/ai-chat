@@ -240,3 +240,99 @@ describe("reading stored parts", () => {
     ).toThrow();
   });
 });
+
+describe("attachments in provider history", () => {
+  const bytes = (text: string) => new TextEncoder().encode(text);
+  const png = { filename: "cat.png", mediaType: "image/png", bytes: bytes("png-bytes") };
+  const pdf = { filename: "spec.pdf", mediaType: "application/pdf", bytes: bytes("%PDF-1.7") };
+  const notes = { filename: "notes.md", mediaType: "text/markdown", bytes: bytes("# Notes\nhi") };
+  const question = (attachments: (typeof png)[]) => ({
+    role: "user" as const,
+    parts: storedParts([{ type: "text", text: "What is this?" }]),
+    attachments,
+  });
+
+  it("sends images and PDFs as inline base64 parts before the text", () => {
+    expect(
+      toModelMessages([question([png, pdf])], { reads: { images: true, pdfs: true } }),
+    ).toEqual([
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "data", value: btoa("png-bytes"), mimeType: "image/png" },
+          },
+          {
+            type: "document",
+            source: { type: "data", value: btoa("%PDF-1.7"), mimeType: "application/pdf" },
+            metadata: { filename: "spec.pdf" },
+          },
+          { type: "text", content: "What is this?" },
+        ],
+      },
+    ]);
+  });
+
+  it("sends text files as text parts, to any Model", () => {
+    expect(toModelMessages([question([notes])])).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", content: "notes.md\n```\n# Notes\nhi\n```" },
+          { type: "text", content: "What is this?" },
+        ],
+      },
+    ]);
+  });
+
+  it("fences a text file that contains a fence with a longer one", () => {
+    const code = { ...notes, bytes: bytes("```js\nx\n```") };
+
+    const [message] = toModelMessages([question([code])]);
+
+    expect(message?.content).toContainEqual({
+      type: "text",
+      content: "notes.md\n````\n```js\nx\n```\n````",
+    });
+  });
+
+  it("replaces images and PDFs the Model can't read with text placeholders", () => {
+    expect(
+      toModelMessages([question([png, pdf])], { reads: { images: false, pdfs: false } }),
+    ).toEqual([
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            content: '[Attached image "cat.png" left out: this Model can\'t read images]',
+          },
+          {
+            type: "text",
+            content: '[Attached PDF "spec.pdf" left out: this Model can\'t read PDFs]',
+          },
+          { type: "text", content: "What is this?" },
+        ],
+      },
+    ]);
+  });
+
+  it("sends attachments the same way when web search is on", () => {
+    expect(toModelMessages([question([notes])], { webSearch: true })).toEqual([
+      {
+        role: "user",
+        content: [
+          { type: "text", content: "notes.md\n```\n# Notes\nhi\n```" },
+          { type: "text", content: "What is this?" },
+        ],
+      },
+    ]);
+  });
+
+  it("keeps plain text content for a Message without attachments", () => {
+    expect(toModelMessages([question([])], { reads: { images: true, pdfs: true } })).toEqual([
+      { role: "user", content: "What is this?" },
+    ]);
+  });
+});

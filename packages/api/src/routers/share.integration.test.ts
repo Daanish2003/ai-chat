@@ -4,6 +4,7 @@ import { getTestDb } from "@ai-chat/db/testing/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
+import { insertAttachment, linkTestAttachments } from "../testing/attachments";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestClient, insertUser } from "../testing/router-client";
 
@@ -43,6 +44,7 @@ describe("share.upsert", () => {
           id: question.id,
           role: "user",
           parts: [{ type: "text", content: "Hi" }],
+          attachments: [],
           model: null,
           status: "complete",
           createdAt: question.createdAt,
@@ -51,6 +53,7 @@ describe("share.upsert", () => {
           id: reply.id,
           role: "assistant",
           parts: [{ type: "text", content: "Hello!" }],
+          attachments: [],
           model: "anthropic:claude-sonnet-5-5",
           status: "complete",
           createdAt: reply.createdAt,
@@ -296,6 +299,31 @@ describe("share.get", () => {
     expect(JSON.stringify(shared)).not.toContain("Private musing");
   });
 
+  it("shows attachments as filename-and-type chips, never their bytes", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+    const secret = "Top secret file contents";
+    const notes = await insertAttachment(user, { filename: "notes.txt", contents: secret });
+    const question = await insertMessage({
+      conversationId: conv.id,
+      role: "user",
+      text: "Summarise",
+      active: true,
+    });
+    await linkTestAttachments(question.id, [notes.id]);
+
+    const link = await client.share.upsert({ conversationId: conv.id });
+    const shared = await createTestClient().share.get({ token: link.token });
+
+    expect(shared.messages[0]?.attachments).toEqual([
+      { filename: "notes.txt", mediaType: "text/plain" },
+    ]);
+    const json = JSON.stringify(shared);
+    expect(json).not.toContain(secret);
+    expect(json).not.toContain(Buffer.from(secret).toString("base64"));
+    expect(json).not.toContain(notes.id);
+  });
+
   it("leaves out the error details of a failed reply earlier on the Branch", async () => {
     const { user, client } = await signedIn();
     const conv = await insertConversation(user);
@@ -330,6 +358,7 @@ describe("share.get", () => {
       id: failed.id,
       role: "assistant",
       parts: [],
+      attachments: [],
       model: "anthropic:claude-sonnet-5-5",
       status: "error",
       createdAt: failed.createdAt,

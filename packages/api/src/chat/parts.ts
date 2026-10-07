@@ -6,6 +6,7 @@ import {
   type WebSearchPart,
 } from "@ai-chat/db/message-parts";
 import {
+  type ContentPart,
   EventType,
   type MessagePart,
   type ModelMessage,
@@ -13,6 +14,7 @@ import {
   type ToolCall,
 } from "@tanstack/ai";
 
+import { attachmentKind, kindLabel, kindLabelPlural } from "../attachments/kinds";
 import type { SearchErrorReason, SearchResult } from "../deps";
 import { providerOf } from "./models";
 import { searchErrorMessages, type WebSearchOutput, webSearchToolName } from "./web-search";
@@ -27,7 +29,14 @@ export type StoredMessage = {
   parts: StoredParts;
   /** `"provider:model"` of the Model that wrote an assistant Message. */
   model?: string | null;
+  /** The files a user Message carries, in order (attachments are never parts, ADR 0001). */
+  attachments?: StoredAttachment[];
 };
+
+export type StoredAttachment = { filename: string; mediaType: string; bytes: Uint8Array };
+
+/** What the Model reads besides text. */
+export type ModelReads = { images: boolean; pdfs: boolean };
 
 /** Validates parts read from the database. Throws on an unknown schema version or part. */
 export function parseStoredParts(json: unknown): StoredParts {
@@ -225,22 +234,70 @@ function withPlaceholders({ role, parts }: StoredMessage): ModelMessage[] {
  */
 export function toModelMessages(
   history: StoredMessage[],
-  { provider, webSearch = false }: { provider?: string; webSearch?: boolean } = {},
+  {
+    provider,
+    webSearch = false,
+    reads = { images: false, pdfs: false },
+  }: {
+    provider?: string;
+    webSearch?: boolean;
+    /** Attachments the Model can't read become text placeholders. */
+    reads?: ModelReads;
+  } = {},
 ): ModelMessage[] {
   return history.flatMap((stored) => {
     const messages = webSearch ? withToolCalls(stored) : withPlaceholders(stored);
     const [first] = messages;
     if (!first) return [];
-    const { parts, model } = stored;
+    const { parts, model, attachments = [] } = stored;
+    // Attachments go before the user's text, in the Message's first (only) model message.
+    if (attachments.length > 0 && typeof first.content === "string") {
+      messages[0] = {
+        ...first,
+        content: [
+          ...attachments.map((file) => attachmentPart(file, reads)),
+          { type: "text", content: first.content },
+        ],
+      };
+    }
     const sameProvider = provider !== undefined && model && providerOf(model) === provider;
     const thinking = sameProvider
       ? parts.parts
           .filter((part) => part.type === "thinking")
           .map(({ text, signature, redacted }) => ({ content: text, signature, redacted }))
       : [];
-    if (thinking.length > 0) messages[0] = { ...first, thinking };
+    if (thinking.length > 0) messages[0] = { ...messages[0]!, thinking };
     return messages;
   });
+}
+
+/**
+ * An attachment as the Provider gets it: images and PDFs as inline base64 when the Model reads
+ * them, text files as fenced text, anything else as a short placeholder.
+ */
+function attachmentPart(
+  { filename, mediaType, bytes }: StoredAttachment,
+  reads: ModelReads,
+): ContentPart {
+  const kind = attachmentKind(mediaType, filename);
+  const source = { type: "data" as const, value: toBase64(bytes), mimeType: mediaType };
+  if (kind === "image" && reads.images) return { type: "image", source };
+  if (kind === "pdf" && reads.pdfs) return { type: "document", source, metadata: { filename } };
+  if (kind === "text") {
+    const fileText = new TextDecoder().decode(bytes);
+    const longestRun = Math.max(0, ...(fileText.match(/`+/g) ?? []).map((run) => run.length));
+    const fence = "`".repeat(Math.max(3, longestRun + 1));
+    return { type: "text", content: `${filename}\n${fence}\n${fileText}\n${fence}` };
+  }
+  const [label, plural] = kind ? [kindLabel(kind), kindLabelPlural(kind)] : ["file", "files"];
+  return {
+    type: "text",
+    content: `[Attached ${label} "${filename}" left out: this Model can't read ${plural}]`,
+  };
+}
+
+function toBase64(bytes: Uint8Array) {
+  return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("base64");
 }
 
 /** `UIMessage` parts for `useChat`. A search is a `web_search` tool call, as it streams. */

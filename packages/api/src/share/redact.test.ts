@@ -1,7 +1,7 @@
 import type { MessagePart } from "@tanstack/ai";
 import { describe, expect, it } from "vitest";
 
-import { redactForShare } from "./redact";
+import { redactAttachmentsForShare, redactForShare } from "./redact";
 
 describe("redactForShare", () => {
   it("keeps text and web-search tool calls and results", () => {
@@ -41,5 +41,20 @@ describe("redactForShare", () => {
         { type: "text", content: "What's in these?" },
       ]),
     ).toEqual([{ type: "text", content: "What's in these?" }]);
+  });
+});
+
+describe("redactAttachmentsForShare", () => {
+  it("keeps only each attachment's filename and type, for chips", () => {
+    expect(
+      redactAttachmentsForShare([
+        {
+          id: "0199a1b2-0000-7000-8000-000000000001",
+          filename: "cat.png",
+          mediaType: "image/png",
+          size: 1234,
+        },
+      ]),
+    ).toEqual([{ filename: "cat.png", mediaType: "image/png" }]);
   });
 });

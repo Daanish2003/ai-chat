@@ -17,6 +17,8 @@ export function Composer({
   streaming = false,
   disabled = false,
   children,
+  attachments,
+  attachmentsPending = false,
 }: {
   onSend: (text: string) => void;
   onStop?: () => void;
@@ -26,9 +28,13 @@ export function Composer({
   disabled?: boolean;
   /** Extra controls on the left of the actions row. */
   children?: ReactNode;
+  /** The attachment chips, above the text. */
+  attachments?: ReactNode;
+  /** An attachment is still uploading (or failed), so sending waits. */
+  attachmentsPending?: boolean;
 }) {
   const [value, setValue] = useState("");
-  const canSend = !disabled && !streaming && value.trim().length > 0;
+  const canSend = !disabled && !streaming && !attachmentsPending && value.trim().length > 0;
 
   const submit = () => {
     if (!canSend) return;
@@ -44,6 +50,7 @@ export function Composer({
       isLoading={disabled || streaming}
       className="rounded-none bg-card"
     >
+      {attachments}
       <PromptInputTextarea
         placeholder="Message (Enter to send, Shift+Enter for a new line)"
         className="text-sm text-foreground"

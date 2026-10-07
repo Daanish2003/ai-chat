@@ -1,3 +1,4 @@
+import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
 import { findModel } from "@ai-chat/api/chat/models";
 import { webSearchOf } from "@ai-chat/api/chat/web-search";
 import { Button } from "@ai-chat/ui/components/button";
@@ -25,7 +26,20 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { describeError, messageSiblings, messageInfo, type MessageInfo } from "@/lib/chat";
+import {
+  describeError,
+  messageAttachments,
+  messageSiblings,
+  messageInfo,
+  type MessageInfo,
+} from "@/lib/chat";
+
+import {
+  AttachButton,
+  AttachmentChips,
+  DraftAttachmentChips,
+  useAttachmentDraft,
+} from "./attachments";
 
 import { SearchRow } from "./search-row";
 
@@ -44,8 +58,13 @@ function thinkingText(message: UIMessage) {
 type MessageActions = {
   /** A reply is streaming in this Conversation. */
   streaming: boolean;
-  /** Sends the edited text as a new Branch beside this user Message. */
-  onEdit: (text: string) => void;
+  /** The selected Model, which decides the files an edit can add. */
+  model: string;
+  /**
+   * Sends the edited text as a new Branch beside this user Message, with the attachments the
+   * user kept and added.
+   */
+  onEdit: (text: string, attachments: AttachmentInfo[]) => void;
   /** Asks for a new reply beside this assistant Message. */
   onRegenerate: () => void;
   /** Shows the Branch through this sibling. */
@@ -74,6 +93,7 @@ export function MessageRow({
   const info = messageInfo(message);
   const text = plainText(message);
   const thinking = thinkingText(message);
+  const attachments = messageAttachments(message);
   const isUser = message.role === "user";
   const model = info.model ? (findModel(info.model)?.label ?? info.model) : null;
   const [editing, setEditing] = useState(false);
@@ -123,15 +143,22 @@ export function MessageRow({
         {editing && actions ? (
           <EditBox
             initial={text}
+            initialAttachments={attachments.flatMap(({ id, size, ...chip }) =>
+              id !== undefined && size !== undefined ? [{ id, size, ...chip }] : [],
+            )}
+            model={actions.model}
             onCancel={() => setEditing(false)}
-            onSave={(edited) => {
+            onSave={(edited, kept) => {
               setEditing(false);
-              actions.onEdit(edited);
+              actions.onEdit(edited, kept);
             }}
             saveDisabled={actions.streaming}
           />
         ) : isUser ? (
-          <p className="max-w-[80ch] text-sm whitespace-pre-wrap">{text}</p>
+          <>
+            <AttachmentChips attachments={attachments} />
+            <p className="max-w-[80ch] text-sm whitespace-pre-wrap">{text}</p>
+          </>
         ) : (
           <>
             {thinking && (
@@ -256,23 +283,32 @@ function CopyButton({ text, disabled }: { text: string; disabled: boolean }) {
   );
 }
 
-/** Inline edit of a user Message: Enter or Save & submit sends it, Escape cancels. */
+/**
+ * Inline edit of a user Message: Enter or Save & submit sends it, Escape cancels. The Message's
+ * attachments are carried over; the user can remove them or add more.
+ */
 function EditBox({
   initial,
+  initialAttachments,
+  model,
   onSave,
   onCancel,
   saveDisabled,
 }: {
   initial: string;
-  onSave: (text: string) => void;
+  initialAttachments: AttachmentInfo[];
+  model: string;
+  onSave: (text: string, attachments: AttachmentInfo[]) => void;
   onCancel: () => void;
   saveDisabled: boolean;
 }) {
   const [value, setValue] = useState(initial);
-  const canSave = !saveDisabled && value.trim().length > 0;
-  const save = () => canSave && onSave(value.trim());
+  const draft = useAttachmentDraft(model, initialAttachments);
+  const canSave = !saveDisabled && !draft.pending && value.trim().length > 0;
+  const save = () => canSave && onSave(value.trim(), draft.uploaded);
   return (
     <div className="flex max-w-[80ch] flex-col gap-2 border bg-card p-2">
+      <DraftAttachmentChips draft={draft} />
       <Textarea
         autoFocus
         aria-label="Edit Message"
@@ -287,7 +323,10 @@ function EditBox({
           if (event.key === "Escape") onCancel();
         }}
       />
-      <div className="flex justify-end gap-1.5">
+      <div className="flex items-center justify-end gap-1.5">
+        <span className="mr-auto">
+          <AttachButton draft={draft} />
+        </span>
         <Button variant="ghost" size="sm" onClick={onCancel}>
           Cancel
         </Button>

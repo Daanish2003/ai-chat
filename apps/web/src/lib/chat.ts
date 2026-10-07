@@ -1,3 +1,4 @@
+import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
 import type { SiblingPosition } from "@ai-chat/api/chat/branches";
 import type { ActiveBranchMessage, ClientMessage } from "@ai-chat/api/chat/store";
 import type { UIMessage } from "@tanstack/ai-react";
@@ -5,19 +6,40 @@ import type { UIMessage } from "@tanstack/ai-react";
 /** What the server knows about a Message beyond its parts, kept in `UIMessage.metadata`. */
 export type MessageInfo = Pick<ClientMessage, "model" | "status" | "error" | "errorReason">;
 
+/**
+ * An attachment as a chip. A Shared link shows only its filename and type; the user's own
+ * Messages also have its id and size.
+ */
+export type AttachmentChip = Pick<AttachmentInfo, "filename" | "mediaType"> &
+  Partial<Pick<AttachmentInfo, "id" | "size">>;
+
 /** `useChat` messages from the Active Branch (`conversation.get`). */
 export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
   return messages.map(
-    ({ id, role, parts, createdAt, model, status, error, errorReason, siblings }) => ({
+    ({ id, role, parts, createdAt, model, status, error, errorReason, siblings, attachments }) => ({
       id,
       role,
       parts: parts as UIMessage["parts"],
       createdAt,
-      metadata: { model, status, error, errorReason, siblings } satisfies MessageInfo & {
+      metadata: {
+        model,
+        status,
+        error,
+        errorReason,
+        siblings,
+        attachments,
+      } satisfies MessageInfo & {
         siblings: SiblingPosition;
+        attachments: AttachmentChip[];
       },
     }),
   );
+}
+
+/** The files a Message carries, kept in `UIMessage.metadata`; none for a reply. */
+export function messageAttachments(message: UIMessage): AttachmentChip[] {
+  const info = message.metadata as { attachments?: AttachmentChip[] } | undefined;
+  return info?.attachments ?? [];
 }
 
 /** Where the Message sits among its siblings, for the ‹ n/m › arrows; 1 of 1 while it streams. */
@@ -84,15 +106,17 @@ export function describeError({ error, errorReason }: MessageInfo) {
  * The first Message of a new Conversation, typed before it existed: the new Conversation
  * page creates it, navigates to `/c/$id`, and that page sends it.
  */
-const pendingFirstMessages = new Map<string, string>();
+type PendingFirstMessage = { text: string; attachments: AttachmentInfo[] };
 
-export function setPendingFirstMessage(conversationId: string, text: string) {
-  pendingFirstMessages.set(conversationId, text);
+const pendingFirstMessages = new Map<string, PendingFirstMessage>();
+
+export function setPendingFirstMessage(conversationId: string, pending: PendingFirstMessage) {
+  pendingFirstMessages.set(conversationId, pending);
 }
 
 /** The pending first Message, handed out once. */
 export function takePendingFirstMessage(conversationId: string) {
-  const text = pendingFirstMessages.get(conversationId);
+  const pending = pendingFirstMessages.get(conversationId);
   pendingFirstMessages.delete(conversationId);
-  return text;
+  return pending;
 }

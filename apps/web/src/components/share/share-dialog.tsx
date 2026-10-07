@@ -81,7 +81,8 @@ export function ShareDialog({
           <DialogTitle>Share "{title ?? "Untitled"}"</DialogTitle>
           <DialogDescription>
             Anyone with the link sees this Branch up to its newest Message, read-only and without
-            your name. Thinking is hidden and files are never shared.
+            your name. Thinking is hidden, and attachments show as file names only: their contents
+            are never shared.
           </DialogDescription>
         </DialogHeader>
 

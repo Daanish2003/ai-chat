@@ -3,6 +3,7 @@ import { sharedLink } from "@ai-chat/db/schema/share";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
+import { type AttachmentInfo, attachmentsOfMessages } from "../attachments/store";
 import type { AppDeps } from "../deps";
 import { type SiblingPosition, siblingPosition, newestLeaf, pathTo } from "./branches";
 import { parseStoredParts, toUIParts } from "./parts";
@@ -122,8 +123,13 @@ export async function loadActiveBranch(
 ): Promise<ActiveBranchMessage[]> {
   if (!leafId) return [];
   const rows = await loadMessages(deps, conversationId);
-  return pathTo(rows, leafId).map((row) => ({
-    ...toClientMessage(row),
+  const path = pathTo(rows, leafId);
+  const attachments = await attachmentsOfMessages(
+    deps,
+    path.map((row) => row.id),
+  );
+  return path.map((row) => ({
+    ...toClientMessage(row, attachments.get(row.id)),
     siblings: siblingPosition(rows, row),
   }));
 }
@@ -165,12 +171,14 @@ export async function switchBranch(
 }
 
 /** A Message as the client sees it, with `useChat` parts. */
-export function toClientMessage(row: MessageRow) {
+export function toClientMessage(row: MessageRow, attachments: AttachmentInfo[] = []) {
   return {
     id: row.id,
     parentId: row.parentId,
     role: row.role,
     parts: toUIParts(parseStoredParts(row.parts)),
+    /** The files the Message carries, as chips: never their bytes. */
+    attachments,
     model: row.model,
     status: row.status,
     error: row.error,

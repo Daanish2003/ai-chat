@@ -3,6 +3,11 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import {
+  AttachButton,
+  DraftAttachmentChips,
+  useAttachmentDraft,
+} from "@/components/chat/attachments";
 import { Composer } from "@/components/chat/composer";
 import { MissingCredentialsBanner } from "@/components/chat/missing-credentials-banner";
 import { NoCredentials } from "@/components/chat/no-credentials";
@@ -30,14 +35,16 @@ function NewConversation() {
   const blocked =
     models.data && model ? missingCredentialsMessage(model, models.data.models) : null;
   const disabled = !model || !!blocked || create.isPending;
+  const draft = useAttachmentDraft(model);
   const search = useWebSearch(model);
 
   const start = async (text: string) => {
     if (!model) return;
+    const attachments = draft.uploaded;
     try {
       const { id } = await create.mutateAsync({ model });
       void invalidateConversationList(queryClient);
-      setPendingFirstMessage(id, text);
+      setPendingFirstMessage(id, { text, attachments });
       await navigate({ to: "/c/$id", params: { id } });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't start the Conversation");
@@ -53,7 +60,13 @@ function NewConversation() {
       </main>
       <div className="flex flex-col gap-2 border-t bg-background px-6 py-3">
         {blocked && <MissingCredentialsBanner message={blocked} />}
-        <Composer onSend={(text) => void start(text)} disabled={disabled}>
+        <Composer
+          onSend={(text) => void start(text)}
+          disabled={disabled}
+          attachments={<DraftAttachmentChips draft={draft} />}
+          attachmentsPending={draft.pending}
+        >
+          <AttachButton draft={draft} disabled={!model || !!blocked} />
           <SearchToggle search={search} />
         </Composer>
       </div>

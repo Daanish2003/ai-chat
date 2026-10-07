@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   branchFrom,
   describeError,
+  messageAttachments,
   messageInfo,
   messageSiblings,
   takePendingFirstMessage,
@@ -21,6 +22,7 @@ describe("toUIMessages", () => {
         parentId: null,
         role: "user",
         parts: [{ type: "text", content: "Hi" }],
+        attachments: [{ id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 }],
         model: null,
         status: "complete",
         error: null,
@@ -33,6 +35,7 @@ describe("toUIMessages", () => {
         parentId: "q",
         role: "assistant",
         parts: [{ type: "text", content: "Hello" }],
+        attachments: [],
         model: "openai:gpt-5.6",
         status: "streaming",
         error: null,
@@ -54,6 +57,7 @@ describe("toUIMessages", () => {
           error: null,
           errorReason: null,
           siblings: { index: 0, count: 1, previousId: null, nextId: null },
+          attachments: [{ id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 }],
         },
       },
       {
@@ -67,6 +71,7 @@ describe("toUIMessages", () => {
           error: null,
           errorReason: null,
           siblings: { index: 1, count: 2, previousId: "a0", nextId: null },
+          attachments: [],
         },
       },
     ]);
@@ -88,6 +93,33 @@ describe("toUIMessages", () => {
   });
 });
 
+describe("messageAttachments", () => {
+  it("reads the attachments the Active Branch gave a Message", () => {
+    const [question] = toUIMessages([
+      {
+        id: "q",
+        parentId: null,
+        role: "user",
+        parts: [],
+        attachments: [{ id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 }],
+        model: null,
+        status: "complete",
+        error: null,
+        errorReason: null,
+        createdAt,
+        siblings: { index: 0, count: 1, previousId: null, nextId: null },
+      },
+    ]);
+    expect(messageAttachments(question!)).toEqual([
+      { id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 },
+    ]);
+  });
+
+  it("is empty for a message without any", () => {
+    expect(messageAttachments({ id: "x", role: "assistant", parts: [] })).toEqual([]);
+  });
+});
+
 describe("messageSiblings", () => {
   it("reads where the Message sits among its siblings", () => {
     const [, reply] = toUIMessages([
@@ -96,6 +128,7 @@ describe("messageSiblings", () => {
         parentId: null,
         role: "user",
         parts: [],
+        attachments: [],
         model: null,
         status: "complete",
         error: null,
@@ -108,6 +141,7 @@ describe("messageSiblings", () => {
         parentId: "q",
         role: "assistant",
         parts: [],
+        attachments: [],
         model: null,
         status: "complete",
         error: null,
@@ -202,9 +236,13 @@ describe("describeError", () => {
 
 describe("pending first message", () => {
   it("is handed out once", () => {
-    setPendingFirstMessage("c1", "Hello");
+    const pending = {
+      text: "Hello",
+      attachments: [{ id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 }],
+    };
+    setPendingFirstMessage("c1", pending);
 
-    expect(takePendingFirstMessage("c1")).toBe("Hello");
+    expect(takePendingFirstMessage("c1")).toEqual(pending);
     expect(takePendingFirstMessage("c1")).toBeUndefined();
   });
 });
