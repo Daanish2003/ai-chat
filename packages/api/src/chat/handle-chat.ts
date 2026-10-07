@@ -73,10 +73,17 @@ export async function handleChat(
   const adapter = deps.adapterFor(model.id, credentials);
   const userParts =
     command.text === undefined ? undefined : storedParts([{ type: "text", text: command.text }]);
-  const messages = toModelMessages([
-    ...history.map((row) => ({ role: row.role, parts: parseStoredParts(row.parts) })),
-    ...(userParts ? [{ role: "user" as const, parts: userParts }] : []),
-  ]);
+  const messages = toModelMessages(
+    [
+      ...history.map((row) => ({
+        role: row.role,
+        parts: parseStoredParts(row.parts),
+        model: row.model,
+      })),
+      ...(userParts ? [{ role: "user" as const, parts: userParts }] : []),
+    ],
+    { provider: model.provider },
+  );
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
   const now = new Date();

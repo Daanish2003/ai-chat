@@ -7,7 +7,18 @@ import { z } from "zod";
 
 export const textPartSchema = z.object({ type: z.literal("text"), text: z.string() });
 
-export const storedPartSchema = z.discriminatedUnion("type", [textPartSchema]);
+/**
+ * A model's thinking. `signature` is the Provider's opaque reasoning artefact, sent back only to
+ * the same Provider; a `redacted` block (Anthropic `redacted_thinking`) has no text, only that.
+ */
+export const thinkingPartSchema = z.object({
+  type: z.literal("thinking"),
+  text: z.string(),
+  signature: z.string().optional(),
+  redacted: z.boolean().optional(),
+});
+
+export const storedPartSchema = z.discriminatedUnion("type", [textPartSchema, thinkingPartSchema]);
 
 export const storedPartsSchema = z.object({
   schemaVersion: z.literal(1),

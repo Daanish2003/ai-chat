@@ -1,3 +1,4 @@
+import { storedParts } from "@ai-chat/db/message-parts";
 import { user as userTable } from "@ai-chat/db/schema/auth";
 import { getTestDb } from "@ai-chat/db/testing/test-database";
 import { eq } from "drizzle-orm";
@@ -270,6 +271,29 @@ describe("share.get", () => {
     await expect(
       createTestClient().share.get({ token: "AAAAAAAAAAAAAAAAAAAAAA" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("never shows a reply's thinking", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Hello!",
+      parts: storedParts([
+        { type: "thinking", text: "Private musing.", signature: "sig-1" },
+        { type: "text", text: "Hello!" },
+      ]),
+      active: true,
+    });
+
+    const link = await client.share.upsert({ conversationId: conv.id });
+    const shared = await createTestClient().share.get({ token: link.token });
+
+    expect(shared.messages[1]?.parts).toEqual([{ type: "text", content: "Hello!" }]);
+    expect(JSON.stringify(shared)).not.toContain("Private musing");
   });
 
   it("leaves out the error details of a failed reply earlier on the Branch", async () => {

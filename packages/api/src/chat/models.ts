@@ -40,6 +40,12 @@ export const curatedModels: CuratedModel[] = [
   model("openai", "gpt-5.4-mini", "GPT-5.4 mini", openai),
 ];
 
+/** The Provider part of a `"provider:model"` id, curated or not. */
+export function providerOf(id: string): string {
+  const [provider = id] = id.split(":");
+  return provider;
+}
+
 /** The curated Model for a `"provider:model"` id, or `undefined`. */
 export function findModel(id: string): CuratedModel | undefined {
   return curatedModels.find((model) => model.id === id);
