@@ -24,12 +24,12 @@ import {
   RefreshCwIcon,
   UserIcon,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import { describeError, messageSiblings, messageInfo, type MessageInfo } from "@/lib/chat";
 
 import { SearchRow } from "./search-row";
-import { citationComponents } from "./source-chips";
+import { replyComponents, ReplySources } from "./source-chips";
 
 function plainText(message: UIMessage) {
   return message.parts.map((part) => (part.type === "text" ? part.content : "")).join("");
@@ -309,20 +309,23 @@ function EditBox({
  * to the reply's Sources render as their numbered citation chips.
  */
 function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
-  const sources = useMemo(() => sourcesOf(parts), [parts]);
-  const components = useMemo(() => citationComponents(sources), [sources]);
-  return replySegments(parts).map((segment) =>
-    segment.type === "text" ? (
-      <Markdown
-        key={segment.key}
-        className="prose prose-sm max-w-[80ch] dark:prose-invert"
-        components={components}
-      >
-        {segment.content}
-      </Markdown>
-    ) : (
-      <SearchRow key={segment.key} searches={segment.searches} sources={sources} />
-    ),
+  const sources = sourcesOf(parts);
+  return (
+    <ReplySources value={sources}>
+      {replySegments(parts).map((segment) =>
+        segment.type === "text" ? (
+          <Markdown
+            key={segment.key}
+            className="prose prose-sm max-w-[80ch] dark:prose-invert"
+            components={replyComponents}
+          >
+            {segment.content}
+          </Markdown>
+        ) : (
+          <SearchRow key={segment.key} searches={segment.searches} sources={sources} />
+        ),
+      )}
+    </ReplySources>
   );
 }
 

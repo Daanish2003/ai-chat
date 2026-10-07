@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { citationComponents } from "./source-chips";
+import { replyComponents, ReplySources } from "./source-chips";
 
 const sources: Source[] = [
   { number: 1, url: "https://tanstack.com/ai", title: "TanStack AI", snippet: "Docs" },
@@ -13,7 +13,11 @@ const sources: Source[] = [
 
 const render = (markdown: string) =>
   renderToStaticMarkup(
-    createElement(Markdown, { components: citationComponents(sources) }, markdown),
+    createElement(
+      ReplySources.Provider,
+      { value: sources },
+      createElement(Markdown, { components: replyComponents, children: markdown }),
+    ),
   );
 
 describe("a reply's links", () => {

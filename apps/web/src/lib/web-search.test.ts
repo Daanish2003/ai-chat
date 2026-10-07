@@ -93,7 +93,7 @@ describe("describeSearches", () => {
         search({ query: "two", results: [page(2), page(3)] }),
         search({ query: "three", state: "error", errorReason: "failed" }),
       ]),
-    ).toEqual({ text: "Searched 3 times · 3 sources", keySettings: false });
+    ).toEqual({ text: "Searched 3 times · 3 sources", keySettings: false, failed: false });
     expect(describeSearches([search({}), search({ query: "two" })]).text).toBe(
       "Searched 2 times · no sources",
     );
@@ -105,7 +105,24 @@ describe("describeSearches", () => {
         search({ query: "one", state: "error", errorReason: "invalid_key" }),
         search({ query: "two", state: "running" }),
       ]),
-    ).toEqual({ text: 'Searching the web for "two"…', keySettings: true });
+    ).toEqual({ text: 'Searching the web for "two"…', keySettings: true, failed: false });
+  });
+
+  it("says the searches failed when none of them finished", () => {
+    expect(
+      describeSearches([
+        search({ query: "one", state: "error", errorReason: "quota_exhausted" }),
+        search({ query: "two", state: "cancelled" }),
+      ]),
+    ).toEqual({ text: "Search cancelled", keySettings: false, failed: true });
+    expect(
+      describeSearches([
+        search({ query: "one", state: "cancelled" }),
+        search({ query: "two", state: "error", errorReason: "quota_exhausted" }),
+      ]).text,
+    ).toBe("Search failed: Tavily's monthly quota is used up.");
+    expect(describeSearches([search({ state: "error" })]).failed).toBe(true);
+    expect(describeSearches([search({}), search({ state: "error" })]).failed).toBe(false);
   });
 });
 

@@ -18,11 +18,10 @@ import { SourceChips } from "./source-chips";
 export function SearchRow({ searches, sources }: { searches: WebSearchPart[]; sources: Source[] }) {
   const [open, setOpen] = useState(false);
   const listId = useId();
-  const { text, keySettings } = describeSearches(searches);
+  const { text, keySettings, failed } = describeSearches(searches);
   const several = searches.length > 1;
   const expandable = several || searches.some((search) => search.results.length > 0);
   const running = searches.some((search) => search.state === "running");
-  const failed = !several && (searches[0]?.state === "error" || searches[0]?.state === "cancelled");
   const found = new Set(searches.flatMap((search) => search.results.map((r) => sourceKey(r.url))));
   const rowSources = sources.filter((source) => found.has(sourceKey(source.url)));
 
