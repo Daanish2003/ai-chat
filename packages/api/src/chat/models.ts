@@ -106,6 +106,13 @@ export function isLiveListProvider(provider: string) {
   return (liveListProviders as string[]).includes(provider);
 }
 
+/** Splits a `"provider:model"` id at its first colon (Ollama model ids contain colons too). */
+export function parseModelId(id: string): { provider: string; modelId: string } | undefined {
+  const separator = id.indexOf(":");
+  if (separator < 0) return undefined;
+  return { provider: id.slice(0, separator), modelId: id.slice(separator + 1) };
+}
+
 /** The curated Model for a `"provider:model"` id, or `undefined`. */
 export function findModel(id: string): CuratedModel | undefined {
   return curatedModels.find((model) => model.id === id);

@@ -1,4 +1,9 @@
-import { type CuratedModel, findModel, isLiveListProvider } from "@ai-chat/api/chat/models";
+import {
+  type CuratedModel,
+  findModel,
+  isLiveListProvider,
+  parseModelId,
+} from "@ai-chat/api/chat/models";
 import { addKeyMessage, providers } from "@ai-chat/api/credentials/services";
 
 export type ModelGroup = {
@@ -30,7 +35,7 @@ export function modelGroups(models: CuratedModel[], search: string): ModelGroup[
  */
 export function missingCredentialsMessage(selected: string, available: CuratedModel[]) {
   if (available.some((model) => model.id === selected)) return null;
-  const prefix = selected.slice(0, selected.indexOf(":"));
+  const prefix = parseModelId(selected)?.provider ?? "";
   const provider =
     findModel(selected)?.provider ?? (isLiveListProvider(prefix) ? prefix : undefined);
   // A live-listed Model can leave its list while the Provider still has credentials.

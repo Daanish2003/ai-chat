@@ -85,7 +85,8 @@ const checkRequests: Record<
 };
 
 /**
- * Checks credentials with one authenticated request through `fetch` (`deps.fetch`).
+ * Checks credentials with one request through `fetch` (`deps.fetch`), or not at all for a
+ * service without a check endpoint.
  * A 429 counts as verified: the key authenticated, the account is only busy.
  */
 export async function checkCredentials(

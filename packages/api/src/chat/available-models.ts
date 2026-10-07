@@ -4,7 +4,14 @@ import { desc, eq } from "drizzle-orm";
 import { listCredentials, loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { ollamaModels, openRouterModels } from "./live-models";
-import { type CuratedModel, curatedModels, defaultModelFor, findModel } from "./models";
+import {
+  type CuratedModel,
+  curatedModels,
+  defaultModelFor,
+  findModel,
+  isLiveListProvider,
+  parseModelId,
+} from "./models";
 
 type Deps = Pick<AppDeps, "db" | "keyEncryptionSecret" | "fetch">;
 
@@ -21,8 +28,11 @@ export async function listAvailableModels(
   const services = (await listCredentials(deps, userId)).map((credential) => credential.service);
   const models = [
     ...curatedModels.filter((model) => services.includes(model.provider)),
-    ...(services.includes("openrouter") ? await openRouterModels(deps.fetch) : []),
-    ...(services.includes("ollama") ? await installedOllamaModels(deps, userId) : []),
+    ...(
+      await Promise.all(
+        services.filter(isLiveListProvider).map((provider) => liveModels(deps, userId, provider)),
+      )
+    ).flat(),
   ];
 
   const [recent] = await deps.db
@@ -56,15 +66,15 @@ export async function resolveModel(
 ): Promise<CuratedModel | undefined> {
   const curated = findModel(id);
   if (curated) return curated;
-  const live = id.startsWith("openrouter:")
-    ? await openRouterModels(deps.fetch)
-    : id.startsWith("ollama:")
-      ? await installedOllamaModels(deps, userId)
-      : [];
+  const provider = parseModelId(id)?.provider;
+  const live = provider ? await liveModels(deps, userId, provider) : [];
   return live.find((model) => model.id === id);
 }
 
-async function installedOllamaModels(deps: Deps, userId: string) {
+/** The live list of `provider` (OpenRouter's, or the user's Ollama host's); empty for others. */
+async function liveModels(deps: Deps, userId: string, provider: string) {
+  if (provider === "openrouter") return openRouterModels(deps.fetch);
+  if (provider !== "ollama") return [];
   const host = (await loadCredentials(deps, userId, "ollama"))?.host;
   return host ? ollamaModels(deps.fetch, host) : [];
 }

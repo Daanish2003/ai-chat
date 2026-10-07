@@ -15,7 +15,7 @@ import { createOpenRouterText } from "@tanstack/ai-openrouter";
 import { createVercelGatewayText } from "@tanstack/ai-vercel-gateway";
 
 import type { Credentials } from "../deps";
-import { findModel, isLiveListProvider } from "./models";
+import { findModel, isLiveListProvider, parseModelId } from "./models";
 
 /** The model id type of an adapter factory. The ids are checked in `models.test.ts`. */
 type ModelOf<Factory extends (model: never, ...rest: never[]) => unknown> = Parameters<Factory>[0];
@@ -26,12 +26,11 @@ type ModelOf<Factory extends (model: never, ...rest: never[]) => unknown> = Para
  * explicit-credential factory. The production `deps.adapterFor`.
  */
 export function adapterFor(model: string, credentials: Credentials): AnyTextAdapter {
-  const separator = model.indexOf(":");
-  const provider = model.slice(0, separator);
-  const modelId = model.slice(separator + 1);
-  if (separator < 0 || (!findModel(model) && !isLiveListProvider(provider))) {
+  const parsed = parseModelId(model);
+  if (!parsed || (!findModel(model) && !isLiveListProvider(parsed.provider))) {
     throw new Error(`"${model}" is not an available Model`);
   }
+  const { provider, modelId } = parsed;
 
   if (provider === "ollama") {
     if (!credentials.host) throw new Error("The ollama credentials have no host");
