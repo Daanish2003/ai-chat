@@ -27,21 +27,11 @@ export async function loadCredentials(
   return decryptCredentials(row.encrypted, encryptionOptions(deps, userId, service));
 }
 
-/** Hints of the user's credentials. Rows that no longer decrypt count as missing and are left out. */
+/**
+ * Hints of the user's credentials, in the order they were first added. Rows that no longer
+ * decrypt count as missing and are left out.
+ */
 export async function listCredentials(deps: Deps, userId: string): Promise<CredentialSummary[]> {
-  const rows = await deps.db.query.userCredentials.findMany({
-    where: { userId },
-    orderBy: { service: "asc" },
-  });
-  return rows
-    .filter((row) =>
-      decryptCredentials(row.encrypted, encryptionOptions(deps, userId, row.service)),
-    )
-    .map(({ service, hint, verified }) => ({ service, hint, verified }));
-}
-
-/** The services the user has working credentials for, in the order they were first added. */
-export async function listCredentialedServices(deps: Deps, userId: string): Promise<string[]> {
   const rows = await deps.db.query.userCredentials.findMany({
     where: { userId },
     orderBy: { createdAt: "asc", service: "asc" },
@@ -50,7 +40,7 @@ export async function listCredentialedServices(deps: Deps, userId: string): Prom
     .filter((row) =>
       decryptCredentials(row.encrypted, encryptionOptions(deps, userId, row.service)),
     )
-    .map((row) => row.service);
+    .map(({ service, hint, verified }) => ({ service, hint, verified }));
 }
 
 /** Inserts or replaces the user's credentials for `service`. */

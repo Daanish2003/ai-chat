@@ -9,7 +9,7 @@ import { NoCredentials } from "@/components/chat/no-credentials";
 import { Welcome } from "@/components/chat/welcome";
 import { setPendingFirstMessage } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
-import { missingCredentialsMessage } from "@/lib/model-picker";
+import { missingCredentialsMessage } from "@/lib/models";
 import { useNewConversationModel } from "@/lib/new-conversation-model";
 import { orpc } from "@/utils/orpc";
 

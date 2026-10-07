@@ -336,8 +336,8 @@ describe("conversation.setModel", () => {
     });
   });
 
-  it("can't change another user's Conversation", async () => {
-    const { client } = await withCredentials();
+  it("can't change another user's Conversation, whatever the Model", async () => {
+    const { client } = await signedIn();
     const conv = await insertConversation(await insertUser());
 
     await expect(

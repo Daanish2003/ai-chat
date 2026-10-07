@@ -6,7 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "@/lib/conversation-list";
-import { missingCredentialsMessage } from "@/lib/model-picker";
+import { missingCredentialsMessage } from "@/lib/models";
 import { useNewConversationModel } from "@/lib/new-conversation-model";
 import { orpc } from "@/utils/orpc";
 
@@ -78,6 +78,9 @@ function ConversationModelPicker({ id }: { id: string }) {
         if (previous) queryClient.setQueryData(getKey, (old) => old && { ...old, model: previous });
         toast.error(error.message);
       },
+      // A refetch already in flight (polling, a run ending) may have overwritten the optimistic
+      // Model. Not cancelled: the chat view awaits those fetches.
+      onSettled: () => queryClient.invalidateQueries({ queryKey: getKey }),
     }),
   );
   const value = conversation.data?.model;

@@ -70,6 +70,9 @@ export const conversationRouter = {
     .input(z.object({ id: z.uuid(), model: z.string() }))
     .handler(async ({ context, input }) => {
       const userId = context.session.user.id;
+      if (!(await findConversation(context.deps, userId, input.id))) {
+        throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+      }
       const model = findModel(input.model);
       if (!model) {
         throw new ORPCError("BAD_REQUEST", {

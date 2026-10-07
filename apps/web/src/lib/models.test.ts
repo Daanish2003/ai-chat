@@ -1,7 +1,7 @@
 import { findModel } from "@ai-chat/api/chat/models";
 import { describe, expect, it } from "vitest";
 
-import { missingCredentialsMessage, modelGroups } from "./model-picker";
+import { missingCredentialsMessage, modelGroups } from "./models";
 
 const available = [
   "openai:gpt-5.6",

@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { modelGroups } from "@/lib/model-picker";
+import { modelGroups } from "@/lib/models";
 
 /**
  * The top-bar Model picker: a popover with a search box, the available Models grouped by

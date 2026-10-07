@@ -11,7 +11,7 @@ import { toast } from "sonner";
 
 import { takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
-import { missingCredentialsMessage } from "@/lib/model-picker";
+import { missingCredentialsMessage } from "@/lib/models";
 import { orpc } from "@/utils/orpc";
 
 import { Composer } from "./composer";
