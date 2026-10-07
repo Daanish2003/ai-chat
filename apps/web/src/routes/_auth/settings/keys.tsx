@@ -13,7 +13,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { TitleModelSelect } from "@/components/settings/title-model-select";
-import { type ProviderRow, type ProviderRowStatus, providerRows } from "@/lib/key-settings";
+import {
+  type ProviderRow,
+  type ProviderRowStatus,
+  providerRows,
+  type ToolRow,
+  toolRows,
+} from "@/lib/key-settings";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/settings/keys")({
@@ -51,6 +57,25 @@ function KeySettings() {
         </ul>
       </section>
 
+      <section className="space-y-2">
+        <h2 className="text-sm font-medium">Tools</h2>
+        <p className="text-xs text-muted-foreground">
+          Tool credentials for features beyond chat. Without a Tavily key, web search is off.
+        </p>
+        <ul className="divide-y border">
+          {toolRows(credentials.data ?? []).map((row) => (
+            <ProviderRowItem
+              key={row.id}
+              row={row}
+              loading={credentials.isPending}
+              editing={editing === row.service}
+              onEdit={setEditing}
+              onDone={() => setEditing(null)}
+            />
+          ))}
+        </ul>
+      </section>
+
       <TitleModelSelect />
     </main>
   );
@@ -70,7 +95,7 @@ function ProviderRowItem({
   onEdit,
   onDone,
 }: {
-  row: ProviderRow;
+  row: ProviderRow | ToolRow;
   loading: boolean;
   editing: boolean;
   onEdit: (service: CredentialService) => void;
@@ -95,7 +120,14 @@ function ProviderRowItem({
           aria-label={dot.label}
           title={dot.label}
         />
-        <span className="flex-1 text-sm font-medium">{row.label}</span>
+        <span className="flex-1 text-sm font-medium">
+          {row.label}
+          {"description" in row && (
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {row.description}
+            </span>
+          )}
+        </span>
 
         {row.status === "coming_soon" ? (
           <span className="text-xs text-muted-foreground">Coming soon</span>

@@ -53,6 +53,7 @@ export const credentialFieldSchemas = {
   lovable: z.object({ apiKey }),
   "vercel-gateway": z.object({ apiKey }),
   ollama: z.object({ host }),
+  tavily: z.object({ apiKey }),
 };
 
 export type CredentialService = keyof typeof credentialFieldSchemas;
@@ -76,6 +77,7 @@ export const saveCredentialsInput = z.discriminatedUnion("service", [
     fields: credentialFieldSchemas["vercel-gateway"],
   }),
   z.object({ service: z.literal("ollama"), fields: credentialFieldSchemas.ollama }),
+  z.object({ service: z.literal("tavily"), fields: credentialFieldSchemas.tavily }),
 ]);
 
 export type SaveCredentialsInput = z.input<typeof saveCredentialsInput>;
@@ -160,6 +162,10 @@ export const credentialForms: Record<
     helpText:
       "No key needed, only your Ollama server's URL. When this app runs in Docker, use http://host.docker.internal:11434.",
   },
+  tavily: {
+    fields: [{ name: "apiKey", label: "API key", placeholder: "tvly-…" }],
+    helpText: "Create a key at app.tavily.com. The free plan includes 1,000 searches a month.",
+  },
 };
 
 export function isCredentialService(service: string): service is CredentialService {
@@ -167,8 +173,20 @@ export function isCredentialService(service: string): service is CredentialServi
 }
 
 export function providerLabel(service: string) {
-  return providers.find((provider) => provider.id === service)?.label ?? service;
+  return (
+    providers.find((provider) => provider.id === service)?.label ??
+    toolServices.find((tool) => tool.id === service)?.label ??
+    service
+  );
 }
+
+/** The Tavily Tool credential's service: the key the `web_search` tool searches with. */
+export const tavilyService = "tavily";
+
+/** Tools that need a Tool credential, in the order Keys & settings lists them. */
+export const toolServices = [
+  { id: tavilyService, label: "Tavily", description: "Web search" },
+] as const;
 
 /** Why a Model can't be used: its Provider has no credentials. */
 export function addKeyMessage(service: string) {

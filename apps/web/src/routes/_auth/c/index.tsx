@@ -6,6 +6,7 @@ import { z } from "zod";
 import { Composer } from "@/components/chat/composer";
 import { MissingCredentialsBanner } from "@/components/chat/missing-credentials-banner";
 import { NoCredentials } from "@/components/chat/no-credentials";
+import { SearchToggle, useWebSearch } from "@/components/chat/search-toggle";
 import { Welcome } from "@/components/chat/welcome";
 import { setPendingFirstMessage } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
@@ -29,6 +30,7 @@ function NewConversation() {
   const blocked =
     models.data && model ? missingCredentialsMessage(model, models.data.models) : null;
   const disabled = !model || !!blocked || create.isPending;
+  const search = useWebSearch(model);
 
   const start = async (text: string) => {
     if (!model) return;
@@ -51,7 +53,9 @@ function NewConversation() {
       </main>
       <div className="flex flex-col gap-2 border-t bg-background px-6 py-3">
         {blocked && <MissingCredentialsBanner message={blocked} />}
-        <Composer onSend={(text) => void start(text)} disabled={disabled} />
+        <Composer onSend={(text) => void start(text)} disabled={disabled}>
+          <SearchToggle search={search} />
+        </Composer>
       </div>
     </div>
   );

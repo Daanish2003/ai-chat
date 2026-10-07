@@ -4,6 +4,7 @@ import {
   isCredentialService,
   type ProviderId,
   providers,
+  toolServices,
 } from "@ai-chat/api/credentials/services";
 
 export type ProviderRowStatus = "verified" | "unverified" | "missing" | "coming_soon";
@@ -30,6 +31,24 @@ export function providerRows(credentials: CredentialSummary[]): ProviderRow[] {
       label,
       status: saved.verified ? "verified" : "unverified",
       hint: saved.hint,
+      service: id,
+    };
+  });
+}
+
+/** A Keys & settings row for a Tool credential. */
+export type ToolRow = Omit<ProviderRow, "id"> & { id: string; description: string };
+
+/** One Keys & settings row per Tool that needs a Tool credential, from `credentials.list`. */
+export function toolRows(credentials: CredentialSummary[]): ToolRow[] {
+  return toolServices.map(({ id, label, description }) => {
+    const saved = credentials.find((credential) => credential.service === id);
+    return {
+      id,
+      label,
+      description,
+      status: saved ? (saved.verified ? "verified" : "unverified") : "missing",
+      hint: saved?.hint ?? null,
       service: id,
     };
   });

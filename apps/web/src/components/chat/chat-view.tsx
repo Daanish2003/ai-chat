@@ -13,11 +13,13 @@ import { toast } from "sonner";
 import { branchFrom, takePendingFirstMessage, toUIMessages } from "@/lib/chat";
 import { invalidateConversationList } from "@/lib/conversation-list";
 import { missingCredentialsMessage } from "@/lib/models";
+import { readSearchPreference } from "@/lib/web-search";
 import { orpc } from "@/utils/orpc";
 
 import { Composer } from "./composer";
 import { MessageRow } from "./message-row";
 import { MissingCredentialsBanner } from "./missing-credentials-banner";
+import { SearchToggle, useWebSearch } from "./search-toggle";
 import { useFocusMessage } from "./use-focus-message";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
@@ -89,6 +91,7 @@ export function ChatView({
   const blocked = models.data
     ? missingCredentialsMessage(conversation.model, models.data.models)
     : null;
+  const search = useWebSearch(conversation.model);
 
   /**
    * Runs a command under `parentId`: a send or an edit with `text`, a regenerate without.
@@ -103,7 +106,8 @@ export function ChatView({
       text,
       attachmentIds: [],
       model: conversation.model,
-      webSearch: false,
+      // Read now: a first Message is sent on mount, before the toggle's state has loaded.
+      webSearch: search.available && readSearchPreference(),
     };
     try {
       if (history) setMessages(history);
@@ -189,7 +193,9 @@ export function ChatView({
           streaming={streaming}
           // The next Message continues the Branch being switched to, so wait for it.
           disabled={!!blocked || switchBranch.isPending}
-        />
+        >
+          <SearchToggle search={search} />
+        </Composer>
       </div>
     </div>
   );

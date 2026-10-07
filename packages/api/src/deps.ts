@@ -2,6 +2,7 @@ import type { Database } from "@ai-chat/db";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
 import { adapterFor } from "./chat/adapters";
+import { createTavilyClient } from "./chat/tavily";
 
 /** Decrypted Provider credentials or Tool credential fields, keyed by field name. */
 export type Credentials = Record<string, string>;
@@ -27,7 +28,11 @@ export class SearchError extends Error {
 
 /** Web search backend for the `web_search` tool. Failures throw a `SearchError`. */
 export type SearchClient = {
-  search: (query: string, credentials: Credentials) => Promise<SearchResult[]>;
+  search: (
+    query: string,
+    credentials: Credentials,
+    options?: { signal?: AbortSignal },
+  ) => Promise<SearchResult[]>;
 };
 
 export type Limits = {
@@ -56,7 +61,7 @@ export const defaultLimits: Limits = {
   runCapMs: 5 * 60_000,
 };
 
-/** The production `AppDeps`. Web search is wired in by a later feature. */
+/** The production `AppDeps`. */
 export function createAppDeps({
   db,
   keyEncryptionSecret,
@@ -67,11 +72,7 @@ export function createAppDeps({
   return {
     db,
     adapterFor,
-    searchClient: {
-      search: async () => {
-        throw new SearchError("failed", "Web search is not available");
-      },
-    },
+    searchClient: createTavilyClient(globalThis.fetch),
     runs: new Map(),
     limits: defaultLimits,
     fetch: globalThis.fetch,
