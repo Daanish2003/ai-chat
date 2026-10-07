@@ -23,7 +23,7 @@ export const credentialsRouter = {
     const summary = {
       service: input.service,
       hint: credentialHint(input.fields),
-      verified: true,
+      verified: result.status === "verified",
     };
     await saveCredentials(context.deps, context.session.user.id, {
       ...summary,

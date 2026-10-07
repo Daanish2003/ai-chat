@@ -24,7 +24,12 @@ describe("modelGroups", () => {
     const groups = modelGroups(available, "  MINI ");
 
     expect(groups).toEqual([
-      { provider: "openai", label: "OpenAI", models: [findModel("openai:gpt-5.4-mini")] },
+      {
+        provider: "openai",
+        label: "OpenAI",
+        live: false,
+        models: [findModel("openai:gpt-5.4-mini")],
+      },
     ]);
   });
 
@@ -33,6 +38,32 @@ describe("modelGroups", () => {
 
     expect(groups.map((group) => group.provider)).toEqual(["anthropic"]);
     expect(groups[0]!.models).toHaveLength(2);
+  });
+});
+
+const liveModel = (provider: "openrouter" | "ollama", modelId: string) => ({
+  id: `${provider}:${modelId}`,
+  provider,
+  modelId,
+  label: modelId,
+  images: false,
+  pdfs: false,
+  tools: true,
+});
+
+describe("modelGroups with live lists", () => {
+  it("labels the OpenRouter and Ollama groups as live lists", () => {
+    const groups = modelGroups(
+      [...available, liveModel("ollama", "qwen3:8b"), liveModel("openrouter", "openai/gpt-5.5")],
+      "",
+    );
+
+    expect(groups.map((group) => [group.provider, group.live])).toEqual([
+      ["anthropic", false],
+      ["openai", false],
+      ["openrouter", true],
+      ["ollama", true],
+    ]);
   });
 });
 
@@ -48,6 +79,18 @@ describe("missingCredentialsMessage", () => {
     expect(missingCredentialsMessage("anthropic:claude-opus-5-5", [])).toBe(
       "Add an Anthropic key or pick another Model",
     );
+  });
+
+  it("asks for the key of a live-listed Model's Provider when its credentials are gone", () => {
+    expect(missingCredentialsMessage("openrouter:openai/gpt-5.5", available)).toBe(
+      "Add an OpenRouter key or pick another Model",
+    );
+  });
+
+  it("asks for another Model when a live-listed Model left its list", () => {
+    expect(
+      missingCredentialsMessage("ollama:llama3.2:latest", [liveModel("ollama", "qwen3:8b")]),
+    ).toBe("Pick another Model");
   });
 
   it("asks for another Model when the selected one isn't offered any more", () => {
