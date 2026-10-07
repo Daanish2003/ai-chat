@@ -31,6 +31,7 @@ const apiKey = z.string().trim().min(1, "Enter an API key");
 export const credentialFieldSchemas = {
   anthropic: z.object({ apiKey }),
   openai: z.object({ apiKey }),
+  tavily: z.object({ apiKey }),
 };
 
 export type CredentialService = keyof typeof credentialFieldSchemas;
@@ -39,6 +40,7 @@ export type CredentialService = keyof typeof credentialFieldSchemas;
 export const saveCredentialsInput = z.discriminatedUnion("service", [
   z.object({ service: z.literal("anthropic"), fields: credentialFieldSchemas.anthropic }),
   z.object({ service: z.literal("openai"), fields: credentialFieldSchemas.openai }),
+  z.object({ service: z.literal("tavily"), fields: credentialFieldSchemas.tavily }),
 ]);
 
 export const credentialServices = Object.keys(credentialFieldSchemas) as [
@@ -59,6 +61,10 @@ export const credentialForms: Record<
     fields: [{ name: "apiKey", label: "API key", placeholder: "sk-…" }],
     helpText: "Create a key in the OpenAI dashboard under API keys.",
   },
+  tavily: {
+    fields: [{ name: "apiKey", label: "API key", placeholder: "tvly-…" }],
+    helpText: "Create a key at app.tavily.com. The free plan includes 1,000 searches a month.",
+  },
 };
 
 export function isCredentialService(service: string): service is CredentialService {
@@ -66,8 +72,20 @@ export function isCredentialService(service: string): service is CredentialServi
 }
 
 export function providerLabel(service: string) {
-  return providers.find((provider) => provider.id === service)?.label ?? service;
+  return (
+    providers.find((provider) => provider.id === service)?.label ??
+    toolServices.find((tool) => tool.id === service)?.label ??
+    service
+  );
 }
+
+/** The Tavily Tool credential's service: the key the `web_search` tool searches with. */
+export const tavilyService = "tavily";
+
+/** Tools that need a Tool credential, in the order Keys & settings lists them. */
+export const toolServices = [
+  { id: tavilyService, label: "Tavily", description: "Web search" },
+] as const;
 
 /** Why a Model can't be used: its Provider has no credentials. */
 export function addKeyMessage(service: string) {

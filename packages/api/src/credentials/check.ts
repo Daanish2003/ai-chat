@@ -20,6 +20,11 @@ const checkRequests: Record<
     url: "https://api.openai.com/v1/models",
     headers: { authorization: `Bearer ${apiKey}` },
   }),
+  // The usage endpoint authenticates the key without spending a search credit.
+  tavily: ({ apiKey }) => ({
+    url: "https://api.tavily.com/usage",
+    headers: { authorization: `Bearer ${apiKey}` },
+  }),
 };
 
 /**

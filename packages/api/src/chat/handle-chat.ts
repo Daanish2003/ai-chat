@@ -5,7 +5,7 @@ import { toServerSentEventsResponse } from "@tanstack/ai";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
-import { addKeyMessage } from "../credentials/services";
+import { addKeyMessage, tavilyService } from "../credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
@@ -60,6 +60,9 @@ export async function handleChat(
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const credentials = await loadCredentials(deps, userId, model.provider);
   if (!credentials) return refuse(400, addKeyMessage(model.provider));
+  // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
+  const searchCredentials =
+    command.webSearch && model.tools ? await loadCredentials(deps, userId, tavilyService) : null;
 
   const history = await loadPath(deps, owned.id, command.parentId);
   if (command.parentId && history.length === 0) {
@@ -69,10 +72,13 @@ export async function handleChat(
   // Everything that can fail runs before the Messages are written.
   const adapter = deps.adapterFor(model.id, credentials);
   const userParts = storedParts([{ type: "text", text: command.text }]);
-  const messages = toModelMessages([
-    ...history.map((row) => ({ role: row.role, parts: parseStoredParts(row.parts) })),
-    { role: "user", parts: userParts },
-  ]);
+  const messages = toModelMessages(
+    [
+      ...history.map((row) => ({ role: row.role, parts: parseStoredParts(row.parts) })),
+      { role: "user", parts: userParts },
+    ],
+    { webSearch: searchCredentials !== null },
+  );
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
   const now = new Date();
@@ -121,6 +127,11 @@ export async function handleChat(
   });
   if (!started) return refuse(409, "A reply is still streaming in this Conversation");
 
-  const chunks = startRun(deps, { messageId: assistantMessageId, adapter, messages });
+  const chunks = startRun(deps, {
+    messageId: assistantMessageId,
+    adapter,
+    messages,
+    webSearch: searchCredentials ?? undefined,
+  });
   return toServerSentEventsResponse(chunks);
 }

@@ -22,12 +22,14 @@ describe("sweepInterruptedRuns", () => {
       role: "assistant",
       text: "Half",
       status: "streaming",
+      createdAt: new Date(Date.now() - 60_000),
     });
     const empty = await insertMessage({
       conversationId: second.id,
       role: "assistant",
       text: "",
       status: "streaming",
+      createdAt: new Date(Date.now() - 60_000),
     });
 
     await sweepInterruptedRuns(createTestDeps());

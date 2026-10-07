@@ -8,8 +8,9 @@ import {
 } from "@tanstack/ai";
 import { and, eq, lt } from "drizzle-orm";
 
-import type { AppDeps } from "../deps";
-import { createPartsBuilder, searchTextOf } from "./parts";
+import type { AppDeps, Credentials } from "../deps";
+import { cancelRunningSearches, createPartsBuilder, parseStoredParts, searchTextOf } from "./parts";
+import { createWebSearchTool } from "./web-search-tool";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -29,7 +30,14 @@ export function startRun(
     messageId,
     adapter,
     messages,
-  }: { messageId: string; adapter: AnyTextAdapter; messages: ModelMessage[] },
+    webSearch,
+  }: {
+    messageId: string;
+    adapter: AnyTextAdapter;
+    messages: ModelMessage[];
+    /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
+    webSearch?: Credentials;
+  },
 ): AsyncIterable<StreamChunk> {
   const abortController = new AbortController();
   deps.runs.set(messageId, abortController);
@@ -68,7 +76,15 @@ export function startRun(
   void (async () => {
     let error: ProviderError | undefined;
     try {
-      const stream = chat({ adapter, messages, abortController });
+      const tools = webSearch && [
+        createWebSearchTool({
+          searchClient: deps.searchClient,
+          credentials: webSearch,
+          parts,
+          onChange: () => (changed = true),
+        }),
+      ];
+      const stream = chat({ adapter, messages, abortController, ...(tools && { tools }) });
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
         changed = true;
@@ -82,6 +98,7 @@ export function startRun(
     } finally {
       clearInterval(snapshotTimer);
       clearTimeout(capTimer);
+      parts.cancelRunningSearches();
       await write(
         withParts(
           timedOut
@@ -217,12 +234,19 @@ function createChunkChannel() {
 
 /**
  * Run at server start (ADR 0002): every `streaming` Message from before `bootedAt` was cut off by
- * a restart, so it ends as `error` "interrupted".
+ * a restart, so it ends as `error` "interrupted", and a search it left running is `cancelled`.
  */
 export async function sweepInterruptedRuns(deps: Pick<AppDeps, "db">, bootedAt = new Date()) {
   // Only Messages from before boot: a run started meanwhile is going, not interrupted.
-  await deps.db
+  const swept = await deps.db
     .update(message)
     .set({ status: "error", error: "interrupted" })
-    .where(and(eq(message.status, "streaming"), lt(message.createdAt, bootedAt)));
+    .where(and(eq(message.status, "streaming"), lt(message.createdAt, bootedAt)))
+    .returning({ id: message.id, parts: message.parts });
+  for (const row of swept) {
+    const parts = parseStoredParts(row.parts);
+    const closed = cancelRunningSearches(parts);
+    if (JSON.stringify(closed) === JSON.stringify(parts)) continue;
+    await deps.db.update(message).set({ parts: closed }).where(eq(message.id, row.id));
+  }
 }
