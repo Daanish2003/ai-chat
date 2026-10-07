@@ -63,7 +63,7 @@ function SharedConversationPage() {
           ))}
         </div>
         <footer className="mt-12 text-center text-xs text-muted-foreground">
-          Read-only snapshot. Attachments aren't shared.
+          Read-only snapshot. Files aren't shared.
         </footer>
       </article>
     </div>

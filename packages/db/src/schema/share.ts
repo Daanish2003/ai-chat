@@ -23,5 +23,3 @@ export const sharedLink = pgTable("shared_link", {
   /** When the link was last created or updated; the page shows it as the share date. */
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
-
-export type SharedLinkRow = typeof sharedLink.$inferSelect;

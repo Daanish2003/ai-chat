@@ -9,7 +9,7 @@ import {
   upsertSharedLink,
 } from "../share/store";
 
-const forConversation = z.object({ conversationId: z.uuid() });
+const conversationInput = z.object({ conversationId: z.uuid() });
 
 const blockedMessages = {
   empty: "There's nothing to share yet",
@@ -24,7 +24,7 @@ function conversationNotFound() {
 /** Shared links (ADR 0004). Only `get` is public; the rest are for the Conversation's owner. */
 export const shareRouter = {
   /** Creates the link, or moves it to the current Active Branch under the same token. */
-  upsert: protectedProcedure.input(forConversation).handler(async ({ context, input }) => {
+  upsert: protectedProcedure.input(conversationInput).handler(async ({ context, input }) => {
     const result = await upsertSharedLink(
       context.deps,
       context.session.user.id,
@@ -38,7 +38,7 @@ export const shareRouter = {
   }),
 
   /** Revokes the link; its URL then answers 404. */
-  delete: protectedProcedure.input(forConversation).handler(async ({ context, input }) => {
+  delete: protectedProcedure.input(conversationInput).handler(async ({ context, input }) => {
     const owned = await deleteSharedLink(
       context.deps,
       context.session.user.id,
@@ -48,11 +48,13 @@ export const shareRouter = {
   }),
 
   /** The share dialog's state: the link, whether it's stale, and why sharing is blocked. */
-  forConversation: protectedProcedure.input(forConversation).handler(async ({ context, input }) => {
-    const status = await shareStatus(context.deps, context.session.user.id, input.conversationId);
-    if (!status) throw conversationNotFound();
-    return status;
-  }),
+  forConversation: protectedProcedure
+    .input(conversationInput)
+    .handler(async ({ context, input }) => {
+      const status = await shareStatus(context.deps, context.session.user.id, input.conversationId);
+      if (!status) throw conversationNotFound();
+      return status;
+    }),
 
   /** The public, read-only page for a token. */
   get: publicProcedure

@@ -56,22 +56,15 @@ export function ShareDialog({
     staleTime: 0,
     refetchInterval: (query) => (query.state.data?.blockedBy === "streaming" ? 1_000 : false),
   });
-  const onChanged = async () => {
-    await queryClient.invalidateQueries({ queryKey: statusQuery.queryKey });
-    await invalidateConversationList(queryClient);
+  const callbacks = {
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: statusQuery.queryKey });
+      await invalidateConversationList(queryClient);
+    },
+    onError: (error: Error) => toast.error(error.message),
   };
-  const upsert = useMutation(
-    orpc.share.upsert.mutationOptions({
-      onSuccess: onChanged,
-      onError: (error) => toast.error(error.message),
-    }),
-  );
-  const remove = useMutation(
-    orpc.share.delete.mutationOptions({
-      onSuccess: onChanged,
-      onError: (error) => toast.error(error.message),
-    }),
-  );
+  const upsert = useMutation(orpc.share.upsert.mutationOptions(callbacks));
+  const remove = useMutation(orpc.share.delete.mutationOptions(callbacks));
 
   const title = useQuery(orpc.conversation.get.queryOptions({ input: { id: conversationId } })).data
     ?.title;
@@ -88,9 +81,15 @@ export function ShareDialog({
           <DialogTitle>Share "{title ?? "Untitled"}"</DialogTitle>
           <DialogDescription>
             Anyone with the link sees this Branch up to its newest Message, read-only and without
-            your name. Thinking is hidden; attachments show as names only.
+            your name. Thinking is hidden and files are never shared.
           </DialogDescription>
         </DialogHeader>
+
+        {status.isError && (
+          <p role="alert" className="text-destructive">
+            Couldn't load the Shared link: {status.error.message}
+          </p>
+        )}
 
         {blockedBy && (
           <p

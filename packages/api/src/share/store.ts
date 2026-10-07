@@ -81,7 +81,7 @@ export async function upsertSharedLink(
     await tx
       .select({ id: conversation.id })
       .from(conversation)
-      .where(eq(conversation.id, conversationId))
+      .where(and(eq(conversation.id, conversationId), eq(conversation.userId, userId)))
       .for("update");
     const state = await findShareState(tx, userId, conversationId);
     if (!state) return { error: "not_found" };
