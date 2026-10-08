@@ -52,7 +52,7 @@ export function Composer({
     >
       {attachments}
       <PromptInputTextarea
-        placeholder="Message (Enter to send, Shift+Enter for a new line)"
+        placeholder="Message (Shift+Enter for a new line)"
         className="text-sm text-foreground"
         aria-label="Message"
       />

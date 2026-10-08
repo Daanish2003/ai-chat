@@ -10,6 +10,7 @@ import {
 } from "@ai-chat/ui/components/dropdown-menu";
 import { Skeleton } from "@ai-chat/ui/components/skeleton";
 import { Link, useNavigate } from "@tanstack/react-router";
+import { UserIcon } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 
@@ -31,8 +32,9 @@ export default function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" />}>
-        {session.user.name}
+      <DropdownMenuTrigger render={<Button variant="outline" size="sm" className="max-w-40" />}>
+        <UserIcon className="sm:hidden" />
+        <span className="truncate max-sm:sr-only">{session.user.name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="bg-card">
         <DropdownMenuGroup>
@@ -46,7 +48,7 @@ export default function UserMenu() {
                 fetchOptions: {
                   onSuccess: () => {
                     navigate({
-                      to: "/",
+                      to: "/login",
                     });
                   },
                 },

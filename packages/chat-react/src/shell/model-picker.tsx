@@ -62,7 +62,9 @@ export function ModelPicker({
       >
         {selected ? (
           <>
-            <span className="text-muted-foreground">{providerLabel(selected.provider)}</span>
+            <span className="text-muted-foreground max-sm:hidden">
+              {providerLabel(selected.provider)}
+            </span>
             <span className="truncate">{selected.label}</span>
           </>
         ) : (

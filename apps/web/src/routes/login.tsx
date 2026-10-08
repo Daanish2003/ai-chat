@@ -1,11 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 
-import Header from "@/components/header";
 import SignInForm from "@/components/sign-in-form";
 import SignUpForm from "@/components/sign-up-form";
+import { getUser } from "@/functions/get-user";
 
 export const Route = createFileRoute("/login")({
+  beforeLoad: async () => {
+    if (await getUser()) throw redirect({ to: "/c" });
+  },
   component: RouteComponent,
 });
 
@@ -13,13 +16,12 @@ function RouteComponent() {
   const [showSignIn, setShowSignIn] = useState(false);
 
   return (
-    <>
-      <Header />
+    <main className="flex-1 overflow-y-auto">
       {showSignIn ? (
         <SignInForm onSwitchToSignUp={() => setShowSignIn(false)} />
       ) : (
         <SignUpForm onSwitchToSignIn={() => setShowSignIn(true)} />
       )}
-    </>
+    </main>
   );
 }

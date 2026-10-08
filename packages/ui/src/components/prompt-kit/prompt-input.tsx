@@ -6,7 +6,14 @@ import {
   TooltipTrigger,
 } from "@ai-chat/ui/components/tooltip";
 import { cn } from "@ai-chat/ui/lib/utils";
-import React, { createContext, useContext, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 type PromptInputContextType = {
   isLoading: boolean;
@@ -139,6 +146,21 @@ function PromptInputTextarea({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, maxHeight, disableAutosize]);
+
+  // A new width (a resized window, a rotated phone) rewraps the text, so fit it again.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || disableAutosize) return;
+    let width = el.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (el.clientWidth === width) return;
+      width = el.clientWidth;
+      adjustHeight(el);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [maxHeight, disableAutosize]);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     adjustHeight(e.target);

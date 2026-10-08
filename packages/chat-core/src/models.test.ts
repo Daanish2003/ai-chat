@@ -1,7 +1,7 @@
 import { findModel } from "@ai-chat/api/chat/models";
 import { describe, expect, it } from "vitest";
 
-import { missingCredentialsMessage, modelGroups } from "./models";
+import { missingCredentialsMessage, modelGroups, modelLabel } from "./models";
 
 const available = [
   "openai:gpt-5.6",
@@ -95,5 +95,21 @@ describe("missingCredentialsMessage", () => {
 
   it("asks for another Model when the selected one isn't offered any more", () => {
     expect(missingCredentialsMessage("openai:gpt-2", available)).toBe("Pick another Model");
+  });
+});
+
+describe("modelLabel", () => {
+  it("is the curated label of a curated Model", () => {
+    expect(modelLabel("anthropic:claude-haiku-4-5")).toBe(
+      findModel("anthropic:claude-haiku-4-5")!.label,
+    );
+  });
+
+  it("is the id without its Provider for a live-listed Model", () => {
+    expect(modelLabel("ollama:llama3.2:3b")).toBe("llama3.2:3b");
+  });
+
+  it("is the id itself when it has no Provider", () => {
+    expect(modelLabel("mystery")).toBe("mystery");
   });
 });
