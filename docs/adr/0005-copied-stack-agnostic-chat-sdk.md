@@ -1,5 +1,5 @@
 ---
-Status: proposed
+Status: accepted
 ---
 
 # The chat SDK is a copied, stack-agnostic core with Host-owned UI
