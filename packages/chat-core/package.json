@@ -12,7 +12,7 @@
   "dependencies": {
     "@ai-chat/api": "workspace:*",
     "@ai-chat/db": "workspace:*",
-    "@tanstack/ai-client": "0.36.2"
+    "@tanstack/ai-client": "0.39.0"
   },
   "devDependencies": {
     "@ai-chat/config": "workspace:*",

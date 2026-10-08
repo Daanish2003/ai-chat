@@ -24,7 +24,7 @@ describe("createFakeAdapter", () => {
 
     const reply = await chat({ adapter: fake.adapter, messages: hello, stream: false });
 
-    expect(reply).toBe("Hi there");
+    expect(reply.text).toBe("Hi there");
     expect(fake.calls).toHaveLength(1);
   });
 
@@ -62,7 +62,7 @@ describe("createFakeAdapter", () => {
     });
 
     expect(inputs).toEqual([{ query: "meaning" }]);
-    expect(reply).toBe("It is 42");
+    expect(reply.text).toBe("It is 42");
     expect(fake.calls).toHaveLength(2);
     expect(JSON.stringify(fake.calls[1]?.messages)).toContain("42");
   });

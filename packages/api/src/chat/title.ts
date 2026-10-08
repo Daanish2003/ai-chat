@@ -70,7 +70,7 @@ async function generateTitle(
   const credentials = await loadCredentials(deps, userId, model.provider);
   if (!credentials) return "";
   try {
-    const text = await chat({
+    const { text } = await chat({
       adapter: deps.adapterFor(model.id, credentials),
       systemPrompts: [titlePrompt],
       messages: [
