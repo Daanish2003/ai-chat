@@ -13,6 +13,7 @@
     "test": "turbo run test:vitest",
     "test:vitest": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "pnpm -F web test:e2e",
     "dev:web": "turbo run dev -F web --",
     "db:push": "turbo run db:push -F @ai-chat/db --",
     "db:studio": "turbo run db:studio -F @ai-chat/db --",
