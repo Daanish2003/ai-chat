@@ -13,8 +13,12 @@ An app that embeds the Chat SDK and supplies its users, its routes and a Postgre
 _Avoid_: Consumer, client app, integrator
 
 **Conversation**:
-One chat thread owned by a single user, listed in the sidebar.
+One chat thread owned by a single user, listed in the sidebar. A user can pin it to the top of the sidebar.
 _Avoid_: Chat, thread, session
+
+**Project**:
+A named group of a user's Conversations that share context: instructions and a default Model. A Conversation is in at most one Project; deleting the Project deletes its Conversations.
+_Avoid_: Folder, workspace, collection
 
 **Message**:
 One turn in a Conversation, authored by either the user or the assistant.
