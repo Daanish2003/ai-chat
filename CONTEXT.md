@@ -20,6 +20,10 @@ _Avoid_: Chat, thread, session
 A named group of a user's Conversations that share context: instructions and a default Model. A Conversation is in at most one Project; deleting the Project deletes its Conversations.
 _Avoid_: Folder, workspace, collection
 
+**Instructions**:
+Text a user or Project gives the assistant to shape every reply. A user's apply to all their Conversations, a Project's only to its Conversations, and both apply together.
+_Avoid_: System prompt, custom instructions, persona
+
 **Message**:
 One turn in a Conversation, authored by either the user or the assistant.
 _Avoid_: Turn, reply, prompt
