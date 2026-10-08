@@ -29,7 +29,7 @@ One turn in a Conversation, authored by either the user or the assistant.
 _Avoid_: Turn, reply, prompt
 
 **Run**:
-The generation of one assistant Message, from the moment it's sent until it ends `complete`, `stopped` or `error`. It goes on without a reader, and anyone can join it while it's live.
+The generation of one assistant Message, from the moment it's sent until it ends `complete`, `stopped`, `error` or waiting for an Approval. It goes on without a reader, and anyone can join it while it's live.
 _Avoid_: Job, generation, stream
 
 **Branch**:
@@ -63,6 +63,14 @@ _Avoid_: Limit, allowance, credits, free tier
 **Tool credential**:
 A user's own API key for a non-LLM service a tool needs, such as web search. Without it, that tool is unavailable to the user.
 _Avoid_: Search key, Provider credentials (those are for Providers only)
+
+**Connection**:
+A user's authorisation to use one of the MCP servers the Host offers, made by signing in to that server. The user switches each Connection on per Conversation.
+_Avoid_: Integration, MCP credential, Tool credential (that is an API key)
+
+**Approval**:
+A user's yes or no to one tool call before it runs. While a call waits for it, the Run has ended; approving starts a new Run that carries on from the call.
+_Avoid_: Confirmation, consent, permission
 
 **Source**:
 A web page a web search returned during an assistant Message, numbered within that Message and shown as a chip under the search and wherever the reply cites it.
