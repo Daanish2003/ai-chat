@@ -6,6 +6,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { createMiddleware } from "@tanstack/react-start";
 import { evlogErrorHandler } from "evlog/nitro/v3";
 
+import { WebChatProvider } from "@/lib/chat-provider";
 import type { orpc } from "@/utils/orpc";
 
 import appCss from "../index.css?url";
@@ -51,7 +52,9 @@ function RootDocument() {
       </head>
       <body>
         <div className="flex h-svh flex-col">
-          <Outlet />
+          <WebChatProvider>
+            <Outlet />
+          </WebChatProvider>
         </div>
         <Toaster richColors />
         <TanStackRouterDevtools position="bottom-left" />
