@@ -17,13 +17,13 @@ Two ways to wire search into TanStack AI:
 
 ## Comparison
 
-| Backend | Price | Free tier | Citation data you get | Plugs into TanStack AI as |
-|---|---|---|---|---|
-| Anthropic web search (server tool) | **$10 / 1,000 searches** plus token cost; results count as input tokens in this turn *and later turns*; failed searches not billed [A1] | None (pay as you go) | Inline `web_search_result_location` citations (`url`, `title`, `cited_text` ≤150 chars, `encrypted_index`); results have `url`, `title`, `page_age`, `encrypted_content` [A1] | Provider tool `webSearchTool` from `@tanstack/ai-anthropic/tools` [T1] |
-| OpenAI web search (Responses API) | Reasoning models: **$10 / 1k calls** + search content tokens at model input rate. Non-reasoning models: **$25 / 1k calls**, search content tokens free [O2] | None | `url_citation` annotations (`url`, `title`, `start_index`, `end_index`) plus `sources` list of all URLs consulted [O1] | Provider tool `webSearchTool` from `@tanstack/ai-openai/tools` (needs the default `openaiText` Responses adapter) [T1][T4] |
-| Tavily | 1 credit basic/fast/ultra-fast, 2 credits advanced; **$0.008 / credit** pay as you go; plans $30–$500/month [V1][V2] | **1,000 credits / month, no card** [V1] | Per result `title`, `url`, `content` snippet, `score`, optional `raw_content`, `published_date`; optional LLM `answer`; `response_time` [V2] | Custom `toolDefinition` with server `execute` [T2] |
-| Exa | Search: instant $4, fast/auto $7, deep $12, deep-reasoning $15 per 1k (≤10 results); contents **$1 / 1k pages per content type** (text, highlights, summary) [E1] | **$10 credit, resets monthly, no payment method** [E1] | Per result `title`, `url`, `publishedDate`, `author`, optional `text` / `highlights` (+ scores) / `summary`; `costDollars` breakdown [E2] | Custom `toolDefinition` |
-| Brave Search API | Search plan **$5 / 1k requests**, 50 qps; Answers plan $4 / 1k + $5 / M tokens, 2 qps [B1] | **$5 credits / month** (≈1,000 searches); **card required** for identity [B1] | Per result `title`, `url`, `description`, optional up to 5 `extra_snippets` [B2] | Custom `toolDefinition` |
+| Backend                            | Price                                                                                                                                                             | Free tier                                                                     | Citation data you get                                                                                                                                                         | Plugs into TanStack AI as                                                                                                  |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| Anthropic web search (server tool) | **$10 / 1,000 searches** plus token cost; results count as input tokens in this turn _and later turns_; failed searches not billed [A1]                           | None (pay as you go)                                                          | Inline `web_search_result_location` citations (`url`, `title`, `cited_text` ≤150 chars, `encrypted_index`); results have `url`, `title`, `page_age`, `encrypted_content` [A1] | Provider tool `webSearchTool` from `@tanstack/ai-anthropic/tools` [T1]                                                     |
+| OpenAI web search (Responses API)  | Reasoning models: **$10 / 1k calls** + search content tokens at model input rate. Non-reasoning models: **$25 / 1k calls**, search content tokens free [O2]       | None                                                                          | `url_citation` annotations (`url`, `title`, `start_index`, `end_index`) plus `sources` list of all URLs consulted [O1]                                                        | Provider tool `webSearchTool` from `@tanstack/ai-openai/tools` (needs the default `openaiText` Responses adapter) [T1][T4] |
+| Tavily                             | 1 credit basic/fast/ultra-fast, 2 credits advanced; **$0.008 / credit** pay as you go; plans $30–$500/month [V1][V2]                                              | **1,000 credits / month, no card** [V1]                                       | Per result `title`, `url`, `content` snippet, `score`, optional `raw_content`, `published_date`; optional LLM `answer`; `response_time` [V2]                                  | Custom `toolDefinition` with server `execute` [T2]                                                                         |
+| Exa                                | Search: instant $4, fast/auto $7, deep $12, deep-reasoning $15 per 1k (≤10 results); contents **$1 / 1k pages per content type** (text, highlights, summary) [E1] | **$10 credit, resets monthly, no payment method** [E1]                        | Per result `title`, `url`, `publishedDate`, `author`, optional `text` / `highlights` (+ scores) / `summary`; `costDollars` breakdown [E2]                                     | Custom `toolDefinition`                                                                                                    |
+| Brave Search API                   | Search plan **$5 / 1k requests**, 50 qps; Answers plan $4 / 1k + $5 / M tokens, 2 qps [B1]                                                                        | **$5 credits / month** (≈1,000 searches); **card required** for identity [B1] | Per result `title`, `url`, `description`, optional up to 5 `extra_snippets` [B2]                                                                                              | Custom `toolDefinition`                                                                                                    |
 
 ### Cost at hobby scale (worked example: 300 searches/month)
 
@@ -44,9 +44,9 @@ Versions read from the TanStack/ai repo at commit `a32782c` (2026-10-06): `@tans
 - **Model support** [T1]: every Anthropic model in TanStack AI's model list supports web search except `claude-opus-5-fast`, which supports no tools. On OpenAI, the GPT-5, O-series, GPT-6 and GPT-4-series models support `webSearchTool`. GPT-3.5 and audio models support none.
 - **Name clash**: `webSearchTool()` and a custom function also named `web_search` cannot go in the same array. Doing so throws `DuplicateToolNameError` [T1].
 - **Citation shape differs by provider (important for the UI):**
-  - *OpenAI*: the adapter automatically adds `include: ['web_search_call.action.sources']`. It turns `url_citation` annotations into a common `metadata.sources` array (`url`, `title?`, `pageAge?`), which you read with `getProviderExecutedMetadata(part)`. The raw `urlCitations` stay under `metadata.openai` [T1][T4].
-  - *Anthropic*: the adapter sends the server tool as a provider-executed tool call. The **raw** `web_search_tool_result` content sits under `metadata.anthropic.result` [T3]. It does **not** fill the common `metadata.sources`; the docs list only OpenAI and Gemini for that [T1]. Searching `packages/ai-anthropic/src` found no handling of `citations_delta`, so the inline `web_search_result_location` citations on text blocks are dropped. The UI would have to build the source list from `metadata.anthropic.result`.
-  - *Anthropic tool version*: the adapter always sends `type: 'web_search_20250305'` [T3]. Anthropic's newer `web_search_20260209` / `web_search_20260318` versions add dynamic filtering, which cuts token use [A1]. TanStack AI cannot use them yet.
+  - _OpenAI_: the adapter automatically adds `include: ['web_search_call.action.sources']`. It turns `url_citation` annotations into a common `metadata.sources` array (`url`, `title?`, `pageAge?`), which you read with `getProviderExecutedMetadata(part)`. The raw `urlCitations` stay under `metadata.openai` [T1][T4].
+  - _Anthropic_: the adapter sends the server tool as a provider-executed tool call. The **raw** `web_search_tool_result` content sits under `metadata.anthropic.result` [T3]. It does **not** fill the common `metadata.sources`; the docs list only OpenAI and Gemini for that [T1]. Searching `packages/ai-anthropic/src` found no handling of `citations_delta`, so the inline `web_search_result_location` citations on text blocks are dropped. The UI would have to build the source list from `metadata.anthropic.result`.
+  - _Anthropic tool version_: the adapter always sends `type: 'web_search_20250305'` [T3]. Anthropic's newer `web_search_20260209` / `web_search_20260318` versions add dynamic filtering, which cuts token use [A1]. TanStack AI cannot use them yet.
 - **Custom server tool** (Tavily, Exa or Brave): `toolDefinition({ name, description, inputSchema, outputSchema }).server(async (args) => ...)`, using a Zod schema. TanStack runs it automatically, adds the result to the conversation history and continues the chat [T2]. The same definition works with both adapters. We choose the output schema, for example `{ results: [{ title, url, snippet, publishedDate? }] }`. The model is then prompted to cite in markdown. You get no character-span citations like the native tools give.
 - Tavily, Exa and Brave can all be called with plain `fetch`. No SDK dependency is required (Brave: `GET https://api.search.brave.com/res/v1/web/search`, header `X-Subscription-Token` [B2]).
 
@@ -61,7 +61,7 @@ Versions read from the TanStack/ai repo at commit `a32782c` (2026-10-06): `@tans
 - How result quality and real latency compare between providers. No neutral primary benchmark exists, and I did not measure them.
 - OpenAI's model list. The OpenAI web search guide named `gpt-6-astra`, `gpt-5.5`, `gpt-4.1` and `gpt-4.1-mini` [O1]. TanStack's matrix is broader [T1]. I did not check this per model.
 - The exact Tavily plan price per credit tier. The pricing page uses a slider and shows only "$30–$500/month" [V2].
-- Brave's AI-use rights. The pricing page says that *storing* results (for example, for LLM training) needs a plan that grants storage rights [B1]. I found no explicit clause on showing results inside a chatbot in what I read. Read the ToS before choosing Brave.
+- Brave's AI-use rights. The pricing page says that _storing_ results (for example, for LLM training) needs a plan that grants storage rights [B1]. I found no explicit clause on showing results inside a chatbot in what I read. Read the ToS before choosing Brave.
 - Whether TanStack AI exposes Anthropic's inline citations in some other way, such as a later version or the raw chunk passthrough. I based this on reading the source, not on running it.
 
 ## Implications for this app
@@ -75,15 +75,15 @@ Versions read from the TanStack/ai repo at commit `a32782c` (2026-10-06): `@tans
 
 ## Sources
 
-- [A1] Anthropic, *Web search tool*: https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool
-- [O1] OpenAI, *Web search guide*: https://developers.openai.com/api/docs/guides/tools-web-search
-- [O2] OpenAI, *Pricing* (tools section): https://developers.openai.com/api/docs/pricing
-- [V1] Tavily, *Pricing*: https://www.tavily.com/pricing
-- [V2] Tavily, *API credits*: https://docs.tavily.com/documentation/api-credits and *Search endpoint*: https://docs.tavily.com/documentation/api-reference/endpoint/search
-- [E1] Exa, *Pricing*: https://exa.ai/pricing
-- [E2] Exa, *Search reference*: https://exa.ai/docs/reference/search
-- [B1] Brave, *Search API*: https://brave.com/search/api/
-- [B2] Brave, *Web search get started*: https://api-dashboard.search.brave.com/app/documentation/web-search/get-started
+- [A1] Anthropic, _Web search tool_: https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool
+- [O1] OpenAI, _Web search guide_: https://developers.openai.com/api/docs/guides/tools-web-search
+- [O2] OpenAI, _Pricing_ (tools section): https://developers.openai.com/api/docs/pricing
+- [V1] Tavily, _Pricing_: https://www.tavily.com/pricing
+- [V2] Tavily, _API credits_: https://docs.tavily.com/documentation/api-credits and _Search endpoint_: https://docs.tavily.com/documentation/api-reference/endpoint/search
+- [E1] Exa, _Pricing_: https://exa.ai/pricing
+- [E2] Exa, _Search reference_: https://exa.ai/docs/reference/search
+- [B1] Brave, _Search API_: https://brave.com/search/api/
+- [B2] Brave, _Web search get started_: https://api-dashboard.search.brave.com/app/documentation/web-search/get-started
 - [T1] TanStack AI, `docs/tools/provider-tools.md`: https://github.com/TanStack/ai/blob/a32782c3e5674cb94f53adc1cc4e5a51bc11c121/docs/tools/provider-tools.md
 - [T2] TanStack AI, `docs/tools/server-tools.md`: https://github.com/TanStack/ai/blob/a32782c3e5674cb94f53adc1cc4e5a51bc11c121/docs/tools/server-tools.md
 - [T3] TanStack AI, `packages/ai-anthropic/src/tools/web-search-tool.ts` and `packages/ai-anthropic/src/adapters/text.ts` (server tool result handling): https://github.com/TanStack/ai/tree/a32782c3e5674cb94f53adc1cc4e5a51bc11c121/packages/ai-anthropic/src

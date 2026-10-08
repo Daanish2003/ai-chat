@@ -14,6 +14,10 @@
       "dependsOn": ["^check-types"],
       "outputs": ["dist/**"]
     },
+    "//#test:vitest": {
+      "cache": false,
+      "passThroughEnv": ["TEST_DATABASE_URL"]
+    },
     "dev": {
       "cache": false,
       "persistent": true
@@ -53,6 +57,7 @@
     "BETTER_AUTH_URL",
     "CI",
     "DATABASE_URL",
+    "KEY_ENCRYPTION_SECRET",
     "NODE_ENV",
     "VERCEL",
     "VERCEL_ENV",

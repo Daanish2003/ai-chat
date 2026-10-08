@@ -4,14 +4,14 @@ Research for issue #2 (child of the v1 map, #1). Researched on 2026-10-06.
 
 **Versions checked** (npm `latest` = repo `main` at commit [`a32782c`](https://github.com/TanStack/ai/tree/a32782c3e5674cb94f53adc1cc4e5a51bc11c121)):
 
-| Package | Version | Role |
-| --- | --- | --- |
-| `@tanstack/ai` | 0.64.1 | Server core: `chat()`, tools, SSE/NDJSON response helpers |
-| `@tanstack/ai-client` | 0.36.2 | Headless `ChatClient`, connection adapters |
-| `@tanstack/ai-react` | 0.29.4 | `useChat`, plus the headless UI at `@tanstack/ai-react/ui` |
-| `@tanstack/ai-anthropic` | 0.19.4 | Claude adapter + `/tools` (web search, …) |
-| `@tanstack/ai-openai` | 0.26.0 | OpenAI adapter (Responses API by default) + `/tools` |
-| `@tanstack/ai-persistence` | 0.7.2 | Optional server persistence middleware (`withPersistence`) |
+| Package                    | Version | Role                                                       |
+| -------------------------- | ------- | ---------------------------------------------------------- |
+| `@tanstack/ai`             | 0.64.1  | Server core: `chat()`, tools, SSE/NDJSON response helpers  |
+| `@tanstack/ai-client`      | 0.36.2  | Headless `ChatClient`, connection adapters                 |
+| `@tanstack/ai-react`       | 0.29.4  | `useChat`, plus the headless UI at `@tanstack/ai-react/ui` |
+| `@tanstack/ai-anthropic`   | 0.19.4  | Claude adapter + `/tools` (web search, …)                  |
+| `@tanstack/ai-openai`      | 0.26.0  | OpenAI adapter (Responses API by default) + `/tools`       |
+| `@tanstack/ai-persistence` | 0.7.2   | Optional server persistence middleware (`withPersistence`) |
 
 Sources are the docs in the repo's `docs/` folder (the same Markdown that tanstack.com/ai renders) and the package source. Links below point to the repo at the commit above. "Docs:" means a docs page; "Source:" means I checked the implementation.
 
@@ -30,20 +30,26 @@ Docs: [api/ai-react.md](https://github.com/TanStack/ai/blob/a32782c3e5674cb94f53
 
 ```ts
 interface UIMessage {
-  id: string
-  role: 'system' | 'user' | 'assistant' | 'activity'
-  parts: MessagePart[]
-  createdAt?: Date
-  name?: string
-  metadata?: Record<string, any> // TanStack writes under metadata.tanstack (model, runId, …)
+  id: string;
+  role: "system" | "user" | "assistant" | "activity";
+  parts: MessagePart[];
+  createdAt?: Date;
+  name?: string;
+  metadata?: Record<string, any>; // TanStack writes under metadata.tanstack (model, runId, …)
 }
 type MessagePart =
-  | TextPart            // { type: 'text', content }
-  | ImagePart | AudioPart | VideoPart | DocumentPart // { type, source: data | url | file }
-  | ToolCallPart        // { type: 'tool-call', id, name, arguments, input?, state, output?, approval?, metadata? }
-  | ToolResultPart      // { type: 'tool-result', toolCallId, content, state, error?, outcome? }
-  | ThinkingPart        // { type: 'thinking', content, signature?, redacted? }
-  | ActivityPart | StructuredOutputPart | UIResourcePart | SubagentPart
+  | TextPart // { type: 'text', content }
+  | ImagePart
+  | AudioPart
+  | VideoPart
+  | DocumentPart // { type, source: data | url | file }
+  | ToolCallPart // { type: 'tool-call', id, name, arguments, input?, state, output?, approval?, metadata? }
+  | ToolResultPart // { type: 'tool-result', toolCallId, content, state, error?, outcome? }
+  | ThinkingPart // { type: 'thinking', content, signature?, redacted? }
+  | ActivityPart
+  | StructuredOutputPart
+  | UIResourcePart
+  | SubagentPart;
 ```
 
 - **There is no parent pointer or branch concept.** A `UIMessage` has no `parentId`, and the docs never mention branches or message trees. (I searched all of `docs/` for branch/parent/regenerate/edit.)
@@ -76,14 +82,24 @@ Two ids frame every stream:
 
 ```ts
 // apps/web/src/routes/api/chat.ts  (same shape as our existing api/rpc/$.ts)
-export const Route = createFileRoute('/api/chat')({
-  server: { handlers: { POST: async ({ request }) => {
-    const { messages, threadId, runId, forwardedProps } = await chatParamsFromRequest(request)
-    const abortController = new AbortController()
-    const stream = chat({ adapter: anthropicText('claude-sonnet-4-6'), messages, threadId, runId, abortController })
-    return toServerSentEventsResponse(stream, { abortController })
-  } } },
-})
+export const Route = createFileRoute("/api/chat")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const { messages, threadId, runId, forwardedProps } = await chatParamsFromRequest(request);
+        const abortController = new AbortController();
+        const stream = chat({
+          adapter: anthropicText("claude-sonnet-4-6"),
+          messages,
+          threadId,
+          runId,
+          abortController,
+        });
+        return toServerSentEventsResponse(stream, { abortController });
+      },
+    },
+  },
+});
 ```
 
 The client side is `useChat({ connection: fetchServerSentEvents('/api/chat') })`. Some details:
@@ -109,7 +125,7 @@ Yes. Both sides are documented, but nobody has documented this exact pairing end
 - **Client.** `stop()` aborts the in-flight request ([chat/streaming.md § Cancel a run](https://github.com/TanStack/ai/blob/a32782c3e5674cb94f53adc1cc4e5a51bc11c121/docs/chat/streaming.md#3-cancel-a-run)). `AbortError` is expected and is not surfaced as an error.
 - **Server.** Pass one `AbortController` to both `chat({ abortController })` and `toServerSentEventsResponse(stream, { abortController })`.
   - When the client disconnects, the response stream's `cancel()` aborts that controller, which stops the provider request (source: [`stream-to-response.ts` L237–260](https://github.com/TanStack/ai/blob/a32782c3e5674cb94f53adc1cc4e5a51bc11c121/packages/ai/src/stream-to-response.ts#L237-L260)).
-  - With a durable stream configured, a disconnect *detaches* instead: the run keeps going so a reload can rejoin it. In that mode Stop needs an explicit out-of-band cancel.
+  - With a durable stream configured, a disconnect _detaches_ instead: the run keeps going so a reload can rejoin it. In that mode Stop needs an explicit out-of-band cancel.
 - **What the transcript keeps.** Text received before the stop stays in `messages`. `onFinish` does not fire.
   - If you persist manually, save the partial assistant Message on abort.
   - With `withPersistence`, an abort marks the run `aborted`. The transcript is only saved at finish, and optionally every ~1s with `snapshotStreaming: true`. So a stopped reply's partial text is **not** saved unless snapshots are on ([persistence/chat-persistence.md § What gets persisted](https://github.com/TanStack/ai/blob/a32782c3e5674cb94f53adc1cc4e5a51bc11c121/docs/persistence/chat-persistence.md#what-gets-persisted-and-when)).
