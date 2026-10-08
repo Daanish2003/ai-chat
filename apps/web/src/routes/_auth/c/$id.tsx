@@ -1,8 +1,8 @@
+import { ChatView } from "@ai-chat/chat-react";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 
-import { ChatView } from "@/components/chat/chat-view";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/c/$id")({

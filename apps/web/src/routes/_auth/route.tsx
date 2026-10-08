@@ -1,6 +1,7 @@
+import { AppShell } from "@ai-chat/chat-react";
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
-import { AppShell } from "@/components/shell/app-shell";
+import UserMenu from "@/components/user-menu";
 import { getUser } from "@/functions/get-user";
 
 export const Route = createFileRoute("/_auth")({
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/_auth")({
 
 function AuthLayout() {
   return (
-    <AppShell>
+    <AppShell userMenu={<UserMenu />}>
       <Outlet />
     </AppShell>
   );
