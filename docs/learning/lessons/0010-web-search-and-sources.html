@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 10 · Web search and Sources</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+    <style>
+      .chip {
+        display: inline-block;
+        min-width: 1.5em;
+        text-align: center;
+        font: 600 12px/1.6 var(--sans);
+        background: var(--blue-soft);
+        color: var(--blue);
+        border: 1px solid var(--blue);
+        border-radius: 999px;
+        padding: 0 6px;
+        margin: 0 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 10</p>
+      <h1>Web search and Sources</h1>
+      <p class="subtitle">A search is one part of a reply. A failure is only its state.</p>
+      <p class="meta">
+        About 14 minutes · a browser · you'll write <code>numberSources(searches)</code>, which
+        numbers a reply's Sources
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Tool</dt>
+          <dd>
+            A function the Model can ask the server to run in the middle of a reply. Here there is
+            one: <code>web_search</code>.
+          </dd>
+          <dt>Tool credential</dt>
+          <dd>
+            A user's own API key for a service a tool needs. For web search, it is a Tavily key.
+          </dd>
+          <dt>Source</dt>
+          <dd>
+            A web page that a search returned during an assistant Message, numbered within that
+            Message.
+          </dd>
+          <dt>Citation</dt>
+          <dd>
+            The chip in the reply's text that points at a Source. A Source is the page; a citation
+            is the pointer.
+          </dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <div
+        class="quiz"
+        data-answer="2"
+        data-why="The run snapshots the streaming Message's parts every snapshotIntervalMs (1,000 ms) when they changed, and once more in finally (Lesson 4)."
+      >
+        <div class="label">Warm-up · Lesson 4</div>
+        <p class="q">While a reply streams, how often does the run save its parts to Postgres?</p>
+        <ol class="opts">
+          <li data-why="The run also saves while it streams, so a reload shows the reply so far.">
+            Only when the run ends
+          </li>
+          <li data-why="That would be one database write per token. The run batches them.">
+            After every single stream chunk
+          </li>
+          <li>At most once a second</li>
+          <li data-why="The client never asks for a save. The run saves on its own (ADR 0002).">
+            Only when the client asks
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span>Three gates before a search</h2>
+      <figure id="gates">
+        <figcaption>
+          The <code>web_search</code> tool reaches the Model only when all three gates are open.
+        </figcaption>
+      </figure>
+      <p>
+        Think of a door with three locks. <code>handleChat</code> offers the tool only when the
+        command asks for search (<code>webSearch: true</code>), the Model has tools
+        (<code>model.tools</code>) and the user has a Tavily Tool credential. If one lock stays
+        closed, the run gets no tool and the Model can't search.
+      </p>
+      <p>
+        The client shows the same locks before you send: <code>searchToggle</code> in
+        <code>chat-core</code> greys out the Search toggle and says why, such as "This Model can't
+        use tools, so it can't search the web". The server still checks again, because the client
+        can be wrong.
+      </p>
+
+      <h2><span class="num">2</span>A search sits between the text</h2>
+      <figure id="parts">
+        <figcaption>
+          The parts builder adds a <code>web_search</code> part where the search happens, between
+          two text parts.
+        </figcaption>
+      </figure>
+      <p>
+        A reply is a list of parts (Lesson 8). When the Model calls the tool,
+        <code>createWebSearchTool</code> calls <code>parts.startSearch</code>, which pushes a
+        <code>web_search</code> part with <code>state: "running"</code>. When Tavily answers,
+        <code>finishSearch</code> sets it to <code>done</code> with up to 5 results. Text that
+        streams after that starts a new text part, so the order on screen is the order of events.
+      </p>
+      <p>
+        One reply may search at most 3 times (<code>maxSearchesPerReply</code>). A fourth call gets
+        the result <code>"search limit reached"</code> and searches nothing.
+      </p>
+
+      <h2><span class="num">3</span>A failure is a state, not an error</h2>
+      <figure>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>What happened</th>
+                <th>Search part state</th>
+                <th>Message status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Tavily returned results</td>
+                <td><code>done</code></td>
+                <td><code>complete</code></td>
+              </tr>
+              <tr>
+                <td>Tavily answered 401 or 403</td>
+                <td><code>error</code>, <code>invalid_key</code></td>
+                <td><code>complete</code></td>
+              </tr>
+              <tr>
+                <td>Tavily answered 432 or 433</td>
+                <td><code>error</code>, <code>quota_exhausted</code></td>
+                <td><code>complete</code></td>
+              </tr>
+              <tr>
+                <td>The user pressed Stop mid-search</td>
+                <td><code>cancelled</code></td>
+                <td><code>stopped</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figcaption>
+          Look at the last column: a failed search alone never makes the Message an
+          <code>error</code>.
+        </figcaption>
+      </figure>
+      <p>
+        When a search fails, the tool doesn't throw. It sets the part to <code>error</code> with a
+        reason and gives the Model a short result such as
+        <code>{ error: "Tavily rejected the API key" }</code>. The Model reads that and can still
+        answer. Only an abort is different: the run's <code>finally</code> calls
+        <code>cancelRunningSearches</code>, so a search that never finished is saved as
+        <code>cancelled</code>.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="The tool catches the SearchError, stores state error with quota_exhausted, and the Model goes on. The run ends complete."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          Tavily answers HTTP 432 during a reply, and the Model then finishes its answer. How is the
+          Message saved?
+        </p>
+        <ol class="opts">
+          <li><code>complete</code>, and the search shows <code>error</code></li>
+          <li
+            data-why="A search failure never becomes a Message error; only the Provider's own errors do."
+          >
+            <code>error</code>, and the reply stops there
+          </li>
+          <li
+            data-why="cancelled is for a search cut off by Stop or the run cap, not for a failure."
+          >
+            <code>stopped</code>, and the search is <code>cancelled</code>
+          </li>
+          <li data-why="The tool doesn't retry. It records the failure and returns at once.">
+            <code>streaming</code>, until Tavily answers again later
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">4</span>Sources get numbers; links become citations</h2>
+      <figure id="sources">
+        <figcaption>
+          Two searches, four results, three Sources: the repeated page keeps its first number.
+        </figcaption>
+      </figure>
+      <p>
+        Sources are never stored. The renderer computes them from the parts with
+        <code>numberSources</code>: it walks every result of every search in order and gives each
+        new page the next number. Two URLs are the same page when their
+        <code>sourceKey</code> matches, which is the URL without its <code>#fragment</code> and
+        trailing slash.
+      </p>
+      <p>
+        The Model cites with ordinary markdown links, because <code>citationPrompt</code> asks it
+        to. Then <code>citationFor(href, sources)</code> checks each link: if its key matches a
+        Source, the link shows as that Source's numbered chip. Any other link stays a plain link.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="1"
+        data-why="sourceKey drops the #top fragment and the trailing slash, so both are https://a.dev/x: one Source."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          One search returns <code>https://a.dev/x#top</code> and another returns
+          <code>https://a.dev/x/</code>. How many Sources?
+        </p>
+        <ol class="opts">
+          <li
+            data-why="Compare the two URLs after sourceKey removes the fragment and the trailing slash."
+          >
+            Two Sources in total
+          </li>
+          <li>One Source in total</li>
+          <li data-why="There are only two URLs here.">Three Sources in total</li>
+          <li data-why="Both results are real pages, so they count.">No Sources at all</li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <figure id="payoff">
+        <div class="toy-out" id="reply-out">
+          Pass the tests first. Then this reply renders its citations with your
+          <code>numberSources</code>.
+        </div>
+        <figcaption>
+          Your <code>numberSources</code> numbers these chips, the same way the reply does.
+        </figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> a search is a part of the reply, its
+          failure is a state of that part, and Sources are computed from the parts, never stored.
+        </p>
+        <ul>
+          <li>
+            <strong>Three gates.</strong> Search asked for, a Model with tools, and a Tavily Tool
+            credential. The server checks all three.
+          </li>
+          <li>
+            <strong>Failures stay small.</strong> A failed search is <code>error</code> on its part;
+            the Message still ends <code>complete</code>.
+          </li>
+          <li>
+            <strong>Number by first appearance.</strong> <code>numberSources</code> dedupes by
+            <code>sourceKey</code>; <code>citationFor</code> turns a matching link into a chip.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box and say each point out loud, then draw the parts of a reply with
+          two searches.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>Read the code</h3>
+        <ul>
+          <li>
+            <a href="../../../packages/api/src/chat/web-search-tool.ts"
+              ><code>web-search-tool.ts</code></a
+            >: the server tool, the limit and the catch.
+          </li>
+          <li>
+            <a href="../../../packages/api/src/chat/tavily.ts"><code>tavily.ts</code></a
+            >: the HTTP status to reason map and the 15-second timeout.
+          </li>
+          <li>
+            <a href="../../../packages/api/src/chat/sources.ts"><code>sources.ts</code></a> and
+            <a href="../../../packages/api/src/chat/citations.ts"><code>citations.ts</code></a
+            >: browser-safe, so <code>chat-react</code> imports them (Lesson 1's side note).
+          </li>
+          <li>
+            <a href="../../../packages/chat-core/src/web-search.ts"
+              ><code>chat-core/web-search.ts</code></a
+            >: <code>searchToggle</code> and the search row's one-line text.
+          </li>
+        </ul>
+        <h3>History without the tool</h3>
+        <p>
+          When the next request does not offer the tool (Search off, or a Model without tools),
+          <code>toModelMessages</code> replays an old search as text, such as
+          <code>[Searched the web for "x": …]</code>. With the tool, it replays as a real tool call
+          and result. Stored history is never rewritten (<a
+            href="../../../packages/api/src/chat/parts.ts"
+            ><code>parts.ts</code></a
+          >).
+        </p>
+        <h3>Why not [1] markers?</h3>
+        <p>
+          <code>citationPrompt</code> tells the Model: "Don't add numbered markers like [1] or a
+          list of sources at the end; the app shows the sources." Links to exact URLs can be checked
+          against the results; a bare number can't.
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          Find the line in <code>handleChat</code> that loads <code>searchCredentials</code>.
+          Explain to your teacher why it is <code>null</code> when the Model has no tools, even if
+          the user has a Tavily key.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="https://tanstack.com/ai/latest/docs">TanStack AI docs</a>, the pages on tools and
+          tool calling (pre-1.0: check against <code>@tanstack/ai</code> 0.64.1). Then read the
+          Source entry in <a href="../../../CONTEXT.md"><code>CONTEXT.md</code></a
+          >.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude) anything: "what does the
+          Model see after a failed search?", or "quiz me on Sources".
+        </p>
+        <div class="nav">
+          <a href="0009-provider-credentials.html">← Lesson 9: Provider credentials</a
+          ><a href="0011-attachments.html">Lesson 11: Attachments →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="10"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // Section 1: three gates.
+      const gate = (x, label, sub, open) =>
+        D.box(x, 40, 150, 56, label, { tone: open ? "ok" : "", sub, mono: false });
+      D.render(
+        "#gates",
+        D.svg(
+          760,
+          150,
+          D.box(10, 44, 110, 48, "Command", { tone: "blue", sub: "webSearch: true" }) +
+            gate(170, "Search asked", "command.webSearch", true) +
+            gate(350, "Model has tools", "model.tools", true) +
+            gate(530, "Tavily key", "loadCredentials", true) +
+            D.arrow(120, 68, 170, 68) +
+            D.arrow(320, 68, 350, 68) +
+            D.arrow(500, 68, 530, 68) +
+            D.arrow(680, 68, 750, 68, { tone: "ok" }) +
+            D.text(750, 112, "web_search offered", {
+              tone: "ok",
+              size: 12,
+              weight: 600,
+              anchor: "end",
+            }) +
+            D.text(170, 130, "all in handleChat (packages/api/src/chat/handle-chat.ts)", {
+              tone: "muted",
+              size: 12,
+            }),
+          { label: "Three gates: search asked, Model has tools, Tavily key" },
+        ),
+      );
+
+      // Section 2: parts of a reply, in stream order.
+      const partBox = (x, label, sub, tone) =>
+        D.box(x, 50, 165, 56, label, { tone, sub, mono: true });
+      D.render(
+        "#parts",
+        D.svg(
+          760,
+          150,
+          D.text(10, 22, "parts = [", { mono: true, tone: "muted" }) +
+            partBox(10, "text", '"Let me check…"', "") +
+            partBox(195, "web_search", "running → done", "blue") +
+            partBox(380, "text", '"It was released…"', "") +
+            partBox(565, "web_search", "state: error", "warn") +
+            D.arrow(10, 128, 740, 128, { tone: "faint" }) +
+            D.text(380, 142, "stream order: what came first is first", {
+              tone: "muted",
+              size: 12,
+              anchor: "middle",
+            }),
+          { label: "A reply's parts: text, a search, text, a failed search" },
+        ),
+      );
+
+      // Section 4: two searches → three Sources.
+      const res = (x, y, url, n, dup) =>
+        D.box(x, y, 210, 30, url, { mono: true, tone: dup ? "warn" : "" }) +
+        D.arrow(x + 210, y + 15, 470, 40 + (n - 1) * 44, {
+          tone: dup ? "warn" : "blue",
+          dashed: dup,
+        });
+      const src = (n, url) =>
+        D.box(470, 22 + (n - 1) * 44, 280, 36, `${n}  ${url}`, { tone: "blue", mono: true });
+      D.render(
+        "#sources",
+        D.svg(
+          760,
+          175,
+          D.text(10, 12, "search 1", { tone: "muted", size: 12 }) +
+            res(10, 22, "tanstack.com/ai", 1) +
+            res(10, 58, "github.com/TanStack/ai", 2) +
+            D.text(10, 104, "search 2", { tone: "muted", size: 12 }) +
+            res(10, 114, "tanstack.com/ai/#start", 1, true) +
+            res(10, 148 - 4, "npmjs.com/@tanstack/ai", 3) +
+            src(1, "tanstack.com/ai") +
+            src(2, "github.com/TanStack/ai") +
+            src(3, "npmjs.com/@tanstack/ai"),
+          { label: "Four results from two searches become three numbered Sources" },
+        ),
+      );
+
+      // Video.
+      Explainer.mount("#video", {
+        title: "Lesson 10 in about 1 minute",
+        width: 760,
+        height: 260,
+        scenes: [
+          {
+            say: "When search is on, the Model may call a tool named web search in the middle of a reply.",
+            show: "The Model may call the web_search tool in the middle of a reply.",
+            draw: (t, A) =>
+              D.box(40, 100, A.lerp(120, 680, A.ease(A.step(t, 0, 0.5))), 50, "reply…", {
+                mono: true,
+              }) +
+              A.fade(
+                t,
+                0.55,
+                0.8,
+                D.box(330, 30, 160, 40, "web_search()", { tone: "blue", mono: true }) +
+                  D.arrow(410, 70, 410, 100, { tone: "blue" }),
+              ),
+          },
+          {
+            say: "Three gates must be open: the Search toggle, a Model with tools, and your own Tavily key.",
+            draw: (t, A) =>
+              ["Search asked", "Model has tools", "Tavily key"]
+                .map((l, i) =>
+                  D.box(60 + i * 230, 90, 180, 60, l, {
+                    tone: A.step(t, 0.15 + i * 0.25, 0.3 + i * 0.25) >= 1 ? "ok" : "",
+                  }),
+                )
+                .join("") +
+              A.fade(
+                t,
+                0.85,
+                1,
+                D.text(380, 200, "✓ tool offered", {
+                  tone: "ok",
+                  weight: 600,
+                  anchor: "middle",
+                  size: 18,
+                }),
+              ),
+          },
+          {
+            say: "Each search is a part of the reply, saved between the text before it and the text after it.",
+            draw: (t, A) =>
+              [
+                ["text", ""],
+                ["web_search", "blue"],
+                ["text", ""],
+              ]
+                .map(([l, tone], i) =>
+                  A.fade(
+                    t,
+                    i * 0.25,
+                    i * 0.25 + 0.2,
+                    D.box(60 + i * 230, 100, 180, 56, l, { tone, mono: true }),
+                  ),
+                )
+                .join(""),
+          },
+          {
+            say: "A failed search is only a state of its part. The Model reads the failure, goes on, and the Message ends complete.",
+            draw: (t, A) =>
+              D.box(80, 90, 240, 60, "web_search", {
+                tone: t > 0.3 ? "warn" : "blue",
+                mono: true,
+                sub: t > 0.3 ? "state: error" : "state: running",
+              }) +
+              A.fade(
+                t,
+                0.55,
+                0.8,
+                D.box(440, 90, 240, 60, "Message", {
+                  tone: "ok",
+                  mono: true,
+                  sub: "status: complete",
+                }) + D.arrow(320, 120, 440, 120),
+              ),
+          },
+          {
+            say: "Results become Sources, numbered one, two, three, and a link to a Source shows as a chip. Now write number sources.",
+            show: "Results → numbered Sources → citation chips. Now write numberSources(searches).",
+            draw: (t, A) =>
+              [1, 2, 3]
+                .map((n) =>
+                  A.fade(
+                    t,
+                    0.1 + n * 0.15,
+                    0.25 + n * 0.15,
+                    `<circle cx="${180 + n * 100}" cy="125" r="24" class="d-box blue"/>` +
+                      D.text(180 + n * 100, 126, String(n), {
+                        tone: "blue",
+                        weight: 700,
+                        size: 20,
+                        anchor: "middle",
+                      }),
+                  ),
+                )
+                .join(""),
+          },
+        ],
+      });
+
+      // Try it: numberSources.
+      const SOURCE_KEY = `// Given: the same page has the same key (no #fragment, no trailing slash).
+function sourceKey(url) {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = "";
+    return parsed.href.replace(/\\/+$/, "");
+  } catch {
+    return url;
+  }
+}`;
+      const r = (url, title = url) => ({ title, url, snippet: "…" });
+      const s = (...results) => ({ type: "web_search", state: "done", results });
+      let learnerNumber = null;
+      Exercise.mount("#ex1", {
+        title: "Write numberSources(searches)",
+        task: "Return the Sources of all the searches: one per page, in order of first appearance, each with <code>{ number, url, title, snippet }</code>.",
+        storageKey: "ai-chat-l10-number-sources",
+        fnName: "numberSources",
+        starter: `${SOURCE_KEY}
+
+// Example: two searches with results a, b and then b#x, c
+// → [{ number: 1, url: a… }, { number: 2, url: b… }, { number: 3, url: c… }]
+// Hint: loop over every result of every search. Keep a Set of the keys
+// you've seen; skip a result whose key is in it.
+function numberSources(searches) {
+  return [];
+}`,
+        solution: `${SOURCE_KEY}
+
+function numberSources(searches) {
+  const seen = new Set();
+  const sources = [];
+  for (const result of searches.flatMap((search) => search.results)) {
+    const key = sourceKey(result.url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    sources.push({ number: sources.length + 1, url: result.url, title: result.title, snippet: result.snippet });
+  }
+  return sources;
+}`,
+        tests: [
+          { name: "no searches → no Sources", args: [[]], expect: [] },
+          {
+            name: "one search, two pages → numbers 1 and 2",
+            args: [[s(r("https://a.dev/"), r("https://b.dev/"))]],
+            expect: [
+              { number: 1, url: "https://a.dev/", title: "https://a.dev/", snippet: "…" },
+              { number: 2, url: "https://b.dev/", title: "https://b.dev/", snippet: "…" },
+            ],
+          },
+          {
+            name: "the same page in two searches → counted once",
+            args: [[s(r("https://a.dev/x")), s(r("https://a.dev/x"))]],
+            expect: [{ number: 1, url: "https://a.dev/x", title: "https://a.dev/x", snippet: "…" }],
+          },
+          {
+            name: "#fragment and trailing slash → the same Source, first URL kept",
+            args: [[s(r("https://a.dev/x#top")), s(r("https://a.dev/x/"), r("https://c.dev/"))]],
+            expect: [
+              { number: 1, url: "https://a.dev/x#top", title: "https://a.dev/x#top", snippet: "…" },
+              { number: 2, url: "https://c.dev/", title: "https://c.dev/", snippet: "…" },
+            ],
+          },
+          {
+            name: "a failed search has no results → adds nothing",
+            args: [[{ type: "web_search", state: "error", results: [] }, s(r("https://b.dev/"))]],
+            expect: [{ number: 1, url: "https://b.dev/", title: "https://b.dev/", snippet: "…" }],
+          },
+        ],
+        onResult(fn, all) {
+          learnerNumber = all ? fn : null;
+          renderReply();
+        },
+      });
+
+      // Payoff: render a reply's links with the learner's numbers, using citationFor's rule.
+      const searches = [
+        s(
+          r("https://tanstack.com/ai/latest", "TanStack AI"),
+          r("https://github.com/TanStack/ai", "GitHub"),
+        ),
+        s(
+          r("https://tanstack.com/ai/latest/#tools", "TanStack AI tools"),
+          r("https://www.npmjs.com/package/@tanstack/ai", "npm"),
+        ),
+      ];
+      const replyText =
+        "TanStack AI has tool calling ([tanstack.com](https://tanstack.com/ai/latest)). Its code is open ([github.com](https://github.com/TanStack/ai)), and the package is on npm ([npmjs.com](https://www.npmjs.com/package/@tanstack/ai)). See also [MDN](https://developer.mozilla.org/).";
+      function keyOf(url) {
+        try {
+          const u = new URL(url);
+          u.hash = "";
+          return u.href.replace(/\/+$/, "");
+        } catch {
+          return url;
+        }
+      }
+      function renderReply() {
+        const out = document.getElementById("reply-out");
+        if (!learnerNumber) {
+          out.textContent =
+            "Pass the tests first. Then this reply renders its citations with your numberSources.";
+          return;
+        }
+        const sources = learnerNumber(searches);
+        out.innerHTML =
+          D.esc(replyText)
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, href) => {
+              const source = sources.find((x) => keyOf(x.url) === keyOf(href));
+              return source
+                ? `<span class="chip" title="${D.esc(source.title)}">${source.number}</span>`
+                : `<a href="${href}">${label}</a>`;
+            })
+            .replace(/\(\s*(<span class="chip"[^>]*>\d+<\/span>)\s*\)/g, "$1") +
+          `<br><small>${sources.length} Sources from ${searches.length} searches with 4 results. The MDN link is not a Source, so it stays plain.</small>`;
+      }
+    </script>
+  </body>
+</html>

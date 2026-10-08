@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 14 · Testing seams</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 14</p>
+      <h1>Testing seams</h1>
+      <p class="subtitle">Swap the outside world for fakes at one place: <code>AppDeps</code>.</p>
+      <p class="meta">
+        About 14 minutes · a browser · you'll write <code>round(...parts)</code> and
+        <code>testKind(path)</code>
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Seam</dt>
+          <dd>
+            A place where a test can put a fake in place of a real part, without editing the code
+            under test.
+          </dd>
+          <dt>Fake</dt>
+          <dd>
+            A small working stand-in for a real service, such as an adapter that plays a script
+            instead of calling a Provider.
+          </dd>
+          <dt>Unit test</dt>
+          <dd>A test of pure code with no database. Its file ends in <code>.test.ts</code>.</dd>
+          <dt>Integration test</dt>
+          <dd>
+            A test against a real Postgres test database. Its file ends in
+            <code>.integration.test.ts</code>.
+          </dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <h2>Warm-up</h2>
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="startRun's finally block writes complete, stopped or error, whether or not anyone still reads the stream (Lesson 4)."
+      >
+        <div class="label">From Lesson 4</div>
+        <p class="q">
+          From memory: where does the run decide that a reply ended <code>complete</code>,
+          <code>stopped</code> or <code>error</code>?
+        </p>
+        <ol class="opts">
+          <li>In the run's finally block.</li>
+          <li data-why="The client only sees the stream close; the server decides (ADR 0002).">
+            In the browser after streaming.
+          </li>
+          <li data-why="The transaction writes the reply as streaming, before the run starts.">
+            In the send transaction body.
+          </li>
+          <li data-why="The boot sweep only handles runs a restart cut off.">
+            In the boot sweep only.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span><code>AppDeps</code> is the seam</h2>
+      <figure id="seam">
+        <figcaption>
+          Same code under test; only the <code>deps</code> object plugged into it changes.
+        </figcaption>
+      </figure>
+      <p>
+        Think of a power socket. <code>handleChat</code>, <code>startRun</code> and every router
+        take <code>deps</code> and never build their own database or adapter, so a test can plug in
+        a different object. Production gets <code>createAppDeps</code> (Lesson 1). Tests get
+        <code>createTestDeps</code>.
+      </p>
+      <p>
+        Look at the right column. The database is still real Postgres, but
+        <code>adapterFor</code> and <code>fetch</code> throw if a test forgets to script them, so no
+        test can reach the network by mistake. The limits are tiny (20 ms snapshots, a 2 s cap), so
+        a "timed out" test runs fast.
+      </p>
+
+      <h2><span class="num">2</span>The fake adapter plays a script</h2>
+      <figure id="script">
+        <figcaption>
+          One <code>round</code> is one model call: the parts, wrapped in RUN_STARTED and
+          RUN_FINISHED.
+        </figcaption>
+      </figure>
+      <p>
+        A real adapter streams chunks from a Provider.
+        <code>createFakeAdapter({ rounds })</code> streams chunks from a script you write with
+        <code>round</code>, <code>text</code>, <code>thinking</code>, <code>toolCall</code> and
+        <code>runError</code>. Each call to the adapter plays the next round, so a tool loop is two
+        rounds.
+      </p>
+      <p>
+        With <code>manual: true</code>, every chunk waits until the test calls
+        <code>release(n)</code>. This is how a test looks at the database in the middle of a run.
+        From
+        <a href="../../../packages/api/src/chat/handle-chat.integration.test.ts"
+          ><code>handle-chat.integration.test.ts</code></a
+        >:
+      </p>
+      <ol class="steps">
+        <li><code>send()</code>: the reply row is <code>streaming</code> with no parts.</li>
+        <li>
+          <code>fake.release(3)</code>: RUN_STARTED, TEXT_MESSAGE_START and the delta "Hello" go
+          through.
+        </li>
+        <li>
+          Poll the row until its parts are <code>[{ text: "Hello" }]</code>: a snapshot was written
+          mid-run.
+        </li>
+      </ol>
+
+      <div
+        class="quiz"
+        data-answer="3"
+        data-why="createTestDeps's adapterFor throws until the test passes its own, for example () => fake.adapter."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          A new integration test calls <code>handleChat</code> with plain
+          <code>createTestDeps()</code>. What happens when the run needs an adapter?
+        </p>
+        <ol class="opts">
+          <li data-why="Nothing in the test deps reaches the network: fetch throws too.">
+            It calls the real Provider.
+          </li>
+          <li data-why="There is no default script; the test must pass one.">
+            It plays an empty script.
+          </li>
+          <li data-why="The run never starts without an adapter, so nothing streams.">
+            It streams a canned reply.
+          </li>
+          <li>It throws "No fake adapter".</li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">3</span>Two kinds of tests</h2>
+      <figure>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th></th>
+                <th>Unit</th>
+                <th>Integration</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>File name</td>
+                <td><code>*.test.ts</code></td>
+                <td><code>*.integration.test.ts</code></td>
+              </tr>
+              <tr>
+                <td>Database</td>
+                <td>None</td>
+                <td>Postgres at <code>TEST_DATABASE_URL</code></td>
+              </tr>
+              <tr>
+                <td>Runs</td>
+                <td>In parallel</td>
+                <td>One file at a time; tables emptied before each test</td>
+              </tr>
+              <tr>
+                <td>Example</td>
+                <td><code>chat-core/src/chat.test.ts</code></td>
+                <td><code>api/src/chat/run.integration.test.ts</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figcaption>
+          Both live under <code>{apps,packages}/*/src/</code>, and <code>pnpm test</code> runs both.
+        </figcaption>
+      </figure>
+      <p>
+        <a href="../../../vitest.config.ts"><code>vitest.config.ts</code></a> splits the files into
+        two projects by name. Integration tests share one database, so they run one file at a time.
+        The global setup applies every migration once, and <code>setup.ts</code> truncates every
+        table before each test, so no test sees another's rows.
+      </p>
+
+      <h2><span class="num">4</span>Add a test for your change</h2>
+      <figure id="recipe">
+        <figcaption>
+          Pick the cheapest test that can see the bug, then watch it fail first.
+        </figcaption>
+      </figure>
+      <p>
+        Follow the picture from the top. If the change is pure logic (a
+        <code>branchFrom</code> rule, a redaction), write a unit test next to the file. If it
+        touches a table, a run or a router, write an integration test with the helpers:
+        <code>insertUser</code>, <code>insertConversation</code>,
+        <code>createTestDeps({ adapterFor: () =&gt; fake.adapter })</code>, then call
+        <code>handleChat</code> or <code>createTestClient({ user })</code>, which calls
+        <code>appRouter</code> in the same process.
+      </p>
+      <p>
+        Before you trust a new test, break the code and see it go red (<code>AGENTS.md</code>,
+        section 5).
+      </p>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <div id="ex2"></div>
+      <figure id="payoff">
+        <div class="toy-out" id="payoff-out">
+          Pass both exercises. Then this box plays a script with your <code>round</code> and sorts
+          real repo files with your <code>testKind</code>.
+        </div>
+        <figcaption>Your two functions drive this box.</figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> code takes <code>deps</code> in, so a
+          test swaps in <code>createTestDeps</code> with a scripted fake adapter and a real test
+          database.
+        </p>
+        <ul>
+          <li>
+            <strong>One seam.</strong> <code>AppDeps</code> holds the database,
+            <code>adapterFor</code>, <code>searchClient</code>, <code>runs</code>,
+            <code>limits</code> and <code>fetch</code>. Test deps throw on the network.
+          </li>
+          <li>
+            <strong>Scripts, not Providers.</strong> <code>round(text("Hello"))</code> is one model
+            call; <code>manual: true</code> with <code>release(n)</code> pauses a run mid-stream.
+          </li>
+          <li>
+            <strong>Two kinds.</strong> <code>*.test.ts</code> for pure code;
+            <code>*.integration.test.ts</code> for anything that touches Postgres.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box, say each point out loud, then name the test you would write for
+          your next change.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>Where the fake comes from</h3>
+        <p>
+          <a href="../../../packages/api/src/testing/fake-adapter.ts"
+            ><code>fake-adapter.ts</code></a
+          >
+          says it is "modelled on TanStack AI's in-repo <code>createMockAdapter</code>". It
+          implements the same <code>chatStream</code> the real adapters have, so
+          <code>chat()</code> can't tell the difference.
+        </p>
+        <h3>Numbers today</h3>
+        <p>
+          The repo has 29 unit test files and 14 integration test files. CI sets
+          <code>TEST_DATABASE_URL</code> in <code>.github/workflows/ci.yml</code>; locally the
+          default is <code>postgresql://postgres:password@localhost:5432/ai-chat_test</code> (<a
+            href="../../../packages/db/src/testing/test-database.ts"
+            ><code>test-database.ts</code></a
+          >), which <code>pnpm db:start</code> provides. <code>turbo.json</code> passes
+          <code>TEST_DATABASE_URL</code> through and never caches the test task.
+        </p>
+        <h3>Other fakes</h3>
+        <p>
+          <code>createFakeSearchClient({ results, error })</code> stands in for Tavily and records
+          every call. <code>liveModelsFetch</code> stands in for the OpenRouter and Ollama model
+          lists. All live in
+          <a href="../../../packages/api/src/testing/"><code>packages/api/src/testing/</code></a
+          >.
+        </p>
+        <h3>Read these</h3>
+        <p>
+          <a href="https://vitest.dev/guide/projects">Vitest: Test projects</a> explains the
+          <code>projects</code> split used in <code>vitest.config.ts</code>.
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          Read the test "keeps running to the end when the client disconnects" in
+          <code>handle-chat.integration.test.ts</code>. Explain to your teacher which line proves
+          ADR 0002, and why it needs <code>manual: true</code>.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="../../../packages/api/src/chat/handle-chat.integration.test.ts"
+            ><code>handle-chat.integration.test.ts</code></a
+          >: read its <code>setup()</code> helper and the first five tests. They show every seam in
+          this lesson at work.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude): "help me write a test for my
+          change", or "quiz me on the whole course".
+        </p>
+        <div class="nav">
+          <a href="0013-automatic-titles.html">← Lesson 13: Automatic titles</a
+          ><span
+            >The end of the course. Next: review a real PR against these lessons, with your
+            teacher.</span
+          >
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="14"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // Section 1: production deps vs test deps.
+      const ROWS = [
+        ["db", "Postgres", "test Postgres"],
+        ["adapterFor", "real adapter", "throws → pass a fake"],
+        ["searchClient", "Tavily", "fake search client"],
+        ["fetch", "network", "throws"],
+        ["limits", "1 s · 5 min", "20 ms · 2 s"],
+      ];
+      function seam(side = "both", t = 1) {
+        const head =
+          D.box(250, 6, 260, 40, "handleChat / startRun", {
+            mono: true,
+            tone: "accent",
+            sub: "takes deps",
+          }) +
+          D.text(110, 66, "createAppDeps", { mono: true, anchor: "middle", weight: 600 }) +
+          D.text(650, 66, "createTestDeps", {
+            mono: true,
+            anchor: "middle",
+            weight: 600,
+            tone: "ok",
+          });
+        return (
+          head +
+          ROWS.map(([k, prod, test], i) => {
+            const y = 84 + i * 38;
+            return (
+              D.box(310, y, 140, 30, k, { mono: true }) +
+              (side !== "test"
+                ? D.box(20, y, 180, 30, prod, { opacity: side === "both" ? 1 : t }) +
+                  D.arrow(200, y + 15, 310, y + 15, { tone: "faint" })
+                : "") +
+              (side !== "prod"
+                ? D.box(560, y, 180, 30, test, { tone: "ok", opacity: side === "both" ? 1 : t }) +
+                  D.arrow(560, y + 15, 450, y + 15, { tone: "ok" })
+                : "")
+            );
+          }).join("")
+        );
+      }
+      D.render(
+        "#seam",
+        D.svg(760, 280, seam(), { label: "Production deps and test deps plug into the same code" }),
+      );
+
+      // Section 2: a scripted round.
+      const CHUNKS = [
+        ["RUN_STARTED", ""],
+        ["TEXT_MESSAGE", "_START"],
+        ["CONTENT", "“Hello”"],
+        ["CONTENT", "“ there!”"],
+        ["TEXT_MESSAGE", "_END"],
+        ["RUN_FINISHED", "stop"],
+      ];
+      function strip(released = CHUNKS.length) {
+        return (
+          D.text(20, 18, 'round(text("Hello", " there!"))', { mono: true, weight: 600 }) +
+          CHUNKS.map(([c, sub], i) =>
+            D.box(20 + i * 122, 40, 116, 44, c, {
+              mono: true,
+              sub,
+              tone: i < released ? (i === 0 || i === 5 ? "blue" : "ok") : "ghost",
+            }),
+          ).join("") +
+          (released < CHUNKS.length
+            ? D.text(20, 104, `manual: true → release(${released}) let ${released} through`, {
+                tone: "accent",
+                size: 13,
+              })
+            : "")
+        );
+      }
+      D.render(
+        "#script",
+        D.svg(760, 112, strip(3), { label: "A round's chunks; three are released" }),
+      );
+
+      // Section 4: recipe.
+      D.render(
+        "#recipe",
+        D.svg(
+          760,
+          200,
+          D.box(260, 6, 240, 40, "What did you change?", { tone: "accent" }) +
+            D.arrow(330, 46, 150, 86) +
+            D.arrow(430, 46, 610, 86) +
+            D.text(170, 62, "pure logic", { tone: "muted", size: 12, anchor: "end" }) +
+            D.text(590, 62, "table, run or router", { tone: "muted", size: 12 }) +
+            D.box(20, 86, 260, 46, "unit test beside the file", {
+              tone: "ok",
+              sub: "chat.test.ts, branches.test.ts",
+            }) +
+            D.box(470, 86, 280, 46, "integration test", {
+              tone: "blue",
+              sub: "createTestDeps + fake adapter",
+            }) +
+            D.box(200, 152, 360, 40, "break the code → see it go red → fix", { tone: "warn" }) +
+            D.arrow(150, 132, 260, 152, { tone: "faint" }) +
+            D.arrow(610, 132, 500, 152, { tone: "faint" }),
+          { label: "Choose a unit or integration test, then watch it fail first" },
+        ),
+      );
+
+      // Video.
+      Explainer.mount("#video", {
+        title: "Lesson 14 in about 1 minute",
+        width: 760,
+        height: 280,
+        scenes: [
+          {
+            say: "The server code never builds its own database or adapter. It takes them in one object, called deps.",
+            draw: (t, A) =>
+              A.fade(
+                t,
+                0,
+                0.3,
+                D.box(250, 6, 260, 40, "handleChat / startRun", {
+                  mono: true,
+                  tone: "accent",
+                  sub: "takes deps",
+                }),
+              ) +
+              ROWS.map(([k], i) =>
+                A.fade(
+                  t,
+                  0.2 + i * 0.1,
+                  0.35 + i * 0.1,
+                  D.box(310, 84 + i * 38, 140, 30, k, { mono: true }),
+                ),
+              ).join(""),
+          },
+          {
+            say: "Production plugs in real services. Tests plug in fakes, and anything that would reach the network throws.",
+            draw: (t, A) => seam(t < 0.5 ? "prod" : "test", A.step(t % 0.5, 0, 0.3)),
+          },
+          {
+            say: "The fake adapter plays a script. One round is one model call, wrapped in run started and run finished.",
+            show: 'round(text("Hello", " there!"))',
+            draw: (t) => strip(Math.min(6, Math.floor(t * 7))),
+          },
+          {
+            say: "In manual mode, release three lets three chunks through, so the test can look at the database mid-run.",
+            show: "fake.release(3) → row is streaming, parts: Hello",
+            draw: (t, A) =>
+              strip(3) +
+              A.fade(
+                t,
+                0.4,
+                0.8,
+                D.text(420, 104, "row: streaming · “Hello”", { tone: "ok", size: 13, weight: 600 }),
+              ),
+          },
+          {
+            say: "Pure logic gets a unit test. Anything that touches Postgres gets an integration test. Now write round and test kind.",
+            show: "*.test.ts or *.integration.test.ts. Next: write round and testKind.",
+            draw: (t, A) =>
+              A.fade(
+                t,
+                0,
+                0.4,
+                D.box(40, 110, 300, 50, "*.test.ts", {
+                  mono: true,
+                  tone: "ok",
+                  sub: "no database, parallel",
+                }),
+              ) +
+              A.fade(
+                t,
+                0.3,
+                0.7,
+                D.box(420, 110, 300, 50, "*.integration.test.ts", {
+                  mono: true,
+                  tone: "blue",
+                  sub: "test Postgres, one file at a time",
+                }),
+              ),
+          },
+        ],
+      });
+
+      // Try it.
+      const learner = { round: null, testKind: null };
+      Exercise.mount("#ex1", {
+        title: "Write round(...parts)",
+        task: "Wrap the parts' chunks like the real <code>round</code> in <code>fake-adapter.ts</code>.",
+        storageKey: "ai-chat-l14-round",
+        fnName: "round",
+        starter: `// Each part is an array of chunks like { type: "TEXT_MESSAGE_CONTENT" }.
+// round(a, b) → [{ type: "RUN_STARTED" }, ...a, ...b, { type: "RUN_FINISHED", finishReason }]
+//   finishReason is "tool_calls" if any chunk is TOOL_CALL_START, otherwise "stop".
+//   A round with a RUN_ERROR chunk gets no RUN_FINISHED at all.
+// Hint: parts.flat(), then chunks.some(...) twice.
+function round(...parts) {
+  return parts.flat();
+}`,
+        solution: `function round(...parts) {
+  const chunks = parts.flat();
+  const failed = chunks.some((chunk) => chunk.type === "RUN_ERROR");
+  const callsTool = chunks.some((chunk) => chunk.type === "TOOL_CALL_START");
+  const started = { type: "RUN_STARTED" };
+  const finished = { type: "RUN_FINISHED", finishReason: callsTool ? "tool_calls" : "stop" };
+  return [started, ...chunks, ...(failed ? [] : [finished])];
+}`,
+        tests: [
+          {
+            name: "a text round ends RUN_FINISHED stop",
+            args: [[{ type: "TEXT_MESSAGE_CONTENT" }]],
+            expect: [
+              { type: "RUN_STARTED" },
+              { type: "TEXT_MESSAGE_CONTENT" },
+              { type: "RUN_FINISHED", finishReason: "stop" },
+            ],
+          },
+          {
+            name: "a round that calls a tool ends tool_calls",
+            args: [[{ type: "TOOL_CALL_START" }, { type: "TOOL_CALL_END" }]],
+            expect: [
+              { type: "RUN_STARTED" },
+              { type: "TOOL_CALL_START" },
+              { type: "TOOL_CALL_END" },
+              { type: "RUN_FINISHED", finishReason: "tool_calls" },
+            ],
+          },
+          {
+            name: "a round with a RUN_ERROR gets no RUN_FINISHED",
+            args: [[{ type: "TEXT_MESSAGE_CONTENT" }], [{ type: "RUN_ERROR" }]],
+            expect: [
+              { type: "RUN_STARTED" },
+              { type: "TEXT_MESSAGE_CONTENT" },
+              { type: "RUN_ERROR" },
+            ],
+          },
+          {
+            name: "two parts are joined in order",
+            args: [[{ type: "REASONING_START" }], [{ type: "TEXT_MESSAGE_START" }]],
+            expect: [
+              { type: "RUN_STARTED" },
+              { type: "REASONING_START" },
+              { type: "TEXT_MESSAGE_START" },
+              { type: "RUN_FINISHED", finishReason: "stop" },
+            ],
+          },
+        ],
+        onResult(fn, all) {
+          learner.round = all ? fn : null;
+          payoff();
+        },
+      });
+      Exercise.mount("#ex2", {
+        title: "Write testKind(path)",
+        task: 'Return <code>"integration"</code>, <code>"unit"</code> or <code>"none"</code>, by the rules in <code>vitest.config.ts</code>.',
+        storageKey: "ai-chat-l14-test-kind",
+        fnName: "testKind",
+        starter: `// vitest.config.ts includes "{apps,packages}/*/src/**/*.test.ts";
+// files ending .integration.test.ts go to the "integration" project, the rest to "unit".
+// Example: "packages/api/src/share/redact.test.ts" → "unit"
+//          "apps/web/e2e/chat.spec.ts" → "none" (Playwright, not Vitest)
+// Hint: first check the folder with a regex like /^(apps|packages)\\/[^/]+\\/src\\//.
+function testKind(path) {
+  return path.endsWith(".test.ts") ? "unit" : "none";
+}`,
+        solution: `function testKind(path) {
+  if (!/^(apps|packages)\\/[^/]+\\/src\\//.test(path)) return "none";
+  if (path.endsWith(".integration.test.ts")) return "integration";
+  if (path.endsWith(".test.ts")) return "unit";
+  return "none";
+}`,
+        tests: [
+          {
+            name: "chat-core/src/chat.test.ts → unit",
+            args: ["packages/chat-core/src/chat.test.ts"],
+            expect: "unit",
+          },
+          {
+            name: "api/src/chat/run.integration.test.ts → integration",
+            args: ["packages/api/src/chat/run.integration.test.ts"],
+            expect: "integration",
+          },
+          {
+            name: "api/src/chat/run.ts (not a test) → none",
+            args: ["packages/api/src/chat/run.ts"],
+            expect: "none",
+          },
+          {
+            name: "apps/web/e2e/chat.spec.ts (Playwright) → none",
+            args: ["apps/web/e2e/chat.spec.ts"],
+            expect: "none",
+          },
+          {
+            name: "a .test.ts outside src/ → none",
+            args: ["packages/api/scripts/x.test.ts"],
+            expect: "none",
+          },
+        ],
+        onResult(fn, all) {
+          learner.testKind = all ? fn : null;
+          payoff();
+        },
+      });
+      const FILES = [
+        "packages/api/src/chat/handle-chat.integration.test.ts",
+        "packages/api/src/share/redact.test.ts",
+        "packages/api/src/testing/fake-adapter.ts",
+        "packages/chat-core/src/chat.test.ts",
+        "packages/api/src/routers/share.integration.test.ts",
+        "apps/web/e2e/chat.spec.ts",
+      ];
+      function payoff() {
+        const out = document.getElementById("payoff-out");
+        if (!learner.round || !learner.testKind) return;
+        const chunks = learner.round([
+          { type: "TEXT_MESSAGE_START" },
+          { type: "TEXT_MESSAGE_CONTENT" },
+          { type: "TEXT_MESSAGE_END" },
+        ]);
+        out.innerHTML =
+          `<strong>Your round plays:</strong> ${chunks.map((c) => `<code>${D.esc(c.type)}${c.finishReason ? " " + D.esc(c.finishReason) : ""}</code>`).join(" → ")}<br><br>` +
+          FILES.map(
+            (f) => `<code>${D.esc(f)}</code> → <strong>${D.esc(learner.testKind(f))}</strong>`,
+          ).join("<br>");
+      }
+    </script>
+  </body>
+</html>

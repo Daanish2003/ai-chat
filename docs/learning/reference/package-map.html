@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Package map</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Reference · from Lesson 1</p>
+      <h1>Package map</h1>
+      <p class="subtitle">Seven packages. Imports point down.</p>
+
+      <figure id="map"><div class="toy-out" id="out">Click a package to see its job.</div></figure>
+
+      <div class="rule-box">
+        <strong>The rule</strong>A new import edge from A to B is safe only if B can't already reach
+        A.
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Package</th>
+              <th>Owns</th>
+              <th>Imports</th>
+              <th>Start reading at</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>apps/web</code></td>
+              <td>Routes, server entry points, wiring</td>
+              <td>chat-react, api, auth, db, ui</td>
+              <td>
+                <code>src/services.ts</code>, <code>src/routes/api/chat.ts</code>,
+                <code>src/lib/chat-provider.tsx</code>
+              </td>
+            </tr>
+            <tr>
+              <td><code>@ai-chat/chat-react</code></td>
+              <td>Chat screens (React); gets routing through <code>ChatAdapter</code></td>
+              <td>chat-core, api, db, ui</td>
+              <td><code>src/chat/chat-view.tsx</code>, <code>src/provider.tsx</code></td>
+            </tr>
+            <tr>
+              <td><code>@ai-chat/chat-core</code></td>
+              <td>Client logic, no React, unit-tested</td>
+              <td>api, db</td>
+              <td><code>src/chat.ts</code></td>
+            </tr>
+            <tr>
+              <td><code>@ai-chat/ui</code></td>
+              <td>Generic UI parts (shadcn, prompt-kit)</td>
+              <td>nothing</td>
+              <td><code>src/components/</code></td>
+            </tr>
+            <tr>
+              <td><code>@ai-chat/api</code></td>
+              <td>Every server rule: oRPC routers, the run, credentials, search, share</td>
+              <td>auth, db</td>
+              <td>
+                <code>src/chat/handle-chat.ts</code>, <code>src/routers/index.ts</code>,
+                <code>src/deps.ts</code>
+              </td>
+            </tr>
+            <tr>
+              <td><code>@ai-chat/auth</code></td>
+              <td>Better Auth: users, sessions</td>
+              <td>db</td>
+              <td><code>src/index.ts</code></td>
+            </tr>
+            <tr>
+              <td><code>@ai-chat/db</code></td>
+              <td>Drizzle tables, stored Message parts shape</td>
+              <td>nothing</td>
+              <td><code>src/schema/chat.ts</code>, <code>src/message-parts.ts</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h2>Two server doors</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Door</th>
+            <th>Route file (apps/web)</th>
+            <th>Hands to (api)</th>
+            <th>Used for</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>POST /api/chat</code></td>
+            <td><code>routes/api/chat.ts</code></td>
+            <td><code>handleChat(request, session, deps)</code></td>
+            <td>Send, edit, regenerate; streams SSE</td>
+          </tr>
+          <tr>
+            <td><code>/api/rpc/*</code></td>
+            <td><code>routes/api/rpc/$.ts</code></td>
+            <td><code>appRouter</code> (oRPC)</td>
+            <td>Everything else: list, get, switchBranch, chat.stop, share, …</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Review checks</h2>
+      <ul>
+        <li>
+          Is the new code in the package that owns that kind of decision? Rules → api. Drawing →
+          chat-react. Pure client logic → chat-core.
+        </li>
+        <li>Does any new import point up, or close a cycle?</li>
+        <li>
+          Does an api file that the browser imports (<code>chat/sources.ts</code>,
+          <code>chat/models.ts</code>, <code>credentials/services.ts</code>,
+          <code>attachments/kinds.ts</code>) now import db or Node-only code?
+        </li>
+        <li>Does a route in apps/web contain logic that belongs in api?</li>
+      </ul>
+    </main>
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/package-map.js"></script>
+    <script>
+      const out = document.getElementById("out");
+      PackageMap.render("#map", {
+        onPick(id) {
+          const p = PackageMap.byId[id],
+            by = PackageMap.importedBy(id);
+          out.innerHTML = `<strong>${p.label}</strong>: ${p.job} Imported by: ${by.length ? by.join(", ") : "nobody"}.`;
+        },
+      });
+    </script>
+  </body>
+</html>

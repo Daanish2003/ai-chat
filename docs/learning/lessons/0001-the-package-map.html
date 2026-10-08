@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 1 · The package map</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 1</p>
+      <h1>The package map</h1>
+      <p class="subtitle">Seven packages, one rule: imports point down.</p>
+      <p class="meta">
+        About 12 minutes · a browser · you'll write <code>reaches(from, to)</code>, a cycle checker
+        for import edges
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Package</dt>
+          <dd>
+            One folder with its own <code>package.json</code>, such as <code>packages/api</code>.
+            Other code imports it by name: <code>@ai-chat/api</code>.
+          </dd>
+          <dt>Import edge</dt>
+          <dd>
+            "A imports B": code in package A uses code from package B. The pictures show it as an
+            arrow from A to B.
+          </dd>
+          <dt>Cycle</dt>
+          <dd>A path of import edges that comes back to the package where it started.</dd>
+          <dt>Wiring</dt>
+          <dd>
+            Code that only connects packages and passes objects in. It has no rules of its own.
+          </dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <h2><span class="num">1</span>Seven packages, seven floors</h2>
+      <figure id="map">
+        <div class="toy-out" id="map-out">Click a package to see its job.</div>
+        <figcaption>
+          Click a package: red arrows show what it imports, and blue arrows show who imports it.
+        </figcaption>
+      </figure>
+      <p>
+        Think of the app as a building where the stairs only go down. Each package is a floor, and
+        code on one floor may use the floors below it, never the floors above.
+      </p>
+      <p>
+        Click <code>@ai-chat/db</code> in the picture: it has no red arrows, because the database
+        package imports nothing. Then click <code>apps/web</code>: five red arrows, because the web
+        app on the top floor joins everything. <code>@ai-chat/ui</code> sits to the side, because
+        only the two top floors use it.
+      </p>
+
+      <h2><span class="num">2</span>What each floor owns</h2>
+      <figure>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Package</th>
+                <th>Owns</th>
+                <th>Look at</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>apps/web</code></td>
+                <td>Routes and wiring</td>
+                <td>
+                  <a href="../../../apps/web/src/services.ts"><code>services.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td><code>chat-react</code></td>
+                <td>The chat screens, in React</td>
+                <td>
+                  <a href="../../../packages/chat-react/src/chat/chat-view.tsx"
+                    ><code>chat-view.tsx</code></a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td><code>chat-core</code></td>
+                <td>Client logic with no React</td>
+                <td>
+                  <a href="../../../packages/chat-core/src/chat.ts"><code>chat.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td><code>ui</code></td>
+                <td>Generic buttons, markdown, scrolling</td>
+                <td><code>components/</code></td>
+              </tr>
+              <tr>
+                <td><code>api</code></td>
+                <td>Every server rule: routers, the run</td>
+                <td>
+                  <a href="../../../packages/api/src/chat/handle-chat.ts"
+                    ><code>handle-chat.ts</code></a
+                  >
+                </td>
+              </tr>
+              <tr>
+                <td><code>auth</code></td>
+                <td>Users and sessions (Better Auth)</td>
+                <td>
+                  <a href="../../../packages/auth/src/index.ts"><code>index.ts</code></a>
+                </td>
+              </tr>
+              <tr>
+                <td><code>db</code></td>
+                <td>Tables and the stored shape of Message parts</td>
+                <td>
+                  <a href="../../../packages/db/src/schema/chat.ts"><code>schema/chat.ts</code></a>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figcaption>
+          Read the table from the bottom up: each row uses only rows below it.
+        </figcaption>
+      </figure>
+      <p>
+        The split puts each kind of decision in one place. If a question is "is this allowed?", the
+        answer lives in <code>api</code>. If it is "how does it look?", it lives in
+        <code>chat-react</code>. Logic that the screen needs but that does not draw anything, such
+        as which Message a new Branch continues, lives in <code>chat-core</code>, so a plain unit
+        test can check it without React.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="Encryption is a server rule, so it lives in api: packages/api/src/credentials/encryption.ts. The browser must never see the secret."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          You write code that decrypts a user's Provider credentials before a run. Which package
+          owns it?
+        </p>
+        <ol class="opts">
+          <li><code>@ai-chat/api</code></li>
+          <li
+            data-why="db holds the tables and their shapes, but no rules about what to do with the rows."
+          >
+            <code>@ai-chat/db</code>
+          </li>
+          <li
+            data-why="chat-core runs in the browser. A decryption secret there would go to every user."
+          >
+            <code>@ai-chat/chat-core</code>
+          </li>
+          <li
+            data-why="apps/web only wires. It passes the secret into api through createAppDeps, but it doesn't use it."
+          >
+            <code>apps/web</code>
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">3</span>The web app only wires</h2>
+      <figure id="doors">
+        <figcaption>
+          Both server doors are thin: each one hands the request to <code>api</code> with the same
+          <code>deps</code>.
+        </figcaption>
+      </figure>
+      <p>
+        Look at the two doors in the picture. <code>/api/chat</code> streams a reply, and
+        <code>/api/rpc</code> answers every other call (list Conversations, switch Branch, stop a
+        run). The route file for <code>/api/chat</code> is 16 lines long: it reads the session and
+        calls <code>handleChat(request, session, deps)</code>. <code>services.ts</code> builds
+        <code>deps</code> once at start, and both doors share it.
+      </p>
+      <p>
+        The client side follows the same idea. <code>chat-react</code> never imports the router, so
+        it asks the host app for links through a <code>ChatAdapter</code>. Follow one link to Key
+        settings:
+      </p>
+      <ol class="steps">
+        <li><code>chat-react</code> renders <code>&lt;Link page={{ to: "keys" }}&gt;</code>.</li>
+        <li>
+          <code>Link</code> is <code>ChatLink</code>, which <code>WebChatProvider</code> in
+          <code>apps/web</code> gave it.
+        </li>
+        <li>
+          <code>routeOf({ to: "keys" })</code> returns <code>{ to: "/settings/keys" }</code>, so the
+          router goes there.
+        </li>
+      </ol>
+
+      <div
+        class="quiz"
+        data-answer="1"
+        data-why='routeOf in apps/web/src/lib/chat-provider.tsx maps each ChatPage to a route. chat-react only says { to: "keys" }.'
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          The URL of the Key settings page changes to <code>/account/keys</code>. Which package must
+          change?
+        </p>
+        <ol class="opts">
+          <li data-why='chat-react only names the page ({ to: "keys" }). It never sees a URL.'>
+            <code>@ai-chat/chat-react</code>
+          </li>
+          <li><code>apps/web</code></li>
+          <li data-why="chat-core has no routing at all; it is plain functions.">
+            <code>@ai-chat/chat-core</code>
+          </li>
+          <li data-why="api serves data. It doesn't know the pages of the web app.">
+            <code>@ai-chat/api</code>
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">4</span>Imports point down: no cycles</h2>
+      <figure id="cycle">
+        <figcaption>
+          The red edge closes a loop, so neither package can be checked first.
+        </figcaption>
+      </figure>
+      <div class="rule-box">
+        <strong>The rule</strong>A new import edge from A to B is safe only if B can't already reach
+        A.
+      </div>
+      <p>
+        A cycle is not only untidy. <code>chat-core</code>'s type check runs
+        <code>tsc -b ../api</code> first, because it needs <code>api</code>'s types. If
+        <code>api</code> also needed <code>chat-core</code>, neither could go first. Here is the
+        check on a real mistake:
+      </p>
+      <ol class="steps">
+        <li>
+          A PR adds <code>import { branchFrom } from "@ai-chat/chat-core/chat"</code> to a file in
+          <code>api</code>.
+        </li>
+        <li>
+          <code>chat-core</code> already imports <code>api</code>, so <code>chat-core</code> reaches
+          <code>api</code>.
+        </li>
+        <li>
+          The new edge <code>api → chat-core</code> makes the loop
+          <code>api → chat-core → api</code>. Refuse it, and move the shared function down into
+          <code>api</code>.
+        </li>
+      </ol>
+
+      <div
+        class="quiz"
+        data-answer="2"
+        data-why="auth already imports db, so db → auth would close the loop db → auth → db."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          A PR adds an import from <code>@ai-chat/db</code> to <code>@ai-chat/auth</code>. What is
+          wrong?
+        </p>
+        <ol class="opts">
+          <li data-why="Check the map: auth already imports db.">Nothing is wrong with it.</li>
+          <li data-why="db imports nothing at all, not even ui.">db may only import ui.</li>
+          <li>It makes an import cycle.</li>
+          <li
+            data-why="Edges may skip floors: web imports db directly. The problem is the direction."
+          >
+            It skips the api floor.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <figure id="checker">
+        <div class="toy-out">
+          New import from
+          <select id="ck-from"></select>
+          to
+          <select id="ck-to"></select>
+          <button class="btn" type="button" id="ck-go">Check</button>
+          <div id="ck-out">
+            Pass the tests first. Then this checker uses your <code>reaches</code>.
+          </div>
+        </div>
+        <figcaption>
+          Your <code>reaches</code> drives this checker: pick an import a PR might add.
+        </figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> imports point down.
+          <code>db</code> stores, <code>api</code> decides, <code>chat-react</code> draws, and
+          <code>apps/web</code> wires.
+        </p>
+        <ul>
+          <li>
+            <strong>Seven floors.</strong> From the bottom: <code>db</code>, <code>auth</code>,
+            <code>api</code>, <code>chat-core</code>, <code>chat-react</code>,
+            <code>apps/web</code>, with <code>ui</code> to the side.
+          </li>
+          <li>
+            <strong>The web app only wires.</strong> Its routes hand requests to
+            <code>api</code> with <code>deps</code>, and its <code>ChatAdapter</code> gives
+            <code>chat-react</code> links.
+          </li>
+          <li>
+            <strong>Check before you import.</strong> An edge from A to B is safe only if B can't
+            already reach A.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box and say each point out loud, then draw the seven floors from
+          memory.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>Why tools care about cycles</h3>
+        <p>
+          Turborepo, which runs this repo's tasks, models the packages as a graph with no loops:
+        </p>
+        <blockquote>
+          "Turborepo uses a data structure called a directed acyclic graph (DAG) to understand your
+          repository and its tasks." (<a
+            href="https://turborepo.com/docs/core-concepts/package-and-task-graph"
+            >Turborepo: Package and Task Graph</a
+          >)
+        </blockquote>
+        <p>
+          The packages link to each other with pnpm's <code>"workspace:*"</code> versions, so an
+          import of <code>@ai-chat/api</code> resolves to the local folder. See
+          <a href="https://pnpm.io/workspaces">pnpm: Workspaces</a>.
+        </p>
+        <h3>The browser imports a few api files</h3>
+        <p>
+          Most of what <code>chat-core</code> and <code>chat-react</code> take from
+          <code>api</code> is <code>import type</code>, such as <code>ChatCommand</code>, so client
+          and server agree on shapes and nothing runs. A few imports are real code:
+          <code>numberSources</code> (<code>api/src/chat/sources.ts</code>),
+          <code>findModel</code> (<code>api/src/chat/models.ts</code>) and
+          <code>providers</code> (<code>api/src/credentials/services.ts</code>). Those files go into
+          the browser bundle, so they must stay pure: today they import only <code>zod</code> or
+          types. When you review a PR, check that such a file doesn't start to import
+          <code>@ai-chat/db</code> or <code>node:crypto</code>.
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          Open
+          <a href="../../../packages/chat-core/package.json"
+            ><code>packages/chat-core/package.json</code></a
+          >. Explain to your teacher why its <code>check-types</code> script is
+          <code>tsc -b ../api &amp;&amp; tsc --noEmit</code>, and what would break first if
+          <code>api</code> imported <code>chat-core</code>.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="https://turborepo.com/docs/core-concepts/package-and-task-graph"
+            >Turborepo: Package and Task Graph</a
+          >. Then read the repo's own <a href="../../../CONTEXT.md"><code>CONTEXT.md</code></a
+          >: it defines every domain word these lessons use.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude) anything: "why is ui on the
+          side?", "show me where deps is used", or "quiz me again".
+        </p>
+        <div class="nav">
+          <a href="../index.html">← All lessons</a
+          ><a href="0002-the-chat-command.html">Next: Lesson 2, the chat command →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="1"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/package-map.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams,
+        PM = PackageMap;
+
+      // Section 1: the clickable map.
+      const out = document.getElementById("map-out");
+      PM.render("#map", {
+        onPick(id) {
+          const p = PM.byId[id];
+          const imports = PM.DEPS[id].length ? PM.DEPS[id].join(", ") : "nothing";
+          const by = PM.importedBy(id);
+          out.innerHTML = `<strong>${p.label}</strong>: ${p.job}<br>Imports: ${imports}. Imported by: ${by.length ? by.join(", ") : "nobody"}.`;
+        },
+      });
+
+      // Section 3: the two server doors.
+      D.render(
+        "#doors",
+        D.svg(
+          760,
+          250,
+          D.box(10, 95, 110, 50, "Browser", { tone: "blue" }) +
+            D.box(170, 30, 200, 50, "POST /api/chat", { mono: true, sub: "routes/api/chat.ts" }) +
+            D.box(170, 160, 200, 50, "/api/rpc/*", { mono: true, sub: "routes/api/rpc/$.ts" }) +
+            D.box(430, 30, 230, 50, "handleChat(…, deps)", {
+              tone: "accent",
+              mono: true,
+              sub: "@ai-chat/api",
+            }) +
+            D.box(430, 160, 230, 50, "appRouter", {
+              tone: "accent",
+              mono: true,
+              sub: "@ai-chat/api",
+            }) +
+            D.box(170, 100, 200, 34, "services.ts → deps", { tone: "ok", mono: true }) +
+            D.arrow(120, 110, 170, 60) +
+            D.arrow(120, 130, 170, 180) +
+            D.arrow(370, 55, 430, 55) +
+            D.arrow(370, 185, 430, 185) +
+            D.arrow(370, 112, 440, 82, { tone: "ok", dashed: true }) +
+            D.arrow(370, 124, 440, 158, { tone: "ok", dashed: true }) +
+            D.text(170, 236, "apps/web (wiring)", { tone: "muted", size: 12 }) +
+            D.text(430, 236, "every rule lives here", { tone: "accent", size: 12 }),
+          { label: "Two server doors in apps/web hand requests to @ai-chat/api" },
+        ),
+      );
+
+      // Section 4: the cycle.
+      D.render(
+        "#cycle",
+        D.svg(
+          760,
+          170,
+          D.box(130, 20, 220, 46, "@ai-chat/chat-core", { mono: true }) +
+            D.box(130, 110, 220, 46, "@ai-chat/api", { mono: true }) +
+            D.arrow(215, 66, 215, 110, { label: "imports today" }) +
+            D.route(
+              [
+                [350, 133],
+                [430, 133],
+                [430, 43],
+                [350, 43],
+              ],
+              { tone: "accent", width: 2.4 },
+            ) +
+            D.text(442, 88, "new import in a PR ✗", { tone: "accent", size: 14, weight: 600 }) +
+            D.text(442, 110, "api → chat-core → api", { tone: "accent", size: 13, mono: true }),
+          { label: "A new import from api to chat-core closes a cycle" },
+        ),
+      );
+
+      // Video.
+      const order = ["web", "chat-react", "chat-core", "ui", "api", "auth", "db"];
+      const dropIn = (t, A) =>
+        PM.PACKAGES.map((p, i) => {
+          const s = A.step(t, 0.08 + i * 0.1, 0.18 + i * 0.1);
+          const x = p.side ? 540 : 250,
+            w = p.side ? 180 : 210;
+          return D.box(x, 16 + 66 * p.floor - (1 - s) * 20, w, 44, p.label, {
+            mono: true,
+            opacity: s,
+          });
+        }).join("");
+      Explainer.mount("#video", {
+        title: "Lesson 1 in about 1 minute",
+        width: 760,
+        height: 404,
+        scenes: [
+          {
+            say: "The chat app is seven packages, stacked like the floors of a building.",
+            draw: (t, A) => dropIn(t, A),
+          },
+          {
+            say: "At the bottom, the db package holds the tables. It imports nothing at all.",
+            draw: (t, A) =>
+              PM.draw("db") +
+              A.fade(
+                t,
+                0.2,
+                0.5,
+                D.text(480, 368, "← imports nothing", { tone: "accent", weight: 600 }),
+              ),
+          },
+          {
+            say: "The api package holds every server rule. The chat-react package draws the screens.",
+            draw: (t, A) =>
+              (t < 0.5 ? PM.draw("api") : PM.draw("chat-react")) +
+              D.text(480, t < 0.5 ? 236 : 104, t < 0.5 ? "← decides" : "← draws", {
+                tone: "accent",
+                weight: 600,
+                opacity: A.step(t % 0.5, 0.05, 0.25),
+              }),
+          },
+          {
+            say: "Imports only point down, like stairs that only go down. So there is never a loop.",
+            draw: (t, A) => {
+              const y = A.lerp(60, 346, A.ease(A.step(t, 0, 0.6)));
+              const bad = A.fade(
+                t,
+                0.65,
+                0.85,
+                D.route(
+                  [
+                    [460, 236],
+                    [500, 236],
+                    [500, 170],
+                    [460, 170],
+                  ],
+                  { tone: "accent", width: 2.4 },
+                ) + D.text(510, 203, "✗ up is a loop", { tone: "accent", weight: 600 }),
+              );
+              return PM.draw(null) + D.dot(355, y, 7) + bad;
+            },
+          },
+          {
+            say: "The web app on top only wires the floors together. Now click through the map, then write the reaches function.",
+            show: "apps/web only wires. Next: click the map, then write reaches(from, to).",
+            draw: (t, A) =>
+              PM.draw("web") +
+              A.fade(
+                t,
+                0.2,
+                0.5,
+                D.text(480, 38, "← wiring only", { tone: "accent", weight: 600 }),
+              ),
+          },
+        ],
+      });
+
+      // Try it: reaches(from, to), then the cycle checker.
+      const DEPS_SRC = `const DEPS = {
+  web: ["chat-react", "api", "auth", "db", "ui"],
+  "chat-react": ["chat-core", "api", "db", "ui"],
+  "chat-core": ["api", "db"],
+  ui: [],
+  api: ["auth", "db"],
+  auth: ["db"],
+  db: [],
+};`;
+      let learnerReaches = null;
+      Exercise.mount("#ex1", {
+        title: "Write reaches(from, to)",
+        task: "Return <code>true</code> when a path of import edges leads from <code>from</code> to <code>to</code>. The checker below then uses it to spot cycles.",
+        storageKey: "ai-chat-l1-reaches",
+        fnName: "reaches",
+        starter: `// Who imports whom, taken from the real repo.
+${DEPS_SRC}
+
+// Example: reaches("chat-react", "auth") is true, because chat-react → api → auth.
+// Hint: look at each package in DEPS[from]. Either it is \`to\`,
+// or it reaches \`to\` itself (call reaches again).
+function reaches(from, to) {
+  return false;
+}`,
+        solution: `${DEPS_SRC}
+
+function reaches(from, to) {
+  return DEPS[from].some((next) => next === to || reaches(next, to));
+}`,
+        tests: [
+          {
+            name: "chat-core reaches db (a direct edge) → true",
+            args: ["chat-core", "db"],
+            expect: true,
+          },
+          {
+            name: "chat-react reaches auth (through api) → true",
+            args: ["chat-react", "auth"],
+            expect: true,
+          },
+          { name: "web reaches db → true", args: ["web", "db"], expect: true },
+          {
+            name: "db reaches api (db imports nothing) → false",
+            args: ["db", "api"],
+            expect: false,
+          },
+          { name: "ui reaches api → false", args: ["ui", "api"], expect: false },
+          {
+            name: "api reaches chat-core (that would point up) → false",
+            args: ["api", "chat-core"],
+            expect: false,
+          },
+        ],
+        onResult(fn, all) {
+          learnerReaches = all ? fn : null;
+        },
+      });
+      const from = document.getElementById("ck-from"),
+        to = document.getElementById("ck-to");
+      for (const sel of [from, to])
+        sel.innerHTML = order.map((id) => `<option value="${id}">${id}</option>`).join("");
+      from.value = "api";
+      to.value = "chat-core";
+      document.getElementById("ck-go").addEventListener("click", () => {
+        const ck = document.getElementById("ck-out"),
+          a = from.value,
+          b = to.value;
+        if (!learnerReaches) return (ck.textContent = "Pass all the tests above first.");
+        if (a === b) return (ck.textContent = "A package doesn't import itself.");
+        if (PM.DEPS[a].includes(b))
+          return (ck.textContent = `${a} already imports ${b}. Nothing new.`);
+        ck.innerHTML = learnerReaches(b, a)
+          ? `<strong style="color:var(--accent)">✗ Cycle.</strong> ${b} already reaches ${a}, so ${a} → ${b} closes a loop. Refuse it.`
+          : `<strong style="color:var(--ok)">✓ Safe.</strong> ${b} can't reach ${a}, so the new edge still points down.`;
+      });
+    </script>
+  </body>
+</html>
