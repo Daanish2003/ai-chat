@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 12 · Shared links</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 12</p>
+      <h1>Shared links</h1>
+      <p class="subtitle">A bookmark into the Message tree, not a copy of it.</p>
+      <p class="meta">
+        About 13 minutes · a browser · you'll write <code>redact(message)</code> and
+        <code>blockedBy(leafId, status)</code>
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Shared link</dt>
+          <dd>
+            A public, read-only view of one Branch of a Conversation. A Conversation has at most one
+            (see <a href="../../../CONTEXT.md"><code>CONTEXT.md</code></a
+            >).
+          </dd>
+          <dt>Token</dt>
+          <dd>
+            The random part of the public URL, <code>/share/&lt;token&gt;</code>. It is 22
+            characters and is not related to any internal id.
+          </dd>
+          <dt>Redact</dt>
+          <dd>Remove the private parts of a Message before a viewer sees it.</dd>
+          <dt>Allowlist</dt>
+          <dd>A list of what may pass. Anything not on the list is removed.</dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <h2>Warm-up</h2>
+      <div
+        class="quiz"
+        data-answer="1"
+        data-why="activeLeafId is the newest Message of the Active Branch. Walking up its parentId chain gives the whole Branch (Lesson 5)."
+      >
+        <div class="label">From Lesson 5</div>
+        <p class="q">From memory: what does <code>conversation.activeLeafId</code> point at?</p>
+        <ol class="opts">
+          <li
+            data-why="The first Message is a root; it has parentId null. The leaf is at the other end."
+          >
+            The first Message of the tree.
+          </li>
+          <li>The newest Message of the Branch.</li>
+          <li data-why="Every Message has its own id; the Conversation stores only one of them.">
+            Every Message on the Active Branch.
+          </li>
+          <li
+            data-why="The Conversation's selected Model is in conversation.model, not activeLeafId."
+          >
+            The Model that wrote the reply.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span>A pointer, not a copy</h2>
+      <figure id="pointer">
+        <figcaption>
+          The <code>shared_link</code> row holds one Message id; the viewer walks up from it to the
+          root.
+        </figcaption>
+      </figure>
+      <p>
+        Think of a bookmark in a book that nobody rewrites. Messages are never changed once written:
+        an edit or a regenerate adds a sibling (Lesson 6). So the path from a root down to one leaf
+        stays the same for as long as the Conversation exists, and the link can store a pointer
+        instead of copies.
+      </p>
+      <p>
+        Look at the row in the picture. It has the <code>token</code>, the
+        <code>conversationId</code> (unique, so one link per Conversation), the
+        <code>leafMessageId</code> and a frozen copy of the <code>title</code>. To show the page,
+        <code>loadSharedConversation</code> calls
+        <code>loadPath(conversationId, leafMessageId)</code>, which is the same walk the Active
+        Branch uses.
+      </p>
+
+      <h2><span class="num">2</span>Sharing again moves the bookmark</h2>
+      <figure id="mover">
+        <div class="toy-out">
+          <button class="btn" type="button" id="mv-share">Share</button>
+          <button class="btn" type="button" id="mv-edit">Edit Message 2</button>
+          <button class="btn" type="button" id="mv-reset">Reset</button>
+          <div id="mv-out">Press Share.</div>
+        </div>
+        <figcaption>
+          Press Share, then Edit, then Share again: the token stays, only the leaf moves.
+        </figcaption>
+      </figure>
+      <p>
+        <code>upsertSharedLink</code> inserts a row, and if the Conversation already has one, it
+        updates that row instead (<code>onConflictDoUpdate</code> on <code>conversationId</code>).
+        Try it in the toy:
+      </p>
+      <ol class="steps">
+        <li>Share: a new row gets token <code>k3Fq…</code> and leaf <code>A2</code>.</li>
+        <li>
+          Edit Message 2: the Active Branch is now <code>U1 → A1 → U2′ → A2′</code>, but the link
+          still shows <code>A2</code>. The dialog says the Conversation "has moved on".
+        </li>
+        <li>
+          Share again: the same row now has leaf <code>A2′</code>, so the old URL shows the new
+          Branch.
+        </li>
+      </ol>
+      <p>
+        Sharing is refused when the Conversation is empty, or when the newest Message is
+        <code>streaming</code> or <code>error</code>. A <code>stopped</code> reply can be shared.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="The upsert keeps the row and its token, and moves leafMessageId to the new Active Branch leaf."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          You share, regenerate the last reply, wait for it to finish, then share again. What
+          happens?
+        </p>
+        <ol class="opts">
+          <li>Same token, the leaf moves.</li>
+          <li
+            data-why="There is never a new token for the same Conversation: conversationId is unique."
+          >
+            New token, old one revoked.
+          </li>
+          <li data-why="At most one row per Conversation, so there can't be two live tokens.">
+            Two tokens, both stay live.
+          </li>
+          <li data-why="The first share isn't final: sharing again updates leafMessageId.">
+            Nothing changes; links are frozen.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">3</span>What a viewer sees</h2>
+      <figure id="redact">
+        <figcaption>
+          Only parts on the allowlist pass; attachments shrink to a file name and type.
+        </figcaption>
+      </figure>
+      <p>
+        A viewer gets the Branch with private things removed. <code>redactForShare</code> keeps only
+        part types on an allowlist: <code>text</code>, <code>tool-call</code> and
+        <code>tool-result</code>, so a reply's searches and Sources still show. Thinking and file
+        contents are not on the list, so they go. <code>redactAttachmentsForShare</code> turns each
+        attachment into <code>{ filename, mediaType }</code>, and drops its id and size.
+      </p>
+      <p>
+        An allowlist fails safe. If a later PR adds a new part type, a Shared link hides it until
+        someone adds it to the list on purpose.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="2"
+        data-why="sharedPartTypes lists text, tool-call and tool-result. A new type is not there, so redactForShare filters it out."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          A future PR adds an <code>audio</code> part type and changes nothing else. Does a Shared
+          link show it?
+        </p>
+        <ol class="opts">
+          <li data-why="That would be a blocklist. redact.ts uses an allowlist.">
+            Yes, every part is shown.
+          </li>
+          <li
+            data-why="Attachments become chips; parts are kept or removed, never turned into chips."
+          >
+            Only its file name shows.
+          </li>
+          <li>No, it isn't listed.</li>
+          <li data-why="The share page is public. It has no signed-in mode.">
+            Only to signed-in viewers.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">4</span>A link lives as long as its Conversation</h2>
+      <figure id="cascade">
+        <figcaption>
+          Delete the Conversation and the cascade removes the link row, so the URL answers 404.
+        </figcaption>
+      </figure>
+      <p>
+        Both foreign keys of <code>shared_link</code> use <code>onDelete: "cascade"</code>. Deleting
+        the Conversation (or the user) deletes its Messages and its link together, and
+        <code>share.get</code> then throws <code>NOT_FOUND</code>. Deleted content can't stay public
+        by mistake, which is the main reason ADR 0004 chose a pointer.
+      </p>
+      <p>
+        The token is <code>randomBytes(16)</code> as base64url: 128 random bits, so nobody can guess
+        it. The page also tells search engines <code>noindex, nofollow</code>.
+      </p>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <div id="ex2"></div>
+      <figure id="viewer">
+        <div class="toy-out" id="viewer-out">
+          Pass both exercises. Then this box shows what a viewer of the sample Message sees, using
+          your functions.
+        </div>
+        <figcaption>Your two functions drive this preview of the public page.</figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> a Shared link is a bookmark
+          (<code>leafMessageId</code>) into a tree that never changes, so it never copies Messages.
+        </p>
+        <ul>
+          <li>
+            <strong>One row per Conversation.</strong> Sharing again keeps the token and moves the
+            leaf to the current Active Branch.
+          </li>
+          <li>
+            <strong>Allowlist redaction.</strong> Text and tool parts pass; thinking and file bytes
+            don't; attachments become name-and-type chips.
+          </li>
+          <li>
+            <strong>It dies with its Conversation.</strong> Cascade deletes remove the row, and the
+            URL answers 404.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box, say each point out loud, then draw the toy's tree and move the
+          bookmark.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>The ADR</h3>
+        <blockquote>
+          "Messages are never mutated once written (edit and regenerate insert siblings, ADR 0001),
+          so the path from a root to a given leaf is fixed for as long as the Conversation exists."
+          (<a href="../../adr/0004-shared-link-points-at-the-tree.md">ADR 0004</a>)
+        </blockquote>
+        <p>
+          The ADR says the page walks up "with the same recursive query as the Active Branch". In
+          today's code that walk is <code>loadPath</code> in
+          <a href="../../../packages/api/src/chat/store.ts"><code>chat/store.ts</code></a
+          >: it loads the Conversation's Messages and calls <code>pathTo</code> in JavaScript, not a
+          SQL recursive query. The idea is the same: one shared walk.
+        </p>
+        <h3>Race with a send</h3>
+        <p>
+          <code>upsertSharedLink</code> locks the Conversation row with
+          <code>for("update")</code> first, the same lock a send takes in
+          <code>handleChat</code> (Lesson 3). So the Active Branch can't change between "read the
+          leaf" and "save the link".
+        </p>
+        <h3>Where to read</h3>
+        <p>
+          <a href="../../../packages/api/src/share/store.ts"><code>share/store.ts</code></a> ·
+          <a href="../../../packages/api/src/share/redact.ts"><code>share/redact.ts</code></a> ·
+          <a href="../../../packages/api/src/routers/share.ts"><code>routers/share.ts</code></a>
+          (only <code>get</code> is a <code>publicProcedure</code>) ·
+          <a href="../../../packages/db/src/schema/share.ts"><code>schema/share.ts</code></a> ·
+          <a href="../../../apps/web/src/routes/share/$token.tsx"
+            ><code>routes/share/$token.tsx</code></a
+          >
+          ·
+          <a href="../../../packages/chat-react/src/share/share-dialog.tsx"
+            ><code>share-dialog.tsx</code></a
+          >
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          ADR 0004 lists "let a viewer continue a shared Conversation in their own account" as out
+          of scope. Tell your teacher why that feature would need a real copy, when sharing itself
+          doesn't.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="../../adr/0004-shared-link-points-at-the-tree.md"
+            >ADR 0004: A Shared link points at the Message tree</a
+          >, then the 21 test names in
+          <a href="../../../packages/api/src/routers/share.integration.test.ts"
+            ><code>share.integration.test.ts</code></a
+          >, which read like a spec.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude): "why does a stopped reply
+          share but an error doesn't?", or "quiz me on Lesson 12".
+        </p>
+        <div class="nav">
+          <a href="0011-attachments.html">← Lesson 11: Attachments</a
+          ><a href="0013-automatic-titles.html">Lesson 13: Automatic titles →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="12"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // A small Message tree: main Branch on top, the edited Branch below.
+      const NODES = {
+        U1: [60, 60],
+        A1: [160, 60],
+        U2: [260, 60],
+        A2: [360, 60],
+        "U2′": [260, 150],
+        "A2′": [360, 150],
+      };
+      const TREE_EDGES = [
+        ["U1", "A1"],
+        ["A1", "U2"],
+        ["U2", "A2"],
+        ["A1", "U2′"],
+        ["U2′", "A2′"],
+      ];
+      function tree({ edited = true, active = "A2", leaf = null, t = 1 } = {}) {
+        const shown = (id) => edited || !id.includes("′");
+        const edges = TREE_EDGES.filter(([a, b]) => shown(a) && shown(b)).map(([a, b]) => {
+          const [x1, y1] = NODES[a],
+            [x2, y2] = NODES[b];
+          return D.arrow(x1 + 22, y1 + (y2 - y1) * 0.2, x2 - 22, y2 - (y2 - y1) * 0.2, {
+            tone: "faint",
+          });
+        });
+        const nodes = Object.entries(NODES)
+          .filter(([id]) => shown(id))
+          .map(([id, [x, y]]) =>
+            D.box(x - 22, y - 18, 44, 36, id, { tone: id === active ? "blue" : "", mono: true }),
+          );
+        let link = "";
+        if (leaf) {
+          const [lx, ly] = NODES[leaf];
+          link =
+            D.box(480, 80, 260, 82, "shared_link", {
+              tone: "accent",
+              mono: true,
+              sub: `token k3Fq… · leaf ${leaf}`,
+            }) +
+            D.route(
+              [
+                [480, 121],
+                [430, 121],
+                [430, ly],
+                [lx + 24, ly],
+              ],
+              { tone: "accent", width: 2.2, opacity: t },
+            );
+        }
+        return (
+          edges.join("") +
+          nodes.join("") +
+          link +
+          D.text(40, 200, "blue = Active Branch leaf", { tone: "blue", size: 12 })
+        );
+      }
+
+      D.render(
+        "#pointer",
+        D.svg(760, 215, tree({ edited: true, active: "A2", leaf: "A2" }), {
+          label: "A shared_link row points at leaf A2; the viewer walks up to U1",
+        }),
+      );
+
+      // Section 2 toy.
+      const mover = document.getElementById("mover");
+      let st;
+      const mvReset = () => {
+        st = { edited: false, active: "A2", leaf: null };
+        drawMover("Press Share.");
+      };
+      function drawMover(msg) {
+        mover.querySelector("svg")?.remove();
+        D.render(
+          mover,
+          D.svg(760, 215, tree(st), { label: "Toy: the Shared link moves with Share again" }),
+        );
+        const moved = st.leaf && st.leaf !== st.active;
+        document.getElementById("mv-out").innerHTML =
+          msg + (moved ? " <strong>The Conversation has moved on</strong> (movedOn = true)." : "");
+      }
+      document.getElementById("mv-share").onclick = () => {
+        const again = !!st.leaf;
+        st.leaf = st.active;
+        drawMover(
+          again
+            ? `Same token k3Fq…, leaf moved to ${st.active}.`
+            : `New row: token k3Fq…, leaf ${st.active}.`,
+        );
+      };
+      document.getElementById("mv-edit").onclick = () => {
+        st.edited = true;
+        st.active = "A2′";
+        drawMover("You edited Message 2: a new Branch U1 → A1 → U2′ → A2′.");
+      };
+      document.getElementById("mv-reset").onclick = mvReset;
+      mvReset();
+
+      // Section 3: redaction.
+      const IN = [
+        ["text", true],
+        ["thinking", false],
+        ["tool-call", true],
+        ["tool-result", true],
+        ["image bytes", false],
+      ];
+      D.render(
+        "#redact",
+        D.svg(
+          760,
+          262,
+          IN.map(
+            ([type, ok], i) =>
+              D.box(20, 42 + i * 42, 150, 32, type, { mono: true, tone: ok ? "" : "warn" }) +
+              D.arrow(172, 58 + i * 42, ok ? 528 : 300, 58 + i * 42, {
+                tone: ok ? "ok" : "faint",
+                dashed: !ok,
+              }) +
+              (ok
+                ? D.box(530, 42 + i * 42, 150, 32, type, { mono: true, tone: "ok" })
+                : D.text(310, 58 + i * 42, "✗ removed", { tone: "warn", size: 13 })),
+          ).join("") +
+            D.box(330, 6, 110, 26, "allowlist", { tone: "accent" }) +
+            D.text(
+              20,
+              254,
+              "attachment { id, filename, mediaType, size } → { filename, mediaType }",
+              { mono: true, size: 12, tone: "muted" },
+            ),
+          { label: "redactForShare keeps text, tool-call and tool-result" },
+        ),
+      );
+
+      // Section 4: cascade.
+      D.render(
+        "#cascade",
+        D.svg(
+          760,
+          150,
+          D.box(20, 50, 170, 46, "conversation", { mono: true, tone: "accent", sub: "deleted" }) +
+            D.box(290, 10, 170, 40, "message", { mono: true }) +
+            D.box(290, 96, 170, 40, "shared_link", { mono: true }) +
+            D.arrow(190, 65, 290, 32, { tone: "accent" }) +
+            D.text(200, 30, "cascade", { tone: "accent", size: 12 }) +
+            D.arrow(190, 82, 290, 115, { tone: "accent" }) +
+            D.box(560, 96, 180, 40, "/share/k3Fq… → 404", { mono: true, tone: "warn" }) +
+            D.arrow(460, 116, 560, 116, { tone: "warn", dashed: true }),
+          { label: "Deleting a Conversation cascades to its Messages and its Shared link" },
+        ),
+      );
+
+      // Video.
+      Explainer.mount("#video", {
+        title: "Lesson 12 in about 1 minute",
+        width: 760,
+        height: 215,
+        scenes: [
+          {
+            say: "Messages never change once written, so the path from the root to a leaf stays fixed.",
+            draw: (t, A) =>
+              tree({ edited: false, active: "A2" }) +
+              A.fade(
+                t,
+                0.3,
+                0.7,
+                D.text(480, 60, "fixed path, root → leaf", { tone: "accent", weight: 600 }),
+              ),
+          },
+          {
+            say: "So a Shared link stores no copies. It is a bookmark: one row that points at the leaf.",
+            draw: (t, A) =>
+              tree({ edited: false, active: "A2", leaf: "A2", t: A.step(t, 0.2, 0.7) }),
+          },
+          {
+            say: "After an edit makes a new Branch, sharing again keeps the same token and moves the bookmark.",
+            draw: (t, A) =>
+              tree({
+                edited: true,
+                active: "A2′",
+                leaf: t < 0.6 ? "A2" : "A2′",
+                t: t < 0.6 ? 1 : A.step(t, 0.6, 0.9),
+              }),
+          },
+          {
+            say: "A viewer sees text and searches, but never thinking or file contents. That is an allowlist.",
+            show: "allowlist: text, tool-call, tool-result",
+            draw: (t, A) =>
+              IN.map(([type, ok], i) =>
+                D.box(
+                  A.lerp(20, ok ? 530 : 300, A.ease(A.step(t, 0.1 + i * 0.12, 0.4 + i * 0.12))),
+                  12 + i * 40,
+                  150,
+                  32,
+                  ok ? type : `✗ ${type}`,
+                  {
+                    mono: true,
+                    tone: ok ? "ok" : "warn",
+                    opacity: ok ? 1 : 1 - 0.6 * A.step(t, 0.5, 0.9),
+                  },
+                ),
+              ).join(""),
+          },
+          {
+            say: "Delete the Conversation and the link goes with it. Next, try the toy, then write redact.",
+            show: "Delete → cascade → 404. Next: the toy, then redact(message).",
+            draw: (t, A) =>
+              A.fade(
+                t,
+                0,
+                0.3,
+                D.box(40, 80, 180, 46, "conversation", { mono: true, tone: "accent" }),
+              ) +
+              D.arrow(220, 103, A.lerp(220, 400, A.step(t, 0.3, 0.6)) + 1, 103, {
+                tone: "accent",
+              }) +
+              A.fade(
+                t,
+                0.6,
+                0.85,
+                D.box(400, 80, 220, 46, "/share/k3Fq… → 404", { mono: true, tone: "warn" }),
+              ),
+          },
+        ],
+      });
+
+      // Try it.
+      const SAMPLE = {
+        parts: [
+          { type: "thinking", content: "They probably mean the 2026 release…" },
+          { type: "tool-call", name: "web_search", arguments: '{"query":"tanstack ai"}' },
+          { type: "tool-result", content: "[3 results]" },
+          { type: "text", content: "TanStack AI is a TypeScript SDK for AI apps." },
+        ],
+        attachments: [
+          { id: "0199a1b2-…", filename: "notes.pdf", mediaType: "application/pdf", size: 52100 },
+        ],
+      };
+      let learner = { redact: null, blockedBy: null };
+      Exercise.mount("#ex1", {
+        title: "Write redact(message)",
+        task: "Return the Message as a viewer sees it: only allowlisted parts, and attachments as <code>{ filename, mediaType }</code>.",
+        storageKey: "ai-chat-l12-redact",
+        fnName: "redact",
+        starter: `// Like redactForShare + redactAttachmentsForShare in packages/api/src/share/redact.ts.
+const SHARED_PART_TYPES = new Set(["text", "tool-call", "tool-result"]);
+
+// Example: { parts: [{type:"thinking"}, {type:"text"}], attachments: [{id, filename, mediaType, size}] }
+//   → { parts: [{type:"text"}], attachments: [{filename, mediaType}] }
+// Hint: parts.filter(...) with SHARED_PART_TYPES.has, and attachments.map(...).
+function redact(message) {
+  return message;
+}`,
+        solution: `const SHARED_PART_TYPES = new Set(["text", "tool-call", "tool-result"]);
+
+function redact(message) {
+  return {
+    parts: message.parts.filter((part) => SHARED_PART_TYPES.has(part.type)),
+    attachments: message.attachments.map(({ filename, mediaType }) => ({ filename, mediaType })),
+  };
+}`,
+        tests: [
+          {
+            name: "thinking is removed, text stays",
+            args: [
+              {
+                parts: [
+                  { type: "thinking", content: "hmm" },
+                  { type: "text", content: "Answer" },
+                ],
+                attachments: [],
+              },
+            ],
+            expect: { parts: [{ type: "text", content: "Answer" }], attachments: [] },
+          },
+          {
+            name: "a search's tool-call and tool-result stay",
+            args: [
+              {
+                parts: [
+                  { type: "tool-call", id: "c1" },
+                  { type: "tool-result", toolCallId: "c1" },
+                ],
+                attachments: [],
+              },
+            ],
+            expect: {
+              parts: [
+                { type: "tool-call", id: "c1" },
+                { type: "tool-result", toolCallId: "c1" },
+              ],
+              attachments: [],
+            },
+          },
+          {
+            name: "image bytes are removed",
+            args: [
+              {
+                parts: [
+                  { type: "image", source: "aGVsbG8=" },
+                  { type: "text", content: "What's this?" },
+                ],
+                attachments: [],
+              },
+            ],
+            expect: { parts: [{ type: "text", content: "What's this?" }], attachments: [] },
+          },
+          {
+            name: "an unknown new part type (audio) is removed",
+            args: [{ parts: [{ type: "audio" }], attachments: [] }],
+            expect: { parts: [], attachments: [] },
+          },
+          {
+            name: "attachment keeps only filename and mediaType",
+            args: [
+              {
+                parts: [],
+                attachments: [
+                  { id: "f1", filename: "cat.png", mediaType: "image/png", size: 1234 },
+                ],
+              },
+            ],
+            expect: { parts: [], attachments: [{ filename: "cat.png", mediaType: "image/png" }] },
+          },
+        ],
+        onResult(fn, all) {
+          learner.redact = all ? fn : null;
+          preview();
+        },
+      });
+      Exercise.mount("#ex2", {
+        title: "Write blockedBy(activeLeafId, leafStatus)",
+        task: 'Return why sharing is blocked: <code>"empty"</code>, <code>"streaming"</code>, <code>"error"</code>, or <code>null</code> when it may go ahead.',
+        storageKey: "ai-chat-l12-blocked-by",
+        fnName: "blockedBy",
+        starter: `// Like findShareState in packages/api/src/share/store.ts.
+// Example: blockedBy("a2", "streaming") → "streaming"; blockedBy("a2", "stopped") → null.
+// Hint: no leaf means "empty". Then only two statuses block.
+function blockedBy(activeLeafId, leafStatus) {
+  return null;
+}`,
+        solution: `function blockedBy(activeLeafId, leafStatus) {
+  if (!activeLeafId) return "empty";
+  if (leafStatus === "streaming" || leafStatus === "error") return leafStatus;
+  return null;
+}`,
+        tests: [
+          { name: 'no leaf yet → "empty"', args: [null, null], expect: "empty" },
+          {
+            name: 'newest reply still streaming → "streaming"',
+            args: ["a2", "streaming"],
+            expect: "streaming",
+          },
+          { name: 'newest reply ended in error → "error"', args: ["a2", "error"], expect: "error" },
+          { name: "complete reply → null (may share)", args: ["a2", "complete"], expect: null },
+          { name: "stopped reply → null (may share)", args: ["a2", "stopped"], expect: null },
+        ],
+        onResult(fn, all) {
+          learner.blockedBy = all ? fn : null;
+          preview();
+        },
+      });
+      function preview() {
+        const out = document.getElementById("viewer-out");
+        if (!learner.redact || !learner.blockedBy) return;
+        const block = learner.blockedBy("a2", "complete");
+        if (block) return (out.textContent = `Sharing blocked: ${block}`);
+        const seen = learner.redact(SAMPLE);
+        const esc = D.esc;
+        out.innerHTML =
+          `<strong>/share/k3Fq…</strong> (blockedBy → null, so the link exists)<br>` +
+          seen.parts
+            .map((p) =>
+              p.type === "text"
+                ? `“${esc(p.content)}”`
+                : `<code>${esc(p.type)}</code> ${esc(p.name ?? p.content ?? "")}`,
+            )
+            .join("<br>") +
+          `<br>` +
+          seen.attachments.map((a) => `📎 ${esc(a.filename)} (${esc(a.mediaType)})`).join(" ") +
+          `<br><span style="color:var(--muted)">Removed: ${SAMPLE.parts.length - seen.parts.length} part(s), and the attachment's id and size.</span>`;
+      }
+    </script>
+  </body>
+</html>

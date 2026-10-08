@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 8 · The parts boundary</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 8</p>
+      <h1>The parts boundary</h1>
+      <p class="subtitle">We store Messages in our own shape, and one file translates.</p>
+      <p class="meta">
+        About 13 minutes · a browser · you'll write <code>collect(chunks)</code> and
+        <code>thinkingFor(message, provider)</code>
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Stored parts</dt>
+          <dd>
+            Our own shape for a Message's content, saved in the <code>message.parts</code> column:
+            <code>{ schemaVersion: 1, parts: [...] }</code>.
+          </dd>
+          <dt>UIMessage</dt>
+          <dd>TanStack AI's shape for a Message that <code>useChat</code> shows in the browser.</dd>
+          <dt>ModelMessage</dt>
+          <dd>TanStack AI's shape for history that a Provider reads.</dd>
+          <dt>Boundary module</dt>
+          <dd>
+            The one file that converts between our shape and a library's shapes:
+            <code>api/src/chat/parts.ts</code>.
+          </dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="Messages are never changed once written. An edit inserts a new Message under the same parent (Lesson 5)."
+      >
+        <div class="label">Warm-up · Lesson 5</div>
+        <p class="q">A user edits their Message. What does the server write?</p>
+        <ol class="opts">
+          <li>A new sibling Message.</li>
+          <li data-why="Messages are never mutated once written (ADR 0001).">
+            It overwrites the Message.
+          </li>
+          <li data-why="That is what TanStack's own persistence does, and why ADR 0001 rejects it.">
+            It deletes later Messages.
+          </li>
+          <li data-why="Only the new Message is written; the tree keeps the rest.">
+            A copy of everything.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span>One shape at home, one adapter</h2>
+      <figure id="shapes">
+        <figcaption>
+          Every arrow that crosses into TanStack AI's shapes goes through <code>parts.ts</code>.
+        </figcaption>
+      </figure>
+      <p>
+        Think of a travel adapter. Your devices keep their own plugs, and one adapter fits the
+        foreign socket. Postgres keeps our plug, the stored parts. TanStack AI has two sockets:
+        <code>UIMessage</code> for the browser and <code>ModelMessage</code> for the Provider.
+      </p>
+      <p>
+        Look at the three arrows. <code>createPartsBuilder</code> turns stream chunks into stored
+        parts while a run goes. <code>toUIParts</code> turns them into what the screen draws, and
+        <code>toModelMessages</code> turns history into what the Provider reads.
+      </p>
+
+      <h2><span class="num">2</span>Why our own shape</h2>
+      <figure>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Stored part</th>
+                <th>Browser gets (<code>toUIParts</code>)</th>
+                <th>Provider gets (<code>toModelMessages</code>)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>text</code></td>
+                <td><code>{ type: "text", content }</code></td>
+                <td>The text as <code>content</code></td>
+              </tr>
+              <tr>
+                <td><code>thinking</code></td>
+                <td>The text, no <code>signature</code></td>
+                <td>Only if the same Provider wrote it</td>
+              </tr>
+              <tr>
+                <td><code>web_search</code></td>
+                <td>A <code>tool-call</code> part</td>
+                <td>A tool call, or a text placeholder when Search is off</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figcaption>Three stored types, each with two translations.</figcaption>
+      </figure>
+      <p>
+        TanStack AI is before version 1.0 and changes fast. If the database held its shapes, one
+        library upgrade could make old Messages unreadable. Our shape is a zod union in
+        <code>db/src/message-parts.ts</code>, and <code>parseStoredParts</code> checks every row it
+        reads. An unknown <code>schemaVersion</code> or part type throws, so a bad row fails loudly,
+        not quietly.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="The rows hold our zod shape, not TanStack's. Only the translation in parts.ts needs a check."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          TanStack AI changes its part shape in a new version. What happens to the Messages already
+          in Postgres?
+        </p>
+        <ol class="opts">
+          <li>Nothing: their stored shape stays.</li>
+          <li data-why="No migration: the rows never held TanStack's shape.">
+            Every row needs a migration.
+          </li>
+          <li data-why="parseStoredParts checks our schema, which didn't change.">
+            They no longer parse correctly.
+          </li>
+          <li data-why="Stored history is never rewritten; it is converted each time it is read.">
+            They get rewritten on read.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">3</span>Building parts from the stream</h2>
+      <figure id="builder">
+        <figcaption>
+          A new <code>messageId</code> starts a new text part; the same one appends.
+        </figcaption>
+      </figure>
+      <p>
+        A Provider streams text in small pieces called deltas. Each
+        <code>TEXT_MESSAGE_CONTENT</code> chunk has a <code>messageId</code> and a
+        <code>delta</code>. Follow the chunks in the picture:
+      </p>
+      <ol class="steps">
+        <li><code>a: "Hel"</code>: no parts yet, so push <code>{ text: "Hel" }</code>.</li>
+        <li>
+          <code>a: "lo"</code>: same id, last part is text, so append:
+          <code>"Hel" + "lo" = "Hello"</code>.
+        </li>
+        <li>
+          <code>b: "Bye"</code>: a new id, so push a second part <code>{ text: "Bye" }</code>.
+        </li>
+      </ol>
+      <p>
+        A search in the middle of a reply also pushes a part, so text after it starts a new part.
+        That keeps the text before and after a search in order.
+      </p>
+
+      <h2><span class="num">4</span>Thinking goes home only</h2>
+      <figure id="thinking">
+        <figcaption>
+          The <code>signature</code> is the Provider's own sealed proof, so another Provider can't
+          use it.
+        </figcaption>
+      </figure>
+      <p>
+        A thinking part can carry a <code>signature</code>: an opaque value the Provider made and
+        wants back, unchanged, on later turns. Another Provider can't read it. So
+        <code>toModelMessages</code> compares <code>providerOf(message.model)</code> with the
+        Provider of this request, and it adds thinking only when they match. The row keeps the
+        thinking either way.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="2"
+        data-why="toModelMessages leaves thinking out for another Provider, but stored history is never rewritten."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          A Conversation moves from <code>anthropic:claude-opus-5-5</code> to
+          <code>openai:gpt-5.6</code>. What happens to the earlier thinking?
+        </p>
+        <ol class="opts">
+          <li data-why="Nothing is deleted. The row keeps every part.">
+            Deleted from the database.
+          </li>
+          <li data-why="OpenAI can't read Anthropic's signature, so it is left out.">
+            Sent to OpenAI too.
+          </li>
+          <li>Stored, but not sent.</li>
+          <li data-why="It is left out, not converted.">Converted into plain text.</li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <figure id="pay1">
+        <div class="toy-out" id="pay1-out">
+          Pass the tests: your <code>collect</code> then builds the parts of a sample reply here.
+        </div>
+        <figcaption>
+          Your <code>collect</code> turns six real-looking chunks into stored parts.
+        </figcaption>
+      </figure>
+      <div id="ex2"></div>
+      <figure id="pay2">
+        <div class="toy-out">
+          Next request goes to
+          <select id="prov">
+            <option>anthropic</option>
+            <option>openai</option>
+            <option>gemini</option>
+          </select>
+          <div id="pay2-out">
+            Pass the tests: your <code>thinkingFor</code> then decides what this Provider gets.
+          </div>
+        </div>
+        <figcaption>
+          The stored reply was written by <code>anthropic:claude-opus-5-5</code>.
+        </figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> Postgres keeps our own shape, and only
+          <code>parts.ts</code> translates it to TanStack AI's shapes.
+        </p>
+        <ul>
+          <li>
+            <strong>One adapter.</strong> <code>createPartsBuilder</code> in,
+            <code>toUIParts</code> and <code>toModelMessages</code> out. A library upgrade checks
+            this one file.
+          </li>
+          <li>
+            <strong>Checked on read.</strong> <code>parseStoredParts</code> validates
+            <code>schemaVersion: 1</code> and the three part types.
+          </li>
+          <li>
+            <strong>Thinking goes home only.</strong> It is sent back only to the Provider that
+            wrote it, and never rewritten in the row.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box and say each point out loud, then name the three stored part
+          types.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>The decision</h3>
+        <blockquote>
+          "Message <code>parts</code> are stored as jsonb in our own zod-validated shape (with a
+          <code>schemaVersion</code>), not TanStack's <code>UIMessage</code> shape, and converted at
+          one boundary module: TanStack AI is pre-1.0 and changing fast, and a library upgrade must
+          not break stored history." (<a href="../../adr/0001-own-message-tree.md">ADR 0001</a>)
+        </blockquote>
+        <p>
+          The ADR also rejected a <code>message_part</code> table, because parts are always read and
+          written with their Message, so a table would only add joins.
+        </p>
+        <h3>Honest edges of "one file"</h3>
+        <p>
+          <code>parts.ts</code> is the one place that converts <em>stored</em> parts. Other api
+          files still import <code>@tanstack/ai</code> for other jobs: <code>run.ts</code> calls
+          <code>chat()</code>, and <code>sources.ts</code> and <code>share/redact.ts</code> read the
+          UI parts after conversion. The browser draws the UI parts directly, so a change to
+          TanStack's UI shape can still reach <code>chat-react</code>. What it can't reach is the
+          rows.
+        </p>
+        <h3>Search in two forms</h3>
+        <p>
+          When this request offers the <code>web_search</code> tool, a finished search replays as a
+          real tool call plus a <code>tool</code> result. Otherwise it becomes text such as
+          <code>[Searched the web for "…": no results]</code>. A running or cancelled search is left
+          out, because a tool call with no result would confuse the Provider. See
+          <code>withToolCalls</code> and <code>withPlaceholders</code> in
+          <a href="../../../packages/api/src/chat/parts.ts"><code>parts.ts</code></a
+          >.
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          Read the tests in
+          <a href="../../../packages/api/src/chat/parts.test.ts"><code>parts.test.ts</code></a
+          >. Find the one that proves thinking is left out for another Provider, then explain to
+          your teacher what <code>redacted</code> thinking is.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="../../adr/0001-own-message-tree.md">ADR 0001: We own the Message tree</a>, then
+          the top of
+          <a href="../../../packages/api/src/chat/parts.ts"
+            ><code>packages/api/src/chat/parts.ts</code></a
+          >
+          and
+          <a href="../../../packages/db/src/message-parts.ts"
+            ><code>packages/db/src/message-parts.ts</code></a
+          >.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude) anything: "show me a real
+          stored row", "why jsonb?", or "quiz me again".
+        </p>
+        <div class="nav">
+          <a href="0007-runs-outlive-the-client.html">← Lesson 7: Runs outlive the client</a
+          ><a href="0009-provider-credentials.html">Lesson 9: Provider credentials →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="8"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // Section 1: three shapes, one adapter.
+      const shapes = (lit = {}) =>
+        D.box(255, 8, 250, 230, "", { tone: "accent", extra: "", opacity: 0.25 }) +
+        D.box(20, 20, 170, 50, "Stream chunks", { sub: "from chat()" }) +
+        D.box(280, 95, 200, 60, "Stored parts", { tone: "ok", sub: "message.parts (jsonb)" }) +
+        D.box(570, 20, 170, 50, "UIMessage parts", { tone: "blue", sub: "useChat, browser" }) +
+        D.box(570, 170, 170, 50, "ModelMessage[]", { tone: "blue", sub: "Provider history" }) +
+        D.text(380, 228, "parts.ts", {
+          tone: "accent",
+          anchor: "middle",
+          weight: 600,
+          mono: true,
+        }) +
+        D.route(
+          [
+            [190, 45],
+            [235, 45],
+            [235, 110],
+            [280, 110],
+          ],
+          { tone: lit.in ? "accent" : "" },
+        ) +
+        D.text(196, 82, "createPartsBuilder", { size: 11, mono: true, tone: "muted" }) +
+        D.route(
+          [
+            [480, 110],
+            [525, 110],
+            [525, 45],
+            [570, 45],
+          ],
+          { tone: lit.ui ? "accent" : "" },
+        ) +
+        D.text(486, 75, "toUIParts", { size: 11, mono: true, tone: "muted" }) +
+        D.route(
+          [
+            [480, 140],
+            [525, 140],
+            [525, 195],
+            [570, 195],
+          ],
+          { tone: lit.model ? "accent" : "" },
+        ) +
+        D.text(486, 178, "toModelMessages", { size: 11, mono: true, tone: "muted" });
+      D.render(
+        "#shapes",
+        D.svg(760, 245, shapes(), {
+          label: "Stored parts in the middle; parts.ts converts in and out",
+        }),
+      );
+
+      // Section 3: the builder.
+      const chunkRow = [
+        ["a", "Hel"],
+        ["a", "lo"],
+        ["b", "Bye"],
+      ];
+      D.render(
+        "#builder",
+        D.svg(
+          760,
+          170,
+          chunkRow
+            .map(([id, d], i) => D.box(20 + i * 120, 20, 105, 44, `${id}: "${d}"`, { mono: true }))
+            .join("") +
+            D.arrow(380, 42, 440, 42) +
+            D.box(460, 10, 130, 64, '"Hello"', { tone: "ok", mono: true, sub: "part 1 (id a)" }) +
+            D.box(605, 10, 130, 64, '"Bye"', { tone: "ok", mono: true, sub: "part 2 (id b)" }) +
+            D.text(20, 100, "same id as the last text part → append", { tone: "muted", size: 13 }) +
+            D.text(20, 124, "new id → push a new part", { tone: "muted", size: 13 }) +
+            D.text(20, 148, "empty delta → ignore", { tone: "muted", size: 13 }),
+          { label: "Three chunks become two text parts" },
+        ),
+      );
+
+      // Section 4: thinking only goes home.
+      D.render(
+        "#thinking",
+        D.svg(
+          760,
+          170,
+          D.box(20, 55, 220, 60, "thinking + signature", {
+            tone: "ok",
+            sub: "by anthropic:claude-opus-5-5",
+          }) +
+            D.box(500, 15, 220, 50, "anthropic request", { tone: "blue" }) +
+            D.box(500, 105, 220, 50, "openai request", { tone: "blue" }) +
+            D.arrow(240, 75, 500, 40, { tone: "ok", label: "sent ✓" }) +
+            D.arrow(240, 95, 500, 130, { tone: "accent", dashed: true, label: "left out ✗" }),
+          { label: "Thinking goes back only to the Provider that wrote it" },
+        ),
+      );
+
+      // Video.
+      Explainer.mount("#video", {
+        title: "Lesson 8 in about 1 minute",
+        width: 760,
+        height: 245,
+        scenes: [
+          {
+            say: "Every Message is saved in our own shape, called stored parts, in the message table.",
+            draw: (t, A) =>
+              A.fade(
+                t,
+                0,
+                0.4,
+                D.box(280, 95, 200, 60, "Stored parts", { tone: "ok", sub: "schemaVersion: 1" }),
+              ),
+          },
+          {
+            say: "TanStack AI has its own shapes, one for the browser and one for the Provider. They change often.",
+            draw: (t, A) =>
+              D.box(280, 95, 200, 60, "Stored parts", { tone: "ok", sub: "schemaVersion: 1" }) +
+              A.fade(t, 0.1, 0.4, D.box(570, 20, 170, 50, "UIMessage", { tone: "blue" })) +
+              A.fade(t, 0.4, 0.7, D.box(570, 170, 170, 50, "ModelMessage", { tone: "blue" })),
+          },
+          {
+            say: "One file, parts dot t s, translates in both directions, like a travel adapter.",
+            show: "parts.ts translates in both directions.",
+            draw: (t) => shapes({ in: t > 0.2, ui: t > 0.45, model: t > 0.7 }),
+          },
+          {
+            say: "While a reply streams, deltas with the same message id join one text part. A new id starts a new part.",
+            draw: (t, A) =>
+              D.box(40, 90, 180, 50, '"Hel"', { mono: true }) +
+              A.fade(t, 0.3, 0.5, D.box(40, 90, 180, 50, '"Hello"', { mono: true, tone: "ok" })) +
+              A.fade(t, 0.6, 0.8, D.box(260, 90, 180, 50, '"Bye"', { mono: true, tone: "ok" })),
+          },
+          {
+            say: "Thinking goes back only to the Provider that wrote it. Now write collect, then thinking for.",
+            show: "Thinking goes home only. Next: write collect(chunks), then thinkingFor(message, provider).",
+            draw: (t, A) =>
+              D.box(20, 90, 200, 50, "thinking", { tone: "ok" }) +
+              D.arrow(220, 105, A.lerp(240, 500, A.step(t, 0, 0.5)), 60, { tone: "ok" }) +
+              D.box(500, 35, 200, 50, "same Provider ✓", { tone: "blue" }) +
+              A.fade(t, 0.5, 0.8, D.box(500, 150, 200, 50, "other Provider ✗", { tone: "accent" })),
+          },
+        ],
+      });
+
+      // Exercise 1: collect(chunks).
+      const SAMPLE = [
+        { messageId: "a", delta: "Paris is " },
+        { messageId: "a", delta: "the capital." },
+        { messageId: "a", delta: "" },
+        { messageId: "b", delta: "Anything " },
+        { messageId: "b", delta: "else?" },
+        { messageId: "c", delta: "Bye." },
+      ];
+      Exercise.mount("#ex1", {
+        title: "Write collect(chunks)",
+        task: 'Turn text chunks <code>{ messageId, delta }</code> into stored text parts <code>{ type: "text", text }</code>, like <code>createPartsBuilder().add</code>.',
+        storageKey: "ai-chat-l8-collect",
+        fnName: "collect",
+        starter: `// Example: [{ messageId: "a", delta: "Hel" }, { messageId: "a", delta: "lo" }]
+//   → [{ type: "text", text: "Hello" }]
+// Hint: remember the messageId of the last text part. Same id → append to it.
+// A new id → push a new part. Skip a chunk whose delta is empty.
+function collect(chunks) {
+  const parts = [];
+  return parts;
+}`,
+        solution: `function collect(chunks) {
+  const parts = [];
+  let lastId;
+  for (const { messageId, delta } of chunks) {
+    if (!delta) continue;
+    const last = parts.at(-1);
+    if (last && messageId === lastId) last.text += delta;
+    else {
+      parts.push({ type: "text", text: delta });
+      lastId = messageId;
+    }
+  }
+  return parts;
+}`,
+        tests: [
+          {
+            name: 'two deltas of one message → one part "Hello"',
+            args: [
+              [
+                { messageId: "a", delta: "Hel" },
+                { messageId: "a", delta: "lo" },
+              ],
+            ],
+            expect: [{ type: "text", text: "Hello" }],
+          },
+          {
+            name: "a new messageId → a second part",
+            args: [
+              [
+                { messageId: "a", delta: "One." },
+                { messageId: "b", delta: "Two." },
+              ],
+            ],
+            expect: [
+              { type: "text", text: "One." },
+              { type: "text", text: "Two." },
+            ],
+          },
+          {
+            name: "an empty delta adds nothing",
+            args: [
+              [
+                { messageId: "a", delta: "" },
+                { messageId: "b", delta: "Hi" },
+              ],
+            ],
+            expect: [{ type: "text", text: "Hi" }],
+          },
+          { name: "no chunks → no parts", args: [[]], expect: [] },
+        ],
+        onResult(fn, all) {
+          if (!all) return;
+          const parts = fn(SAMPLE);
+          document.getElementById("pay1-out").innerHTML =
+            `<code>{ schemaVersion: 1, parts: [</code>` +
+            parts
+              .map(
+                (p) =>
+                  `<div style="margin-left:1.5em"><code>${D.esc(JSON.stringify(p))}</code></div>`,
+              )
+              .join("") +
+            `<code>] }</code>`;
+        },
+      });
+
+      // Exercise 2: thinkingFor(message, provider).
+      const STORED = {
+        model: "anthropic:claude-opus-5-5",
+        parts: [
+          { type: "thinking", text: "The user wants a capital.", signature: "sig-EXAMPLE" },
+          { type: "text", text: "Paris." },
+        ],
+      };
+      Exercise.mount("#ex2", {
+        title: "Write thinkingFor(message, provider)",
+        task: "Return the thinking to send with this Message: <code>{ content, signature }</code> for each thinking part, but only when <code>provider</code> wrote it. Otherwise return <code>[]</code>.",
+        storageKey: "ai-chat-l8-thinking-for",
+        fnName: "thinkingFor",
+        starter: `// The part before ":" in a Model id is its Provider.
+function providerOf(id) {
+  return id.split(":")[0];
+}
+
+// Example: a message by "anthropic:claude-opus-5-5" with one thinking part,
+// asked for "anthropic" → [{ content: "…", signature: "…" }]; for "openai" → [].
+// Hint: a user Message has model null, so it never sends thinking.
+function thinkingFor(message, provider) {
+  return message.parts.filter((p) => p.type === "thinking").map((p) => ({ content: p.text, signature: p.signature }));
+}`,
+        solution: `function providerOf(id) {
+  return id.split(":")[0];
+}
+
+function thinkingFor(message, provider) {
+  if (!message.model || providerOf(message.model) !== provider) return [];
+  return message.parts
+    .filter((p) => p.type === "thinking")
+    .map((p) => ({ content: p.text, signature: p.signature }));
+}`,
+        tests: [
+          {
+            name: "same Provider (anthropic) → the thinking",
+            args: [STORED, "anthropic"],
+            expect: [{ content: "The user wants a capital.", signature: "sig-EXAMPLE" }],
+          },
+          { name: "another Provider (openai) → []", args: [STORED, "openai"], expect: [] },
+          {
+            name: "a user Message (model null) → []",
+            args: [{ model: null, parts: [{ type: "text", text: "Hi" }] }, "anthropic"],
+            expect: [],
+          },
+          {
+            name: "same Provider, no thinking parts → []",
+            args: [{ model: "openai:gpt-5.6", parts: [{ type: "text", text: "Hi" }] }, "openai"],
+            expect: [],
+          },
+        ],
+        onResult(fn, all) {
+          learnerThinking = all ? fn : null;
+          showPay2();
+        },
+      });
+      let learnerThinking = null;
+      const prov = document.getElementById("prov");
+      function showPay2() {
+        const out = document.getElementById("pay2-out");
+        if (!learnerThinking) return;
+        const sent = learnerThinking(STORED, prov.value);
+        out.innerHTML = sent.length
+          ? `<strong style="color:var(--ok)">Sent:</strong> thinking "${D.esc(sent[0].content)}" with its signature, then the text "Paris."`
+          : `<strong style="color:var(--accent)">Left out:</strong> ${prov.value} gets only the text "Paris." The row still keeps the thinking.`;
+      }
+      prov.addEventListener("change", showPay2);
+    </script>
+  </body>
+</html>

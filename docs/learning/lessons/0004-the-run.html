@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 4 · The run</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 4</p>
+      <h1>The run</h1>
+      <p class="subtitle">
+        One loop drains the model, saves every second, and decides how the Message ends.
+      </p>
+      <p class="meta">
+        About 15 minutes · a browser · you'll write <code>finalFields</code> (how a run ends) and
+        <code>writeTimes</code> (when it saves)
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Run</dt>
+          <dd>
+            The work that writes one assistant Message, from <code>startRun</code> until its
+            <code>finally</code> block ends.
+          </dd>
+          <dt>Chunk</dt>
+          <dd>
+            One small event from the model's stream, such as a few words of text. TanStack AI calls
+            it a <code>StreamChunk</code>.
+          </dd>
+          <dt>Snapshot</dt>
+          <dd>A save of the Message's parts so far into its row in Postgres.</dd>
+          <dt>Status</dt>
+          <dd>
+            The state of a Message row: <code>streaming</code>, <code>complete</code>,
+            <code>stopped</code> or <code>error</code>.
+          </dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <h2>Warm-up</h2>
+      <div
+        class="quiz"
+        data-answer="1"
+        data-why='handleChat&apos;s transaction inserts the assistant Message with status "streaming" and empty parts, and only then calls startRun (Lesson 3).'
+      >
+        <div class="label">Warm-up · Lesson 3</div>
+        <p class="q">
+          At the moment <code>startRun</code> begins, what status does the assistant Message's row
+          have in Postgres?
+        </p>
+        <ol class="opts">
+          <li data-why="complete is written only by the run's finally block, at the end.">
+            complete
+          </li>
+          <li>streaming</li>
+          <li data-why="The row already exists: handleChat wrote it before any chunk arrived.">
+            missing
+          </li>
+          <li data-why="stopped needs a Stop call, and nothing has run yet.">stopped</li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span>One loop, two outputs</h2>
+      <figure id="flow">
+        <figcaption>
+          Follow one chunk: it goes into the parts and down the channel at the same time.
+        </figcaption>
+      </figure>
+      <p>
+        Think of the run as a cook with an order ticket. The cook finishes the dish whether or not a
+        waiter is there to carry plates. In the picture, each chunk from <code>chat()</code> goes
+        two ways: into the parts builder, which collects the Message's text, and into the chunk
+        channel, which carries it to the browser.
+      </p>
+      <p>
+        <code>startRun</code> doesn't wait for the loop. It starts the loop with
+        <code>void (async () =&gt; { … })()</code> and at once returns <code>listener.chunks</code>,
+        which <code>handleChat</code> turns into the SSE response. It also puts its
+        <code>AbortController</code> in <code>deps.runs</code>, so Stop can find it (Lesson 7).
+      </p>
+
+      <h2><span class="num">2</span>The chunk channel: one reader, then silence</h2>
+      <figure id="chan">
+        <div class="toy-out">
+          <button class="btn" type="button" data-act="push">Chunk arrives</button>
+          <button class="btn" type="button" data-act="read">Reader takes one</button>
+          <button class="btn" type="button" data-act="leave">Reader leaves</button>
+          <button class="btn" type="button" data-act="reset">Reset</button>
+          <div id="chan-out">Press "Chunk arrives" a few times.</div>
+        </div>
+        <figcaption>
+          Press "Reader leaves", then add chunks: the run keeps pushing, and the channel drops them.
+        </figcaption>
+      </figure>
+      <p>
+        The reader is the SSE response. When the browser closes the tab, the response calls
+        <code>return()</code> on the channel's iterator, which sets <code>detached</code> and
+        empties the buffer. After that, <code>push</code> drops every chunk, but the loop in section
+        1 never notices.
+      </p>
+      <p>
+        The iterator is written by hand on purpose. An async generator's <code>return()</code> waits
+        for the pending <code>next()</code>, so a disconnect would hang until the model sent its
+        next chunk.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="3"
+        data-why="Closing the tab only detaches the reader. The loop drains chat() to the end, and finally saves the whole text as complete."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          A reply has 10 chunks. The user closes the tab after chunk 3. What does the row hold when
+          the run ends?
+        </p>
+        <ol class="opts">
+          <li data-why="Closing a tab is not Stop. Only chat.stop aborts the run.">
+            Only three chunks, status stopped.
+          </li>
+          <li data-why="Nothing deletes a Message row when a reader leaves.">
+            No chunks, the row deleted.
+          </li>
+          <li data-why="finally always writes a final status; streaming never stays.">
+            Three chunks, status still streaming.
+          </li>
+          <li>All ten chunks, status complete.</li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">3</span>A snapshot every second, if something changed</h2>
+      <figure id="timeline">
+        <figcaption>
+          Blue dots are chunks; a red mark is a save. The tick at 2 s saves nothing.
+        </figcaption>
+      </figure>
+      <p>
+        Each chunk sets <code>changed = true</code>. A timer fires every
+        <code>snapshotIntervalMs</code> (1,000 ms in <code>defaultLimits</code>), and it saves only
+        when <code>changed</code> is true, then sets it back to false. Here is the run in the
+        picture:
+      </p>
+      <ol class="steps">
+        <li>Chunks arrive at 200 and 500 ms, so the tick at 1,000 ms saves.</li>
+        <li>No chunk arrives between 1,000 and 2,000 ms, so the tick at 2,000 ms skips.</li>
+        <li>
+          A chunk at 2,600 ms makes the tick at 3,000 ms save. At 3,100 ms the run ends, and
+          <code>finally</code> saves once more.
+        </li>
+      </ol>
+      <p>
+        Every save goes through <code>write</code>, which chains it onto the last one (<code
+          >writes = writes.then(…)</code
+        >). So a slow save can never land after a newer one, and the final save waits for all
+        earlier ones.
+      </p>
+
+      <h2><span class="num">4</span>The <code>finally</code> block decides how it ends</h2>
+      <figure>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>What happened</th>
+                <th>Fields saved</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>The 5-minute cap fired (<code>timedOut</code>)</td>
+                <td><code>status: "error"</code>, <code>error: "timed out"</code></td>
+              </tr>
+              <tr>
+                <td>Stop aborted the controller</td>
+                <td><code>status: "stopped"</code></td>
+              </tr>
+              <tr>
+                <td><code>chat()</code> threw, or sent a <code>RUN_ERROR</code> chunk</td>
+                <td><code>status: "error"</code>, the message, and <code>errorReason</code></td>
+              </tr>
+              <tr>
+                <td>None of these</td>
+                <td><code>status: "complete"</code>, then <code>titleConversation</code></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <figcaption>The rows are checked from the top down; the first match wins.</figcaption>
+      </figure>
+      <p>
+        The order matters. The cap ends a run by calling <code>abortController.abort()</code>, the
+        same call as Stop, so a timed-out run is also aborted. That is why <code>timedOut</code> is
+        checked first. <code>errorReasonOf</code> turns the Provider's code into a reason:
+        <code>"401"</code> becomes <code>invalid_key</code>, and <code>"429"</code> becomes
+        <code>rate_limited</code>.
+      </p>
+      <p>
+        Before the save, <code>finally</code> clears both timers and marks a running web search
+        <code>cancelled</code>. After it, the run leaves <code>deps.runs</code> and closes the
+        channel. Only a <code>complete</code> run starts a title, without waiting for it (Lesson
+        13).
+      </p>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <figure id="badges">
+        <figcaption>
+          Your <code>finalFields</code> picks the badge on each of these four runs.
+        </figcaption>
+      </figure>
+      <div id="ex2"></div>
+      <figure id="mytimeline">
+        <div class="toy-out">
+          <button class="btn" type="button" id="reroll">New random run</button>
+          <span id="tl-note"
+            >Pass the tests first. Then your <code>writeTimes</code> marks the saves.</span
+          >
+        </div>
+        <figcaption>
+          Your <code>writeTimes</code> puts the red save marks on a random run.
+        </figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> the run drains <code>chat()</code> to the
+          end on its own; the browser is only an optional reader.
+        </p>
+        <ul>
+          <li>
+            <strong>Two outputs.</strong> Each chunk goes into the parts (saved to Postgres) and
+            down the channel (sent to the browser).
+          </li>
+          <li>
+            <strong>Saves are cheap and ordered.</strong> At most one snapshot a second, only when
+            something changed, chained so they land in order.
+          </li>
+          <li>
+            <strong><code>finally</code> picks the status.</strong> Timed out, then stopped, then
+            error, else complete; only complete gets a title.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box and say each point out loud, then recite the four rows of the
+          status table in order.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>The tests that pin this down</h3>
+        <p>
+          In
+          <a href="../../../packages/api/src/chat/handle-chat.integration.test.ts"
+            ><code>handle-chat.integration.test.ts</code></a
+          >, read "keeps running to the end when the client disconnects" (it cancels the reader
+          after one read and still expects <code>complete</code> with the full text) and "writes
+          snapshots of the assistant Message while it streams". The tests set
+          <code>snapshotIntervalMs: 20</code> and <code>runCapMs: 100</code> through
+          <code>deps.limits</code>, so they don't wait seconds.
+        </p>
+        <h3>How the parts builder joins text</h3>
+        <p>
+          <code>createPartsBuilder</code> in
+          <a href="../../../packages/api/src/chat/parts.ts"><code>parts.ts</code></a> appends a text
+          delta to the last text part when it has the same <code>messageId</code>; otherwise it
+          starts a new text part. So text before and after a web search stays in two parts, with the
+          search between them. Each snapshot also writes <code>searchText</code>, the plain text
+          used to search history.
+        </p>
+        <h3>Async iteration</h3>
+        <p>
+          The loop is a
+          <a
+            href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of"
+            ><code>for await...of</code></a
+          >
+          over the stream. The channel is a plain object with <code>next()</code> and
+          <code>return()</code>, which is all that <code>for await</code> needs.
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          A write in <code>write()</code> fails because Postgres is down for a moment. Read
+          <code>write</code> in
+          <a href="../../../packages/api/src/chat/run.ts"><code>run.ts</code></a> and tell your
+          teacher what happens to the next snapshot, and why the <code>.catch</code> is on the chain
+          and not on the caller.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="../../../docs/adr/0002-runs-outlive-the-client.md"
+            >ADR 0002: Assistant runs outlive the client</a
+          >, then
+          <a href="../../../packages/api/src/chat/run.ts"
+            ><code>packages/api/src/chat/run.ts</code></a
+          >
+          top to bottom (272 lines).
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude) anything: "why not save on
+          every chunk?", "show me where the channel's return() is called", or "quiz me again".
+        </p>
+        <div class="nav">
+          <a href="0003-handle-chat-checks-then-writes.html"
+            >← Lesson 3: handleChat checks, then writes</a
+          ><a href="0005-the-message-tree.html">Lesson 5: The Message tree →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="4"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // Section 1: one loop, two outputs.
+      function flow(dotT = null, cut = false) {
+        const dot =
+          dotT === null
+            ? ""
+            : (() => {
+                const t = dotT;
+                if (t < 0.4) return D.dot(70 + (240 - 70) * (t / 0.4), 115, 7, { tone: "blue" });
+                const u = (t - 0.4) / 0.6;
+                return (
+                  D.dot(320 + 140 * u, 115 - 62 * u, 7, { tone: "ok" }) +
+                  (cut ? "" : D.dot(320 + 140 * u, 115 + 62 * u, 7, { tone: "blue" }))
+                );
+              })();
+        return (
+          D.box(10, 90, 120, 50, "chat()", { mono: true, sub: "the model's stream" }) +
+          D.box(170, 90, 150, 50, "for await (chunk)", { mono: true, sub: "the run's loop" }) +
+          D.box(380, 30, 190, 46, "parts.add(chunk)", {
+            mono: true,
+            sub: "parts builder",
+            tone: "ok",
+          }) +
+          D.box(380, 154, 190, 46, "listener.push(chunk)", {
+            mono: true,
+            sub: "chunk channel",
+            tone: "blue",
+          }) +
+          D.box(610, 30, 140, 46, "message row", { sub: "snapshot each 1 s", tone: "accent" }) +
+          D.box(610, 154, 140, 46, cut ? "(reader left)" : "Browser", {
+            sub: "SSE",
+            tone: cut ? "" : "blue",
+          }) +
+          D.arrow(130, 115, 170, 115) +
+          D.arrow(320, 105, 380, 60, { tone: "ok" }) +
+          D.arrow(320, 125, 380, 172, { tone: "blue" }) +
+          D.arrow(570, 53, 610, 53, { tone: "accent" }) +
+          (cut
+            ? D.text(590, 190, "✗", { tone: "accent", size: 22, anchor: "middle", weight: 700 })
+            : D.arrow(570, 177, 610, 177, { tone: "blue" })) +
+          dot
+        );
+      }
+      D.render(
+        "#flow",
+        D.svg(760, 220, flow(), {
+          label: "Each chunk goes to the parts builder and to the chunk channel",
+        }),
+      );
+
+      // Section 2: the chunk channel toy.
+      const chan = { buffer: [], detached: false, next: 1, dropped: 0 };
+      const chanFig = document.getElementById("chan"),
+        chanOut = document.getElementById("chan-out");
+      function drawChan() {
+        const boxes = chan.buffer
+          .slice(0, 6)
+          .map((n, i) => D.box(200 + i * 56, 55, 46, 40, `#${n}`, { tone: "blue", mono: true }))
+          .join("");
+        const svg = D.svg(
+          760,
+          150,
+          D.box(10, 50, 140, 50, "run loop", { sub: "push(chunk)", tone: "ok" }) +
+            `<rect class="d-box ghost" x="185" y="40" width="360" height="70" rx="8"/>` +
+            D.text(365, 128, `buffer${chan.detached ? " (emptied, detached = true)" : ""}`, {
+              anchor: "middle",
+              tone: "muted",
+              size: 12,
+            }) +
+            boxes +
+            D.arrow(150, 75, 185, 75) +
+            D.arrow(545, 75, 590, 75, { tone: chan.detached ? "faint" : "blue" }) +
+            D.box(590, 50, 160, 50, chan.detached ? "reader left" : "reader", {
+              sub: chan.detached ? "return() called" : "the SSE response",
+              tone: chan.detached ? "" : "blue",
+            }) +
+            (chan.dropped
+              ? D.text(365, 22, `${chan.dropped} chunk(s) dropped`, {
+                  anchor: "middle",
+                  tone: "accent",
+                  weight: 600,
+                })
+              : ""),
+          { label: "The chunk channel's buffer and its one reader" },
+        );
+        chanFig.querySelector("svg")?.remove();
+        D.render(chanFig, svg);
+      }
+      chanFig.addEventListener("click", (e) => {
+        const act = e.target.dataset?.act;
+        if (!act) return;
+        if (act === "reset")
+          Object.assign(chan, { buffer: [], detached: false, next: 1, dropped: 0 });
+        if (act === "push") {
+          const n = chan.next++;
+          if (chan.detached) {
+            chan.dropped++;
+            chanOut.textContent = `Chunk #${n}: the loop pushed it, and the channel dropped it. The parts still got it.`;
+          } else {
+            chan.buffer.push(n);
+            chanOut.textContent = `Chunk #${n} waits in the buffer for the reader.`;
+          }
+        }
+        if (act === "read") {
+          const n = chan.buffer.shift();
+          chanOut.textContent = chan.detached
+            ? "The reader is gone."
+            : n
+              ? `The reader took #${n} and sent it to the browser.`
+              : "The buffer is empty, so next() waits for a chunk.";
+        }
+        if (act === "leave" && !chan.detached) {
+          chan.detached = true;
+          chan.buffer.length = 0;
+          chanOut.textContent = "return(): detached = true, buffer emptied. The run doesn't know.";
+        }
+        drawChan();
+      });
+      drawChan();
+
+      // Section 3: the snapshot timeline (reused by the payoff).
+      function timeline(chunks, end, writes, interval = 1000) {
+        const x = (ms) => 40 + (ms / end) * 680;
+        let s = `<line class="d-line" x1="40" y1="70" x2="720" y2="70"/>`;
+        for (let t = interval; t < end; t += interval) {
+          const saved = writes.includes(t);
+          s +=
+            `<line class="d-line faint" x1="${x(t)}" y1="40" x2="${x(t)}" y2="100"/>` +
+            D.text(x(t), 112, `${t / 1000} s`, { anchor: "middle", tone: "muted", size: 12 }) +
+            (saved ? "" : D.text(x(t), 28, "skip", { anchor: "middle", tone: "muted", size: 12 }));
+        }
+        s += chunks.map((c) => D.dot(x(c), 70, 6, { tone: "blue" })).join("");
+        s += writes
+          .map((w) =>
+            w === end
+              ? `<polygon class="d-head accent" points="${x(w) - 7},100 ${x(w) + 7},100 ${x(w)},86"/>` +
+                D.text(x(w), 128, `final save at ${end} ms`, {
+                  anchor: "end",
+                  tone: "accent",
+                  size: 12,
+                  weight: 600,
+                })
+              : `<polygon class="d-head accent" points="${x(w) - 7},40 ${x(w) + 7},40 ${x(w)},54"/>` +
+                D.text(x(w), 28, "save", {
+                  anchor: "middle",
+                  tone: "accent",
+                  size: 12,
+                  weight: 600,
+                }),
+          )
+          .join("");
+        return s;
+      }
+      D.render(
+        "#timeline",
+        D.svg(760, 140, timeline([200, 500, 2600], 3100, [1000, 3000, 3100]), {
+          label: "Chunks and saves on a timeline",
+        }),
+      );
+
+      // Video.
+      const statuses = [
+        ["complete", "ok"],
+        ["stopped", "warn"],
+        ["error", "accent"],
+      ];
+      Explainer.mount("#video", {
+        title: "Lesson 4 in about 1 minute",
+        width: 760,
+        height: 220,
+        scenes: [
+          {
+            say: "A run starts when handle chat calls start run. The Message row already says streaming.",
+            show: 'handleChat → startRun(…). The row already says status: "streaming".',
+            draw: (t, A) =>
+              A.fade(
+                t,
+                0,
+                0.3,
+                D.box(40, 80, 220, 56, "startRun(deps, …)", { mono: true, tone: "ok" }),
+              ) +
+              A.fade(t, 0.35, 0.65, D.arrow(260, 108, 420, 108)) +
+              A.fade(
+                t,
+                0.5,
+                0.8,
+                D.box(420, 80, 280, 56, "message row", {
+                  sub: "status: streaming",
+                  tone: "accent",
+                }),
+              ),
+          },
+          {
+            say: "Each chunk from chat goes two ways: into the parts, and down the channel to the browser.",
+            draw: (t) => flow((t * 2) % 1),
+          },
+          {
+            say: "Every second, if something changed, the run saves a snapshot of the parts.",
+            draw: (t, A) => {
+              const end = 3100,
+                now = A.lerp(0, end, t);
+              return (
+                timeline(
+                  [200, 500, 2600].filter((c) => c <= now),
+                  end,
+                  [1000, 3000, 3100].filter((w) => w <= now),
+                ) + D.text(40, 150, `${Math.round(now)} ms`, { tone: "muted", mono: true })
+              );
+            },
+          },
+          {
+            say: "If the browser leaves, the channel drops its chunks. The loop keeps going to the end.",
+            draw: (t) => flow((t * 2) % 1, true),
+          },
+          {
+            say: "When chat ends, the finally block picks the status. Now write final fields, and write times.",
+            show: "finally: timed out → stopped → error → complete. Next: write finalFields and writeTimes.",
+            draw: (t) => {
+              const [s, tone] = statuses[Math.min(2, Math.floor(t * 3))];
+              return D.box(230, 70, 300, 70, `status: "${s}"`, {
+                mono: true,
+                tone,
+                sub: "saved in finally",
+              });
+            },
+          },
+        ],
+      });
+
+      // Exercise 1: finalFields.
+      const REASON_SRC = `function errorReasonOf(code) {
+  switch (code) {
+    case "401": case "403": case "invalid_api_key": return "invalid_key";
+    case "429": case "rate_limit_exceeded": case "insufficient_quota": return "rate_limited";
+    default: return "provider_error";
+  }
+}`;
+      const sorted =
+        "((...a) => { const r = finalFields(...a); return r && typeof r === 'object' ? Object.fromEntries(Object.entries(r).sort()) : r; })";
+      const SCENARIOS = [
+        {
+          label: "Nothing went wrong",
+          args: { timedOut: false, aborted: false, error: undefined },
+        },
+        { label: "User pressed Stop", args: { timedOut: false, aborted: true, error: undefined } },
+        { label: "Cap fired at 5 min", args: { timedOut: true, aborted: true, error: undefined } },
+        {
+          label: "Provider said 429",
+          args: { timedOut: false, aborted: false, error: { message: "Slow down", code: "429" } },
+        },
+      ];
+      let finalFn = null;
+      function drawBadges() {
+        const fig = document.getElementById("badges");
+        fig.querySelector("svg")?.remove();
+        const tones = { complete: "ok", stopped: "warn", error: "accent" };
+        D.render(
+          fig,
+          D.svg(
+            760,
+            110,
+            SCENARIOS.map((sc, i) => {
+              let out = null;
+              try {
+                out = finalFn ? finalFn(sc.args) : null;
+              } catch {
+                out = null;
+              }
+              const x = 10 + i * 187;
+              return (
+                D.text(x + 86, 18, sc.label, { anchor: "middle", size: 13, weight: 600 }) +
+                D.box(x, 34, 172, 60, out ? out.status : "?", {
+                  mono: true,
+                  tone: out ? tones[out.status] || "" : "",
+                  sub: out ? out.errorReason || out.error || "" : "pass the tests",
+                })
+              );
+            }).join(""),
+            { label: "Four runs and the status your finalFields gives each" },
+          ),
+        );
+      }
+      drawBadges();
+      Exercise.mount("#ex1", {
+        title: "Write finalFields({ timedOut, aborted, error })",
+        task: "Return the fields the <code>finally</code> block saves. <code>error</code> is <code>undefined</code> or <code>{ message, code }</code>.",
+        storageKey: "ai-chat-l4-final-fields",
+        fnName: sorted,
+        starter: `// Given (copied from run.ts):
+${REASON_SRC}
+
+// Example: finalFields({ timedOut: false, aborted: true, error: undefined })
+//   → { status: "stopped" }
+// Hint: the cap aborts too, so check timedOut first, then aborted, then error.
+function finalFields({ timedOut, aborted, error }) {
+  return { status: "complete" };
+}`,
+        solution: `${REASON_SRC}
+
+function finalFields({ timedOut, aborted, error }) {
+  if (timedOut) return { status: "error", error: "timed out" };
+  if (aborted) return { status: "stopped" };
+  if (error !== undefined) {
+    return { status: "error", error: error.message, errorReason: errorReasonOf(error.code) };
+  }
+  return { status: "complete" };
+}`,
+        tests: [
+          {
+            name: "nothing went wrong → complete",
+            args: [{ timedOut: false, aborted: false }],
+            expect: { status: "complete" },
+          },
+          {
+            name: "Stop pressed → stopped",
+            args: [{ timedOut: false, aborted: true }],
+            expect: { status: "stopped" },
+          },
+          {
+            name: 'cap fired (timedOut and aborted) → error, "timed out"',
+            args: [{ timedOut: true, aborted: true }],
+            expect: { error: "timed out", status: "error" },
+          },
+          {
+            name: 'Provider code "401" → error with invalid_key',
+            args: [{ timedOut: false, aborted: false, error: { message: "bad key", code: "401" } }],
+            expect: { error: "bad key", errorReason: "invalid_key", status: "error" },
+          },
+          {
+            name: 'Provider code "429" → error with rate_limited',
+            args: [
+              { timedOut: false, aborted: false, error: { message: "slow down", code: "429" } },
+            ],
+            expect: { error: "slow down", errorReason: "rate_limited", status: "error" },
+          },
+          {
+            name: "Stop, then an error chunk came in → stopped",
+            args: [{ timedOut: false, aborted: true, error: { message: "x", code: "500" } }],
+            expect: { status: "stopped" },
+          },
+        ],
+        onResult(fn, all) {
+          finalFn = all ? fn : null;
+          drawBadges();
+        },
+      });
+
+      // Exercise 2: writeTimes.
+      let writeFn = null;
+      const tlFig = document.getElementById("mytimeline");
+      function drawMine() {
+        tlFig.querySelector("svg")?.remove();
+        if (!writeFn) return;
+        const end = 1500 + Math.floor(Math.random() * 3) * 1000 + 300;
+        const chunks = [];
+        for (let t = 50; t < end; t += 150 + Math.random() * 900) chunks.push(Math.round(t));
+        let writes = [];
+        try {
+          writes = writeFn(chunks, 1000, end) || [];
+        } catch {
+          writes = [];
+        }
+        document.getElementById("tl-note").textContent =
+          `Your writeTimes saved at ${writes.join(", ")} ms.`;
+        D.render(
+          tlFig,
+          D.svg(
+            760,
+            140,
+            timeline(
+              chunks.filter((c) => c % 1000 !== 0),
+              end,
+              writes,
+            ),
+            { label: "A random run with your save marks" },
+          ),
+        );
+      }
+      document.getElementById("reroll").addEventListener("click", drawMine);
+      Exercise.mount("#ex2", {
+        title: "Write writeTimes(chunkTimes, interval, end)",
+        task: "Return the times (ms) when the run saves: each tick that saw a new chunk, then the final save at <code>end</code>.",
+        storageKey: "ai-chat-l4-write-times",
+        fnName: "writeTimes",
+        starter: `// Ticks fire at interval, 2 × interval, … while they are before end.
+// A tick saves only if a chunk arrived since the tick before it.
+// Example: writeTimes([200, 500, 2600], 1000, 3100) → [1000, 3000, 3100]
+// Hint: keep a "changed" flag, like run.ts does.
+function writeTimes(chunkTimes, interval, end) {
+  return [end];
+}`,
+        solution: `function writeTimes(chunkTimes, interval, end) {
+  const writes = [];
+  let last = 0;
+  for (let tick = interval; tick < end; tick += interval) {
+    const changed = chunkTimes.some((t) => t > last && t <= tick);
+    if (changed) writes.push(tick);
+    last = tick;
+  }
+  return [...writes, end];
+}`,
+        tests: [
+          {
+            name: "the run in section 3 → saves at 1000, 3000, then final 3100",
+            args: [[200, 500, 2600], 1000, 3100],
+            expect: [1000, 3000, 3100],
+          },
+          {
+            name: "a chunk every second → every tick saves",
+            args: [[100, 1100, 2100], 1000, 2200],
+            expect: [1000, 2000, 2200],
+          },
+          {
+            name: "no chunks at all → only the final save",
+            args: [[], 1000, 2500],
+            expect: [2500],
+          },
+          {
+            name: "a run shorter than one second → only the final save",
+            args: [[100, 300], 1000, 800],
+            expect: [800],
+          },
+          {
+            name: "chunks only after 2 s → first save at 3000",
+            args: [[2100, 2900], 1000, 3500],
+            expect: [3000, 3500],
+          },
+        ],
+        onResult(fn, all) {
+          writeFn = all ? fn : null;
+          drawMine();
+        },
+      });
+    </script>
+  </body>
+</html>

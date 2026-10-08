@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 3 · handleChat: check, then write</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 3</p>
+      <h1>handleChat: check, then write</h1>
+      <p class="subtitle">Every check runs before the first row is written.</p>
+      <p class="meta">
+        About 13 minutes · a browser · you'll write <code>firstRefusal(req)</code>, which finds the
+        check that stops a send
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Refusal</dt>
+          <dd>
+            An early error <code>Response</code> from <code>refuse(status, message)</code>. It ends
+            <code>handleChat</code> before any write.
+          </dd>
+          <dt>Transaction</dt>
+          <dd>
+            A group of database statements that all happen or none happen. Drizzle opens one with
+            <code>deps.db.transaction(…)</code>.
+          </dd>
+          <dt>Row lock</dt>
+          <dd>
+            <code>.for("update")</code> on a select. Other transactions that lock the same row wait
+            until this one ends.
+          </dd>
+          <dt>Streaming row</dt>
+          <dd>
+            An assistant Message with <code>status: "streaming"</code> and no parts yet, written
+            before the reply starts.
+          </dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <div
+        class="quiz"
+        data-answer="2"
+        data-why="A regenerate answers the same user Message again, so the command has a parentId but no text."
+      >
+        <div class="label">Warm-up · Lesson 2</div>
+        <p class="q">From memory: which field does a regenerate's ChatCommand leave out?</p>
+        <ol class="opts">
+          <li data-why="parentId is there: it is the user Message above the reply.">
+            <code>parentId</code>
+          </li>
+          <li data-why="model is always there; the server checks it on every command.">
+            <code>model</code>
+          </li>
+          <li><code>text</code></li>
+          <li data-why="Every command names its Conversation."><code>conversationId</code></li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span>The check-in desk</h2>
+      <figure id="ladder">
+        <figcaption>
+          A send goes down the ladder; the first failed check returns its status, and nothing is
+          written.
+        </figcaption>
+      </figure>
+      <p>
+        Think of an airport. Every check happens at the desk, and you walk to the plane only when
+        all of them pass. <code>handleChat</code> in
+        <a href="../../../packages/api/src/chat/handle-chat.ts"><code>handle-chat.ts</code></a>
+        works the same way, and its own comment says so: "Everything that can fail runs before the
+        Messages are written."
+      </p>
+      <p>
+        This matters because a half-written send is worse than none. If the streaming row were
+        written and then a credentials check failed, that row would stay <code>streaming</code>, and
+        every later send to the Conversation would get 409.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="3"
+        data-why="findConversation only matches a Conversation the user owns, so someone else's looks exactly like a missing one: 404. Nobody learns that the id exists."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          A signed-in user sends a valid command with another user's <code>conversationId</code>.
+          Which status comes back?
+        </p>
+        <ol class="opts">
+          <li data-why="401 is only for no session at all.">401</li>
+          <li
+            data-why="handleChat never says 403: that would tell the caller the Conversation exists."
+          >
+            403
+          </li>
+          <li data-why="409 is the one-run rule, much further down the ladder.">409</li>
+          <li>404</li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">2</span>One run per Conversation</h2>
+      <figure id="race">
+        <figcaption>
+          B's lock waits for A's transaction to end, so B sees A's streaming row.
+        </figcaption>
+      </figure>
+      <p>
+        Two tabs can press Send at the same moment. Without a lock, both could look for a streaming
+        row, find none, and both start a run. So the transaction first locks the Conversation row
+        with <code>.for("update")</code>; Postgres makes any other locker of that row wait until
+        this transaction ends.
+      </p>
+      <ol class="steps">
+        <li>A locks the row, finds no streaming Message and inserts its streaming row.</li>
+        <li>B asks for the same lock and waits.</li>
+        <li>
+          A commits, so B gets the lock, finds A's streaming row and returns
+          <code>"streaming"</code>, which becomes 409.
+        </li>
+      </ol>
+
+      <h2><span class="num">3</span>What the transaction writes</h2>
+      <figure id="writes">
+        <figcaption>
+          A send writes two Messages; a regenerate writes only the reply, under the old user
+          Message.
+        </figcaption>
+      </figure>
+      <p>
+        Look at the left tree. Inside the same transaction, <code>handleChat</code> inserts the user
+        Message (<code>complete</code>) and, under it, the assistant Message
+        (<code>streaming</code>, empty parts) with a <code>createdAt</code> one millisecond later,
+        so it always sorts after its parent. Then it links the attachments and sets the
+        Conversation's <code>activeLeafId</code>, <code>lastMessageAt</code> and <code>model</code>.
+      </p>
+      <p>
+        Both ids come from <code>uuidv7()</code> on the server; the client's ids are never stored.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="The one-run check looks for a streaming row, and a reloaded page polls until nothing is streaming. Both need the row to exist before the reply starts."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">Why is the empty streaming reply written before the run starts?</p>
+        <ol class="opts">
+          <li>So other sends see it.</li>
+          <li data-why="Writing a row first makes nothing faster.">So the reply streams faster.</li>
+          <li data-why="The Provider gets the history as model messages; it never reads our rows.">
+            So the Provider reads it.
+          </li>
+          <li
+            data-why="useChat gets the server's ids only by fetching the Active Branch after the stream."
+          >
+            So useChat gets its id.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">4</span>Then, and only then, the stream</h2>
+      <figure id="stream">
+        <figcaption>
+          After the commit, the run starts and its chunks become the SSE response.
+        </figcaption>
+      </figure>
+      <p>
+        After the transaction commits, <code>handleChat</code> calls
+        <code>startRun(deps, { messageId, adapter, messages, webSearch })</code> and returns
+        <code>toServerSentEventsResponse(chunks)</code>. The adapter and the model messages were
+        built during the checks, so the steps that can fail are already behind it. Lesson 4 opens
+        <code>startRun</code>.
+      </p>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <figure id="payoff">
+        <div class="toy-out">
+          <button class="btn" type="button" data-case="ok">A normal send</button>
+          <button class="btn" type="button" data-case="nokey">No Provider credentials</button>
+          <button class="btn" type="button" data-case="regen">Regenerate under a reply</button>
+          <button class="btn" type="button" data-case="race">Second tab</button>
+          <div id="pay-out">
+            Pass the tests first. Then these requests go down the ladder with your
+            <code>firstRefusal</code>.
+          </div>
+        </div>
+        <div id="pay-pic"></div>
+        <figcaption>
+          Your <code>firstRefusal</code> picks the step; the ladder shows where the request stopped.
+        </figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> <code>handleChat</code> checks everything
+          first, writes in one locked transaction, and only then starts the run.
+        </p>
+        <ul>
+          <li>
+            <strong>The ladder.</strong> Session, command, ownership, Model, credentials, parent,
+            attachments. The first failure returns its status, and nothing is written.
+          </li>
+          <li>
+            <strong>One run per Conversation.</strong> The row lock queues sends, so a second send
+            sees the streaming row and gets 409.
+          </li>
+          <li>
+            <strong>The writes.</strong> User Message, empty streaming reply, attachment links, then
+            <code>activeLeafId</code> moves to the reply.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box and say each point out loud, then write the ladder from memory
+          with its statuses.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>What the row lock does</h3>
+        <blockquote>
+          "FOR UPDATE causes the rows retrieved by the SELECT statement to be locked as though for
+          update. This prevents them from being locked, modified or deleted by other transactions
+          until the current transaction ends." (<a
+            href="https://www.postgresql.org/docs/current/explicit-locking.html"
+            >PostgreSQL: Explicit Locking</a
+          >)
+        </blockquote>
+        <p>
+          <code>switchBranch</code> in <code>api/src/chat/store.ts</code> takes the same lock, so a
+          Branch switch can't slip in while a send is being written. See
+          <a href="https://orm.drizzle.team/docs/transactions">Drizzle: Transactions</a> for the
+          API.
+        </p>
+        <h3>Two attachment locks</h3>
+        <p>
+          <code>lockAttachments</code> uses <code>.for("key share")</code>, a weaker lock, so the
+          orphan cleanup can't delete an uploaded file between the checks and
+          <code>linkAttachments</code>. If a file is gone by then, the send returns 404 "Attachment
+          not found".
+        </p>
+        <h3>Unusual statuses</h3>
+        <p>
+          An invalid command is 400, a missing Conversation is 404, and an attachment problem is 404
+          (not yours) or 400 (wrong type, over 5 MB, Branch over 20 MB), from
+          <code>attachmentsForSend</code>.
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          Find the test for the one-run rule in
+          <a href="../../../packages/api/src/chat/handle-chat.integration.test.ts"
+            ><code>handle-chat.integration.test.ts</code></a
+          >. How does it keep the first reply <code>streaming</code> while it sends the second (look
+          at <code>manual: true</code> and <code>fake.releaseAll()</code>)? Does it test the row
+          lock itself, or only the streaming-row check? Explain it to your teacher.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="../../../packages/api/src/chat/handle-chat.ts"><code>handle-chat.ts</code></a>
+          (179 lines; read it top to bottom with the ladder beside you), then
+          <a href="../../adr/0002-runs-outlive-the-client.md">ADR 0002</a> for the one-run rule.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude) anything: "why 404 and not
+          403?", "what does resolveModel check?", or "quiz me again".
+        </p>
+        <div class="nav">
+          <a href="0002-the-chat-command.html">← Lesson 2: The chat command</a
+          ><a href="0004-the-run.html">Lesson 4: The run →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="3"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // The ladder, in handleChat's order.
+      const STEPS = [
+        ["auth", "Signed in?", "401"],
+        ["command", "forwardedProps is a valid ChatCommand?", "400"],
+        ["regenerate-attachments", "A regenerate adds no attachments?", "400"],
+        ["owned", "The Conversation is yours?", "404"],
+        ["model", "The Model is available?", "400"],
+        ["credentials", "You have Provider credentials for it?", "400"],
+        ["parent", "parentId is in this Conversation?", "400"],
+        ["regenerate-parent", "A regenerate answers a user Message?", "400"],
+        ["attachments", "Attachments are yours, readable, small enough?", "404/400"],
+        ["one-run", "In the transaction: nothing streaming?", "409"],
+      ];
+      const ladder = (stopAt = null, dotY = null) => {
+        const stop = STEPS.findIndex(([k]) => k === stopAt);
+        const rows = STEPS.map(([key, label, status], i) => {
+          const y = 8 + i * 34 + (i === 9 ? 22 : 0);
+          const tone =
+            i === stop ? "accent" : stop >= 0 && i < stop ? "ok" : stopAt === "started" ? "ok" : "";
+          return (
+            D.box(20, y, 470, 28, label, { tone }) +
+            D.text(510, y + 14, status, {
+              tone: i === stop ? "accent" : "muted",
+              weight: 600,
+              mono: true,
+            })
+          );
+        }).join("");
+        const line = 8 + 9 * 34 + 8;
+        return (
+          rows +
+          D.route(
+            [
+              [16, line],
+              [600, line],
+            ],
+            { tone: "warn", dashed: true },
+          ).replace(/<polygon[^>]*>/, "") +
+          D.text(610, line, "first write", { tone: "warn", size: 12, weight: 600 }) +
+          D.box(20, 8 + 10 * 34 + 26, 470, 30, "startRun → SSE response", {
+            tone: stopAt === "started" ? "ok" : "blue",
+            mono: true,
+          }) +
+          (dotY !== null ? D.dot(600, dotY, 7) : "")
+        );
+      };
+      D.render(
+        "#ladder",
+        D.svg(720, 404, ladder(), {
+          label: "The ladder of checks in handleChat, with each refusal status",
+        }),
+      );
+
+      // Section 2: the race.
+      const racePic = (t = 1, A = { step: () => 1, fade: (_t, _a, _b, s) => s }) =>
+        D.text(10, 30, "Tab A", { weight: 600 }) +
+        D.text(10, 110, "Tab B", { weight: 600 }) +
+        D.box(70, 12, 150, 36, "lock row", { tone: "ok", mono: true }) +
+        A.fade(
+          t,
+          0.15,
+          0.3,
+          D.box(230, 12, 200, 36, "insert streaming row", { tone: "ok", mono: true }),
+        ) +
+        A.fade(t, 0.3, 0.45, D.box(440, 12, 110, 36, "commit", { tone: "ok", mono: true })) +
+        A.fade(
+          t,
+          0.05,
+          0.2,
+          D.box(70, 92, 360, 36, "lock row … waits", { tone: "ghost", mono: true }),
+        ) +
+        A.fade(
+          t,
+          0.5,
+          0.65,
+          D.arrow(495, 48, 495, 92, { tone: "ok", dashed: true, label: "lock free" }) +
+            D.box(440, 92, 150, 36, "sees streaming", { tone: "accent", mono: true }),
+        ) +
+        A.fade(t, 0.7, 0.85, D.box(600, 92, 90, 36, "409", { tone: "accent", mono: true }));
+      D.render(
+        "#race",
+        D.svg(720, 140, racePic(), {
+          label: "Two sends at once: the second waits for the lock, then gets 409",
+        }),
+      );
+
+      // Section 3: the writes.
+      const writesPic = () =>
+        D.text(10, 16, "Send / edit", { weight: 600, tone: "muted", size: 13 }) +
+        D.box(10, 30, 210, 40, "parent (or no parent)", { tone: "ghost" }) +
+        D.box(10, 100, 210, 44, "user Message", { tone: "blue", sub: "complete · at now" }) +
+        D.box(10, 174, 210, 44, "assistant Message", {
+          tone: "accent",
+          sub: "streaming · parts [] · now+1ms",
+        }) +
+        D.arrow(115, 70, 115, 100) +
+        D.arrow(115, 144, 115, 174) +
+        D.box(250, 230, 250, 34, "conversation.activeLeafId", { mono: true, tone: "ok" }) +
+        D.route(
+          [
+            [250, 247],
+            [160, 247],
+            [160, 218],
+          ],
+          { tone: "ok" },
+        ) +
+        D.text(390, 16, "Regenerate", { weight: 600, tone: "muted", size: 13 }) +
+        D.box(390, 30, 210, 44, "old user Message", {
+          tone: "blue",
+          sub: "parentId of the command",
+        }) +
+        D.box(390, 104, 160, 40, "old reply", { tone: "ghost" }) +
+        D.box(560, 104, 180, 44, "new assistant", { tone: "accent", sub: "streaming · parts []" }) +
+        D.route([
+          [495, 74],
+          [495, 89],
+          [470, 89],
+          [470, 104],
+        ]) +
+        D.route(
+          [
+            [495, 74],
+            [495, 89],
+            [650, 89],
+            [650, 104],
+          ],
+          { tone: "accent" },
+        );
+      D.render(
+        "#writes",
+        D.svg(760, 272, writesPic(), {
+          label: "Rows the send transaction writes, for a send and for a regenerate",
+        }),
+      );
+
+      // Section 4: then the stream.
+      D.render(
+        "#stream",
+        D.svg(
+          760,
+          80,
+          D.box(10, 18, 150, 44, "commit", { tone: "ok", mono: true }) +
+            D.arrow(160, 40, 200, 40) +
+            D.box(200, 18, 230, 44, "startRun(deps, {…})", {
+              tone: "accent",
+              mono: true,
+              sub: "Lesson 4",
+            }) +
+            D.arrow(430, 40, 470, 40, { label: "chunks" }) +
+            D.box(470, 18, 280, 44, "toServerSentEventsResponse", { tone: "blue", mono: true }),
+          { label: "After the commit, startRun's chunks become the SSE response" },
+        ),
+      );
+
+      // Video.
+      Explainer.mount("#video", {
+        title: "Lesson 3 in about 1 minute",
+        width: 720,
+        height: 404,
+        scenes: [
+          {
+            say: "Every send goes down a ladder of checks before anything is written to the database.",
+            draw: (t, A) => `<g opacity="${A.step(t, 0, 0.3)}">${ladder()}</g>`,
+          },
+          {
+            say: "The first check that fails returns a refusal at once, and the database stays exactly as it was.",
+            show: "No Provider credentials → 400, and nothing is written.",
+            draw: (t, A) =>
+              ladder(
+                t > 0.6 ? "credentials" : null,
+                A.lerp(22, 8 + 5 * 34 + 14, A.ease(A.step(t, 0, 0.6))),
+              ),
+          },
+          {
+            say: "Then one transaction locks the Conversation row, so two sends can never both start a run.",
+            draw: (t, A) => racePic(t, A),
+          },
+          {
+            say: "It writes the user Message, an empty streaming reply, and moves the Active Branch to that reply.",
+            draw: (t, A) =>
+              `<g opacity="${A.step(t, 0, 0.3)}">${writesPic()}</g>` +
+              D.dot(115, A.lerp(50, 196, A.ease(A.step(t, 0.2, 0.9))), 6),
+          },
+          {
+            say: "Only after the commit does the run start and stream back. Now write first refusal, and walk requests down the ladder.",
+            show: "After the commit: startRun → SSE. Next: write firstRefusal(req).",
+            draw: (t, A) => ladder("started", A.lerp(22, 380, A.ease(A.step(t, 0, 0.8)))),
+          },
+        ],
+      });
+
+      // Try it.
+      const OK = {
+        signedIn: true,
+        validCommand: true,
+        text: "Hi",
+        attachmentIds: [],
+        owned: true,
+        modelAvailable: true,
+        hasCredentials: true,
+        parentId: "a1",
+        historyLength: 2,
+        lastRole: "assistant",
+        attachmentsOk: true,
+        streaming: false,
+      };
+      const OK_SRC = `// A request that passes every check:
+const OK = ${JSON.stringify(OK, null, 1).replace(/\n\s*/g, " ")};`;
+      let learnerFn = null;
+      Exercise.mount("#ex1", {
+        title: "Write firstRefusal(req)",
+        task: 'Return the key of the first ladder step that fails, in handleChat\'s order, or <code>"started"</code> when every check passes. The keys: <code>auth, command, regenerate-attachments, owned, model, credentials, parent, regenerate-parent, attachments, one-run</code>.',
+        storageKey: "ai-chat-l3-first-refusal",
+        fnName: "firstRefusal",
+        starter: `${OK_SRC}
+
+// Example: firstRefusal({ ...OK, signedIn: false }) → "auth"
+// Hint: follow the ladder in section 1, top to bottom. A regenerate is a
+// request with text === undefined. "parent" fails when parentId is set
+// but historyLength is 0. "one-run" fails when streaming is true.
+function firstRefusal(req) {
+  if (!req.signedIn) return "auth";
+  return "started";
+}`,
+        solution: `${OK_SRC}
+
+function firstRefusal(req) {
+  const regenerate = req.text === undefined;
+  if (!req.signedIn) return "auth";
+  if (!req.validCommand) return "command";
+  if (regenerate && req.attachmentIds.length > 0) return "regenerate-attachments";
+  if (!req.owned) return "owned";
+  if (!req.modelAvailable) return "model";
+  if (!req.hasCredentials) return "credentials";
+  if (req.parentId && req.historyLength === 0) return "parent";
+  if (regenerate && req.lastRole !== "user") return "regenerate-parent";
+  if (!req.attachmentsOk) return "attachments";
+  if (req.streaming) return "one-run";
+  return "started";
+}`,
+        tests: [
+          { name: "a normal send → started", args: [OK], expect: "started" },
+          {
+            name: "not signed in AND not the owner → auth (401 comes first)",
+            args: [{ ...OK, signedIn: false, owned: false }],
+            expect: "auth",
+          },
+          {
+            name: "someone else's Conversation → owned (404)",
+            args: [{ ...OK, owned: false }],
+            expect: "owned",
+          },
+          {
+            name: "no credentials and a bad parent → credentials (it comes first)",
+            args: [{ ...OK, hasCredentials: false, historyLength: 0 }],
+            expect: "credentials",
+          },
+          {
+            name: "regenerate with an attachment → regenerate-attachments",
+            args: [{ ...OK, text: undefined, attachmentIds: ["f1"] }],
+            expect: "regenerate-attachments",
+          },
+          {
+            name: "regenerate under an assistant Message → regenerate-parent",
+            args: [{ ...OK, text: undefined }],
+            expect: "regenerate-parent",
+          },
+          {
+            name: "regenerate under a user Message → started",
+            args: [{ ...OK, text: undefined, lastRole: "user" }],
+            expect: "started",
+          },
+          {
+            name: "first Message of a Conversation (parentId null, no history) → started",
+            args: [{ ...OK, parentId: null, historyLength: 0, lastRole: undefined }],
+            expect: "started",
+          },
+          {
+            name: "a reply already streaming → one-run (409)",
+            args: [{ ...OK, streaming: true }],
+            expect: "one-run",
+          },
+        ],
+        onResult(fn, all) {
+          learnerFn = all ? fn : null;
+        },
+      });
+      const CASES = {
+        ok: OK,
+        nokey: { ...OK, hasCredentials: false },
+        regen: { ...OK, text: undefined },
+        race: { ...OK, streaming: true },
+      };
+      document.querySelectorAll("#payoff [data-case]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const out = document.getElementById("pay-out");
+          if (!learnerFn) return (out.textContent = "Pass all the tests above first.");
+          const key = learnerFn(CASES[b.dataset.case]);
+          const step = STEPS.find(([k]) => k === key);
+          out.innerHTML = step
+            ? `Stopped at <strong>${step[1]}</strong> → <code>${step[2]}</code>. Nothing was written.`
+            : `<strong>Started.</strong> Two rows written, the run streams back.`;
+          document.getElementById("pay-pic").innerHTML = D.svg(720, 404, ladder(key), {
+            label: "Where this request stopped",
+          });
+        }),
+      );
+    </script>
+  </body>
+</html>

@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 13 · Automatic titles</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 13</p>
+      <h1>Automatic titles</h1>
+      <p class="subtitle">
+        After a reply completes, the server names the Conversation, and the top bar waits for it.
+      </p>
+      <p class="meta">
+        About 12 minutes · a browser · you'll write <code>fallbackTitle(first)</code> and
+        <code>awaitingTitle(conversation)</code>
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Title Model</dt>
+          <dd>
+            The Model that writes titles. The user picks it in Keys &amp; settings; the default is
+            "Same as first reply".
+          </dd>
+          <dt>Fire-and-forget</dt>
+          <dd>
+            Start an async call without waiting for it. Nothing waits, so it must catch its own
+            errors.
+          </dd>
+          <dt>Fallback title</dt>
+          <dd>The first words of the first Message, used when no Model can write a title.</dd>
+          <dt>Polling</dt>
+          <dd>Asking the server again on a timer, here once a second, until the answer changes.</dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="startRun's finally block writes complete, stopped or error, so the server alone decides (Lesson 4)."
+      >
+        <div class="label">Warm-up · Lesson 4</div>
+        <p class="q">
+          Where does a run decide its final status: <code>complete</code>, <code>stopped</code> or
+          <code>error</code>?
+        </p>
+        <ol class="opts">
+          <li>In the finally block.</li>
+          <li data-why="The client only sees the stream close; it never sets a status.">
+            In the client's useChat.
+          </li>
+          <li data-why="The transaction writes the Message as streaming, before the run starts.">
+            Inside handleChat's send transaction.
+          </li>
+          <li data-why="The boot sweep only marks leftover streaming rows as interrupted.">
+            In the boot sweep.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span>When: after a complete run</h2>
+      <figure id="when">
+        <figcaption>
+          The title starts after the stream closes, so it never delays the reply.
+        </figcaption>
+      </figure>
+      <p>
+        Look at the end of the run in the picture. The <code>finally</code> block in
+        <code>startRun</code> saves the status and closes the stream. Then, only if the run ended
+        <code>complete</code>, it calls <code>void titleConversation(deps, messageId)</code>. The
+        <code>void</code> means fire-and-forget: nothing waits, and
+        <code>titleConversation</code> catches every error itself.
+      </p>
+      <p>
+        The first thing <code>titleConversation</code> checks is the title. If the Conversation
+        already has one, it stops. So the first <em>complete</em> reply titles a Conversation, even
+        if earlier replies failed.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="1"
+        data-why="Only a complete run starts titleConversation, and it acts while the title is still null."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          The first reply ends in <code>error</code>. The user regenerates, and the second reply
+          completes. When is the Conversation titled?
+        </p>
+        <ol class="opts">
+          <li data-why="An error run never calls titleConversation.">After the first reply.</li>
+          <li>After the second reply.</li>
+          <li data-why="The title is still null, so the next complete run titles it.">
+            Never, it stays Untitled.
+          </li>
+          <li data-why="A rename sets a title by hand; it doesn't start the automatic one.">
+            Only after a rename.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">2</span>Which Model writes it</h2>
+      <figure id="ladder">
+        <figcaption>Each step that fails drops to the fallback title.</figcaption>
+      </figure>
+      <p>Follow the ladder in the picture from the top:</p>
+      <ol class="steps">
+        <li>
+          The Model is <code>user_settings.titleModel</code>, or, when that is <code>null</code>,
+          the Model that wrote this reply.
+        </li>
+        <li>
+          <code>findModel</code> looks it up in the curated list, and
+          <code>loadCredentials</code> gets the user's key for its Provider (Lesson 9).
+        </li>
+        <li>
+          <code>chat({ stream: false })</code> gets the first user Message and the reply, each cut
+          to 2,000 characters, with the prompt "Write a short title (at most 6 words)".
+        </li>
+        <li>
+          <code>cleanTitle</code> makes it one line with no quotes or end period, at most 100
+          characters.
+        </li>
+      </ol>
+
+      <h2><span class="num">3</span>The fallback title</h2>
+      <figure id="fallback">
+        <figcaption>Cut at 50 characters, back to the last space, then add "…".</figcaption>
+      </figure>
+      <p>
+        If there is no Model, no key, or the call fails, the title is the start of the first
+        Message. <code>fallbackTitle</code> joins all whitespace into single spaces. If the result
+        is 50 characters or fewer, that is the title. If not, it cuts at 50 and moves back to the
+        last space, but only when that space is after character 25. Then it adds "…".
+      </p>
+
+      <h2><span class="num">4</span>How the top bar finds out</h2>
+      <figure id="poll">
+        <figcaption>The top bar asks once a second, for at most 30 seconds.</figcaption>
+      </figure>
+      <p>
+        The browser doesn't get a message when the title is written. So
+        <code>ConversationTitle</code> in <code>top-bar.tsx</code> polls
+        <code>conversation.get</code> while <code>awaitingTitle</code> is true: there is no title,
+        nothing is <code>streaming</code>, and an assistant Message is <code>complete</code>. It
+        stops when the title arrives, or after <code>titleWaitMs</code> (30 seconds). Then it
+        refreshes the Conversation panel, so the new name shows there too.
+      </p>
+      <p>
+        A manual rename always wins, because the server writes the title with
+        <code>where title is null</code>.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="The update has where title is null, so once the rename is saved, the automatic title changes nothing."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          A user renames the Conversation while the title call is still running. Which title stays?
+        </p>
+        <ol class="opts">
+          <li>The user's manual rename.</li>
+          <li data-why="The automatic update only matches rows whose title is still null.">
+            The generated automatic title.
+          </li>
+          <li data-why="It isn't a race: the automatic write checks for null first.">
+            Whichever finished writing last.
+          </li>
+          <li
+            data-why="The fallback is only used when the Model call fails, and it is also written only over null."
+          >
+            The fallback first words.
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <figure id="pay1">
+        <div class="toy-out">
+          First Message:
+          <input
+            id="first"
+            size="44"
+            value="Explain how the Message tree stores Branches when a user edits a Message"
+            aria-label="First Message"
+          />
+          <div id="pay1-out">
+            Pass the tests: your <code>fallbackTitle</code> then names this Conversation in the top
+            bar.
+          </div>
+        </div>
+        <figcaption>The top bar with your fallback title.</figcaption>
+      </figure>
+      <div id="ex2"></div>
+      <figure id="pay2">
+        <div class="toy-out">
+          <button class="btn" type="button" id="step">Next moment ▶</button>
+          <span id="pay2-out"
+            >Pass the tests: your <code>awaitingTitle</code> then drives this top bar.</span
+          >
+        </div>
+        <figcaption>
+          Step through one Conversation's life; your function decides when to poll.
+        </figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> a complete run fires
+          <code>titleConversation</code> and forgets it; the top bar polls until the title appears.
+        </p>
+        <ul>
+          <li>
+            <strong>Only while untitled.</strong> It runs after any complete run, but writes only
+            <code>where title is null</code>, so a rename wins.
+          </li>
+          <li>
+            <strong>Title Model, else the reply's Model.</strong> No Model, no key or a failed call
+            gives the fallback title.
+          </li>
+          <li>
+            <strong>The client polls.</strong> <code>awaitingTitle</code> → refetch every 1 s, for
+            at most 30 s.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box and say each point out loud, then say the four steps of the
+          ladder.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>A live-listed Model gets the fallback</h3>
+        <p>
+          <code>findModel</code> searches only <code>curatedModels</code>. A reply from a Model that
+          the picker lists live (OpenRouter's or Ollama's lists) isn't there, so with the default
+          "Same as first reply" setting, <code>generateTitle</code> returns <code>""</code> and the
+          fallback title is used. Picking a curated Title Model in Keys &amp; settings fixes that.
+          Check it yourself in
+          <a href="../../../packages/api/src/chat/title.ts"><code>title.ts</code></a> and
+          <a href="../../../packages/api/src/chat/models.ts"><code>models.ts</code></a
+          >.
+        </p>
+        <h3>Why credentials must be on the server</h3>
+        <p>
+          The title is made after the run, with nobody connected. That is one of the two reasons ADR
+          0003 gives for keeping Provider credentials on the server (Lesson 9).
+        </p>
+        <h3>Polling in TanStack Query</h3>
+        <p>
+          <code>refetchInterval</code> can be a function of the query, which returns a delay or
+          <code>false</code>. That is how the top bar turns polling on and off. See
+          <a href="https://tanstack.com/query/latest/docs/framework/react/reference/useQuery"
+            >TanStack Query: useQuery</a
+          >.
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          Read
+          <a href="../../../packages/api/src/chat/title.integration.test.ts"
+            ><code>title.integration.test.ts</code></a
+          >. Find the test that proves a rename isn't overwritten, and tell your teacher how it
+          makes the race happen.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="../../../packages/api/src/chat/title.ts"
+            ><code>packages/api/src/chat/title.ts</code></a
+          >
+          (108 lines; read it top to bottom), then
+          <a href="../../../packages/chat-core/src/title.ts"><code>chat-core/src/title.ts</code></a
+          >.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude) anything: "why not stream the
+          title?", "what if two runs complete at once?", or "quiz me again".
+        </p>
+        <div class="nav">
+          <a href="0012-shared-links.html">← Lesson 12: Shared links</a
+          ><a href="0014-testing-seams.html">Lesson 14: Testing seams →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="13"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // Section 1: the end of a run.
+      const when = (n = 4) =>
+        D.arrow(20, 30, 740, 30) +
+        D.text(20, 12, "end of startRun →", { tone: "muted", size: 12 }) +
+        [
+          ["save status", "complete", "ok"],
+          ["runs.delete", "", ""],
+          ["close stream", "reply done", "blue"],
+          ["titleConversation", "fire-and-forget", "accent"],
+        ]
+          .slice(0, n)
+          .map(([l, s, tone], i) =>
+            D.box(20 + i * 185, 50, 170, 54, l, { tone, sub: s, mono: i > 0 }),
+          )
+          .join("") +
+        (n >= 4 ? D.text(575, 125, "only if complete", { tone: "accent", size: 13 }) : "");
+      D.render(
+        "#when",
+        D.svg(760, 140, when(), { label: "Titling starts after the stream closes" }),
+      );
+
+      // Section 2: the ladder.
+      const ladder = (n = 4) =>
+        [
+          ["Title Model, else the reply's Model", ""],
+          ["findModel + loadCredentials", ""],
+          ["chat({ stream: false })", ""],
+          ["cleanTitle", "ok"],
+        ]
+          .slice(0, n)
+          .map(
+            ([l, tone], i) =>
+              D.box(20 + i * 30, 10 + i * 52, 330, 42, l, { tone, mono: i > 0 }) +
+              D.arrow(350 + i * 30, 31 + i * 52, 470, 31 + i * 52, {
+                tone: "accent",
+                dashed: true,
+              }),
+          )
+          .join("") +
+        D.box(470, 70, 270, 80, "fallbackTitle(first)", {
+          tone: "warn",
+          mono: true,
+          sub: "on any failure",
+        });
+      D.render(
+        "#ladder",
+        D.svg(760, 220, ladder(), { label: "Each failing step drops to the fallback title" }),
+      );
+
+      // Section 3: the fallback cut.
+      D.render(
+        "#fallback",
+        D.svg(
+          760,
+          120,
+          D.box(
+            10,
+            20,
+            740,
+            40,
+            "Explain how the Message tree stores Branches when| a user edits…",
+            { mono: true },
+          ) +
+            D.text(
+              10,
+              85,
+              '50 characters → back to the last space (after character 25) → add "…"',
+              { tone: "muted", size: 13 },
+            ) +
+            D.text(10, 106, '→ "Explain how the Message tree stores Branches when…"', {
+              tone: "ok",
+              size: 13,
+              mono: true,
+            }),
+          { label: "The fallback cut" },
+        ),
+      );
+
+      // Section 4: polling.
+      const poll = (k = 4) =>
+        D.arrow(20, 70, 740, 70) +
+        [0, 1, 2, 3]
+          .slice(0, k)
+          .map(
+            (i) =>
+              D.dot(120 + i * 110, 70, 7, { tone: i === 3 ? "ok" : "" }) +
+              D.text(120 + i * 110, 95, i === 3 ? "title ✓" : "null", {
+                anchor: "middle",
+                size: 12,
+                tone: i === 3 ? "ok" : "muted",
+              }),
+          )
+          .join("") +
+        D.text(20, 30, "conversation.get every 1 s, while awaitingTitle(…)", {
+          size: 13,
+          mono: true,
+        }) +
+        D.text(600, 95, "stop at 30 s", { tone: "accent", size: 12 });
+      D.render(
+        "#poll",
+        D.svg(760, 115, poll(), { label: "The top bar polls until the title arrives" }),
+      );
+
+      // Video.
+      Explainer.mount("#video", {
+        title: "Lesson 13 in about 1 minute",
+        width: 760,
+        height: 220,
+        scenes: [
+          {
+            say: "When a reply ends complete, the run starts titleConversation and does not wait for it.",
+            draw: (t) => when(1 + Math.min(3, Math.floor(t * 4))),
+          },
+          {
+            say: "It acts only while the Conversation has no title, so the first complete reply names it.",
+            draw: (t, A) =>
+              D.box(260, 80, 240, 50, "title: null", { mono: true }) +
+              A.fade(
+                t,
+                0.4,
+                0.7,
+                D.box(260, 80, 240, 50, '"Lisbon trip plan"', { mono: true, tone: "ok" }),
+              ),
+          },
+          {
+            say: "The Title Model writes it, or the Model of the reply. Any failure drops to the fallback.",
+            draw: (t) => ladder(1 + Math.min(3, Math.floor(t * 4))),
+          },
+          {
+            say: "The fallback is the first fifty characters of the first Message, cut at a word.",
+            show: 'fallbackTitle: first ~50 characters, cut at a word, plus "…".',
+            draw: (t, A) =>
+              D.box(
+                20,
+                80,
+                A.lerp(720, 470, A.ease(A.step(t, 0.2, 0.7))),
+                44,
+                "Explain how the Message tree stores Branches when…",
+                { mono: true, tone: "warn" },
+              ),
+          },
+          {
+            say: "The top bar polls every second, for at most thirty seconds. Now write the fallback and the check.",
+            show: "Poll every 1 s, up to 30 s. Next: write fallbackTitle, then awaitingTitle.",
+            draw: (t) => poll(1 + Math.min(3, Math.floor(t * 4))),
+          },
+        ],
+      });
+
+      // Exercise 1: fallbackTitle(first).
+      let learnerFallback = null;
+      Exercise.mount("#ex1", {
+        title: "Write fallbackTitle(first)",
+        task: 'Join whitespace into single spaces and trim. 50 characters or fewer: return it. Longer: cut at 50, go back to the last space if it is after character 25, trim the end and add <code>"…"</code>.',
+        storageKey: "ai-chat-l13-fallback-title",
+        fnName: "fallbackTitle",
+        starter: `// Example: "  Plan   my\\ntrip " → "Plan my trip"
+// Example: a 72-character question → its first words up to a space, then "…"
+// Hint: line.slice(0, 50), then cut.lastIndexOf(" "). Use the "…" character.
+function fallbackTitle(first) {
+  return first.slice(0, 50);
+}`,
+        solution: `function fallbackTitle(first) {
+  const line = first.replace(/\\s+/g, " ").trim();
+  if (line.length <= 50) return line;
+  const cut = line.slice(0, 50);
+  const space = cut.lastIndexOf(" ");
+  return \`\${(space > 25 ? cut.slice(0, space) : cut).trimEnd()}…\`;
+}`,
+        tests: [
+          { name: 'short text stays as it is → "Hi"', args: ["Hi"], expect: "Hi" },
+          {
+            name: "extra spaces and line breaks → single spaces",
+            args: ["  Plan   my\ntrip  to Lisbon "],
+            expect: "Plan my trip to Lisbon",
+          },
+          {
+            name: 'long text → cut at the last space before 50, then "…"',
+            args: ["Explain how the Message tree stores Branches when a user edits a Message"],
+            expect: "Explain how the Message tree stores Branches when…",
+          },
+          {
+            name: "no space after character 25 → cut at exactly 50",
+            args: ["https://example.com/a-very-long-link-without-any-spaces-at-all-in-it ok"],
+            expect: "https://example.com/a-very-long-link-without-any-s…",
+          },
+        ],
+        onResult(fn, all) {
+          learnerFallback = all ? fn : null;
+          showTitle();
+        },
+      });
+      const first = document.getElementById("first");
+      function showTitle() {
+        if (!learnerFallback) return;
+        document.getElementById("pay1-out").innerHTML =
+          `Top bar: <strong>${D.esc(learnerFallback(first.value) || "Untitled")}</strong>`;
+      }
+      first.addEventListener("input", showTitle);
+
+      // Exercise 2: awaitingTitle(conversation).
+      let learnerAwaiting = null;
+      const conv = (title, ...statuses) => ({
+        title,
+        messages: statuses.map(([role, status]) => ({ role, status })),
+      });
+      Exercise.mount("#ex2", {
+        title: "Write awaitingTitle(conversation)",
+        task: "Return <code>true</code> when the server is about to title it: no title, no Message <code>streaming</code>, and some assistant Message <code>complete</code>. A missing Conversation → <code>false</code>.",
+        storageKey: "ai-chat-l13-awaiting-title",
+        fnName: "awaitingTitle",
+        starter: `// conversation: { title, messages: [{ role, status }] }, or undefined
+// Example: title null, [user complete, assistant complete] → true
+// Hint: messages.some(...) twice: once for "streaming", once for a complete assistant.
+function awaitingTitle(conversation) {
+  return conversation?.title === null;
+}`,
+        solution: `function awaitingTitle(conversation) {
+  if (!conversation || conversation.title !== null) return false;
+  const { messages } = conversation;
+  return (
+    !messages.some((m) => m.status === "streaming") &&
+    messages.some((m) => m.role === "assistant" && m.status === "complete")
+  );
+}`,
+        tests: [
+          {
+            name: "untitled, reply complete → true",
+            args: [conv(null, ["user", "complete"], ["assistant", "complete"])],
+            expect: true,
+          },
+          {
+            name: "already titled → false",
+            args: [conv("Lisbon trip", ["user", "complete"], ["assistant", "complete"])],
+            expect: false,
+          },
+          {
+            name: "untitled, reply still streaming → false",
+            args: [conv(null, ["user", "complete"], ["assistant", "streaming"])],
+            expect: false,
+          },
+          {
+            name: "untitled, only an error reply → false",
+            args: [conv(null, ["user", "complete"], ["assistant", "error"])],
+            expect: false,
+          },
+          { name: "no Conversation loaded → false", args: [undefined], expect: false },
+        ],
+        onResult(fn, all) {
+          learnerAwaiting = all ? fn : null;
+        },
+      });
+      const LIFE = [
+        [
+          "You sent a Message; the reply streams.",
+          conv(null, ["user", "complete"], ["assistant", "streaming"]),
+        ],
+        [
+          "The reply completed; the server is titling.",
+          conv(null, ["user", "complete"], ["assistant", "complete"]),
+        ],
+        [
+          "The title was written.",
+          conv("Lisbon trip plan", ["user", "complete"], ["assistant", "complete"]),
+        ],
+      ];
+      let moment = -1;
+      document.getElementById("step").addEventListener("click", () => {
+        const out = document.getElementById("pay2-out");
+        if (!learnerAwaiting) return (out.textContent = "Pass all the tests above first.");
+        moment = (moment + 1) % LIFE.length;
+        const [what, c] = LIFE[moment];
+        const polling = learnerAwaiting(c);
+        out.innerHTML = `${what} Top bar: <strong>${D.esc(c.title ?? "Untitled")}</strong> · ${polling ? '<span style="color:var(--accent)">polling every 1 s</span>' : "not polling"}`;
+      });
+    </script>
+  </body>
+</html>

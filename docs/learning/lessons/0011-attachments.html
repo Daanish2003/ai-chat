@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lesson 11 · Attachments</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+    <style>
+      .toy-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 14px;
+        align-items: center;
+        margin: 4px 0;
+      }
+      .toy-row label {
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Lesson 11</p>
+      <h1>Attachments</h1>
+      <p class="subtitle">Upload first, send the ids, link them — never copy the file.</p>
+      <p class="meta">
+        About 14 minutes · a browser · you'll write
+        <code>checkSend(model, files, historyBytes)</code>, the checks a send makes on its files
+      </p>
+
+      <section class="words">
+        <h2>Words you'll need</h2>
+        <dl>
+          <dt>Attachment</dt>
+          <dd>
+            A file (image, PDF or text file) that a user uploads and attaches to their Message. It
+            is never copied.
+          </dd>
+          <dt>Join table</dt>
+          <dd>
+            A table whose rows only link rows of two other tables. Here:
+            <code>message_attachment</code> links a Message to an Attachment.
+          </dd>
+          <dt>Orphan</dt>
+          <dd>
+            An Attachment that no Message uses, such as a file you uploaded and then never sent.
+          </dd>
+        </dl>
+        <p class="hint">
+          Forgot a code name? Press the <strong>Names?</strong> button in the bottom-right corner.
+        </p>
+      </section>
+
+      <figure id="video"></figure>
+
+      <div
+        class="quiz"
+        data-answer="3"
+        data-why="citationFor compares the link's sourceKey with each Source of the Message. A match shows as that Source's numbered chip."
+      >
+        <div class="label">Warm-up · Lesson 10</div>
+        <p class="q">What makes a markdown link in a reply show as a citation chip?</p>
+        <ol class="opts">
+          <li data-why="citationPrompt tells the Model not to write [1] markers.">
+            The Model writes [1] markers
+          </li>
+          <li data-why="Sources and chips are computed by the renderer, never stored.">
+            The server stores the chip
+          </li>
+          <li data-why="The link text is the site's name, such as tanstack.com.">
+            The link text is numeric
+          </li>
+          <li>Its URL matches a Source</li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">1</span>Upload first, then send the ids</h2>
+      <figure id="upload">
+        <figcaption>
+          Each file uploads the moment you pick it; the send carries only ids.
+        </figcaption>
+      </figure>
+      <p>
+        Think of a coat check. You hand over the coat first and get a ticket; later you show only
+        the ticket. When you pick a file, the composer calls <code>attachment.upload</code> at once.
+        The server checks it (up to 5 MB; an image, a PDF or UTF-8 text) and returns an
+        <code>AttachmentInfo</code>: <code>{ id, filename, mediaType, size }</code>.
+      </p>
+      <p>
+        The send waits until every upload is done, then puts the ids in
+        <code>ChatCommand.attachmentIds</code>. The bytes are in their own table,
+        <code>attachment_blob</code>, so a list of Messages never loads them by accident.
+      </p>
+
+      <h2><span class="num">2</span>Linked, never copied</h2>
+      <figure id="links">
+        <figcaption>
+          An edit is a new Message that links the same Attachment again; the file exists once.
+        </figcaption>
+      </figure>
+      <p>
+        Attachments are not Message parts (ADR 0001). <code>linkAttachments</code> writes one
+        <code>message_attachment</code> row per file: <code>messageId</code>,
+        <code>attachmentId</code> and a <code>position</code> for the order.
+      </p>
+      <p>
+        An edit is a new user Message beside the old one, so the client sends the full list it
+        keeps. In the picture, the edit kept <code>photo.png</code> and dropped
+        <code>notes.md</code>, which gives one new link row and no copy. A regenerate writes no user
+        Message, so its links stay as they were, and <code>handleChat</code> refuses a regenerate
+        that brings attachments. The foreign key from the link to the Attachment has no cascade, so
+        an Attachment can't be deleted while a Message uses it.
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="0"
+        data-why="The edit inserts a new user Message and links the one kept Attachment to it. The old Message and its links stay untouched."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">
+          You edit a Message that had two attachments. You remove one and add none. What does the
+          send write?
+        </p>
+        <ol class="opts">
+          <li>New Message, one link row</li>
+          <li data-why="Messages are never changed once written, and neither are their links.">
+            Old link row is deleted
+          </li>
+          <li data-why="Attachments are never copied; the new Message links the same row.">
+            Attachment bytes copied once more
+          </li>
+          <li data-why="The client sends only the attachments you kept.">
+            New Message, two link rows
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">3</span>Orphans and the lock</h2>
+      <figure id="race">
+        <figcaption>
+          The send locks its Attachments, so the cleanup skips them instead of deleting them.
+        </figcaption>
+      </figure>
+      <p>
+        Files that you upload and never send would stay forever, so every upload first runs
+        <code>deleteOrphanAttachments</code>: it deletes Attachments older than 24 hours that no
+        Message links. That opens a race. Look at the picture: a send could link a day-old upload at
+        the same moment that another upload's cleanup deletes it.
+      </p>
+      <p>
+        So the send transaction calls <code>lockAttachments</code>, which takes a
+        <code>FOR KEY SHARE</code> lock on its rows. The cleanup selects with
+        <code>FOR UPDATE SKIP LOCKED</code>, so it steps over locked rows. If a file is already
+        gone, the lock finds fewer rows and the send answers 404 "Attachment not found".
+      </p>
+
+      <div
+        class="quiz"
+        data-answer="2"
+        data-why="lockAttachments holds the rows until the send's transaction links them, and the cleanup's SKIP LOCKED steps over them."
+      >
+        <div class="label">Quiz</div>
+        <p class="q">Why does the send lock the Attachments it is about to link?</p>
+        <ol class="opts">
+          <li data-why="The lock doesn't change how the bytes load.">So the bytes load faster</li>
+          <li data-why="Attachments always belong to one user; the lock only checks ownership.">
+            So two users can share
+          </li>
+          <li>So cleanup can't delete them</li>
+          <li data-why="What the Model reads is decided by attachmentsForSend, not by a lock.">
+            So the Model reads them
+          </li>
+        </ol>
+        <p class="fb"></p>
+      </div>
+
+      <h2><span class="num">4</span>What the Model may read</h2>
+      <figure id="checks">
+        <figcaption>
+          <code>attachmentsForSend</code> runs these checks in order and stops at the first that
+          fails.
+        </figcaption>
+      </figure>
+      <p>
+        Before any write, <code>handleChat</code> calls <code>attachmentsForSend</code>. Every Model
+        reads text files; images and PDFs only when its capabilities say so
+        (<code>acceptedKinds</code>). The Branch limit exists because the history goes to the
+        Provider again on every turn. Here is a send that fails:
+      </p>
+      <ol class="steps">
+        <li>The Model is a GPT Model: <code>images: true</code>, <code>pdfs: false</code>.</li>
+        <li>
+          <code>acceptedKinds</code> gives <code>["text", "image"]</code>, and
+          <code>report.pdf</code> is a <code>pdf</code>.
+        </li>
+        <li>
+          <code>"pdf"</code> is not in the list, so the send answers 400
+          <code>`${model.label} can't read PDFs`</code> and writes nothing.
+        </li>
+      </ol>
+      <p>
+        A Shared link shows each Attachment only as a filename and type:
+        <code>redactAttachmentsForShare</code> drops the id and size, and the bytes are never
+        public.
+      </p>
+
+      <h2>Try it</h2>
+      <div id="ex1"></div>
+      <figure id="payoff">
+        <div class="toy-out">
+          <div class="toy-row">
+            <label
+              >Model
+              <select id="t-model">
+                <option value="claude">Claude (images, PDFs)</option>
+                <option value="gpt">GPT (images)</option>
+                <option value="text">Text-only Model</option>
+              </select></label
+            >
+            <label
+              >History
+              <select id="t-history">
+                <option value="0">0 MB</option>
+                <option value="10">10 MB</option>
+                <option value="18">18 MB</option>
+              </select></label
+            >
+          </div>
+          <div class="toy-row" id="t-files"></div>
+          <div id="t-out">
+            Pass the tests first. Then this send uses your <code>checkSend</code>.
+          </div>
+        </div>
+        <figcaption>
+          Your <code>checkSend</code> decides this send: pick a Model and files, then read the
+          answer.
+        </figcaption>
+      </figure>
+
+      <section class="takeaways">
+        <h2>Key takeaways</h2>
+        <p class="one-thing">
+          <strong>If you remember only one thing:</strong> an Attachment is uploaded once and linked
+          by id through <code>message_attachment</code>; it is never a part and never copied.
+        </p>
+        <ul>
+          <li>
+            <strong>Coat check.</strong> Upload first, send <code>attachmentIds</code>. An edit
+            sends the full kept list; a regenerate sends none.
+          </li>
+          <li>
+            <strong>Lock before you link.</strong> The send's <code>FOR KEY SHARE</code> lock keeps
+            the orphan cleanup away.
+          </li>
+          <li>
+            <strong>Check, then write.</strong> Owned, readable by the Model, 5 MB each, 20 MB per
+            Branch. A Shared link shows filename and type only.
+          </li>
+        </ul>
+        <p class="selftest">
+          Self-test: cover this box and say each point out loud, then draw the three tables and
+          their links.
+        </p>
+      </section>
+
+      <details class="deeper">
+        <summary>Go deeper: sources, side notes and a challenge</summary>
+        <h3>Read the code</h3>
+        <ul>
+          <li>
+            <a href="../../../packages/db/src/schema/attachment.ts"
+              ><code>schema/attachment.ts</code></a
+            >: <code>attachment</code>, <code>attachment_blob</code>,
+            <code>message_attachment</code>.
+          </li>
+          <li>
+            <a href="../../../packages/api/src/attachments/store.ts"
+              ><code>attachments/store.ts</code></a
+            >: every read and write, the cleanup and the lock.
+          </li>
+          <li>
+            <a href="../../../packages/api/src/attachments/send.ts"
+              ><code>attachments/send.ts</code></a
+            >
+            and <a href="../../../packages/api/src/attachments/kinds.ts"><code>kinds.ts</code></a
+            >: the checks and the file kinds (<code>kinds.ts</code> is browser-safe).
+          </li>
+          <li>
+            <a href="../../../docs/adr/0001-own-message-tree.md">ADR 0001</a>, Consequences:
+            "Attachments are not parts."
+          </li>
+        </ul>
+        <h3>Old files and a new Model</h3>
+        <p>
+          The kind check runs only on the new files. If you switch the Conversation to a Model that
+          can't read PDFs, a PDF already in the history is not refused:
+          <code>toModelMessages</code> sends it as a short placeholder,
+          <code>[Attached PDF "x" left out: this Model can't read PDFs]</code>. Text files always go
+          as fenced text.
+        </p>
+        <h3>The two lock modes</h3>
+        <p>
+          PostgreSQL's <code>FOR KEY SHARE</code> conflicts with <code>FOR UPDATE</code>, (<a
+            href="https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS"
+            >PostgreSQL: Row-Level Locks</a
+          >), and with <code>SKIP LOCKED</code> &quot;any selected rows that cannot be immediately
+          locked are skipped&quot; (<a
+            href="https://www.postgresql.org/docs/current/sql-select.html#SQL-FOR-UPDATE-SHARE"
+            >PostgreSQL: the locking clause</a
+          >).
+        </p>
+        <h3>Challenge</h3>
+        <p>
+          The cleanup runs only inside <code>saveAttachment</code>. Explain to your teacher what
+          happens to a user's orphans if nobody uploads anything for a week, and whether that
+          matters.
+        </p>
+      </details>
+
+      <div class="footer-box">
+        <p>
+          <strong>Primary source:</strong>
+          <a href="../../../docs/adr/0001-own-message-tree.md">ADR 0001: We own the Message tree</a
+          >, then
+          <a href="https://www.postgresql.org/docs/current/explicit-locking.html#LOCKING-ROWS"
+            >PostgreSQL: Row-Level Locks</a
+          >. The Attachment entry in <a href="../../../CONTEXT.md"><code>CONTEXT.md</code></a> has
+          the domain rules.
+        </p>
+        <p>
+          <strong>Cheat sheets:</strong> <a href="../reference/package-map.html">Package map</a> ·
+          <a href="../reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Stuck or curious?</strong> Ask your teacher (Claude) anything: "why is the blob a
+          separate table?", or "quiz me on edit and regenerate".
+        </p>
+        <div class="nav">
+          <a href="0010-web-search-and-sources.html">← Lesson 10: Web search and Sources</a
+          ><a href="0012-shared-links.html">Lesson 12: Shared links →</a>
+        </div>
+      </div>
+    </main>
+
+    <script src="../assets/diagrams.js"></script>
+    <script src="../assets/names.js" data-upto="11"></script>
+    <script src="../assets/explainer.js"></script>
+    <script src="../assets/quiz.js"></script>
+    <script src="../assets/exercise.js"></script>
+    <script>
+      const D = Diagrams;
+
+      // Section 1: upload first, then send ids.
+      D.render(
+        "#upload",
+        D.svg(
+          760,
+          190,
+          D.box(10, 20, 130, 50, "Pick a file", { tone: "blue", sub: "composer" }) +
+            D.box(190, 20, 200, 50, "attachment.upload", { mono: true, sub: "oRPC, at once" }) +
+            D.box(440, 10, 150, 34, "attachment", { mono: true, tone: "accent" }) +
+            D.box(440, 52, 150, 34, "attachment_blob", { mono: true, tone: "accent" }) +
+            D.box(190, 120, 200, 50, "{ id, filename, … }", {
+              mono: true,
+              tone: "ok",
+              sub: "AttachmentInfo",
+            }) +
+            D.box(440, 120, 300, 50, "attachmentIds: [id]", {
+              mono: true,
+              sub: "ChatCommand → /api/chat",
+            }) +
+            D.arrow(140, 45, 190, 45) +
+            D.arrow(390, 40, 440, 27) +
+            D.arrow(390, 50, 440, 69) +
+            D.arrow(290, 70, 290, 120, { tone: "ok" }) +
+            D.arrow(390, 145, 440, 145) +
+            D.text(600, 30, "metadata", { tone: "muted", size: 12 }) +
+            D.text(600, 70, "bytes", { tone: "muted", size: 12 }),
+          {
+            label:
+              "Upload writes attachment and blob rows and returns an id; the send carries the id",
+          },
+        ),
+      );
+
+      // Section 2: two Messages link one Attachment.
+      D.render(
+        "#links",
+        D.svg(
+          760,
+          200,
+          D.text(10, 14, "message", { tone: "muted", size: 12 }) +
+            D.box(10, 26, 180, 46, "M1 (user)", { mono: true, sub: "original" }) +
+            D.box(10, 120, 180, 46, "M1′ (user)", {
+              mono: true,
+              sub: "the edit, a sibling",
+              tone: "blue",
+            }) +
+            D.text(280, 14, "message_attachment", { tone: "muted", size: 12 }) +
+            D.box(280, 10, 200, 34, "M1 · photo · 0", { mono: true }) +
+            D.box(280, 54, 200, 34, "M1 · notes · 1", { mono: true }) +
+            D.box(280, 126, 200, 34, "M1′ · photo · 0", { mono: true, tone: "blue" }) +
+            D.text(570, 14, "attachment", { tone: "muted", size: 12 }) +
+            D.box(570, 40, 170, 40, "photo.png", { mono: true, tone: "accent" }) +
+            D.box(570, 100, 170, 40, "notes.md", { mono: true, tone: "accent" }) +
+            D.arrow(190, 40, 280, 27) +
+            D.arrow(190, 58, 280, 71) +
+            D.arrow(190, 143, 280, 143, { tone: "blue" }) +
+            D.arrow(480, 27, 570, 55) +
+            D.arrow(480, 71, 570, 115) +
+            D.arrow(480, 143, 570, 70, { tone: "blue" }),
+          { label: "The original Message and its edit both link photo.png; it is stored once" },
+        ),
+      );
+
+      // Section 3: the race, two lanes.
+      D.render(
+        "#race",
+        D.svg(
+          760,
+          200,
+          D.text(10, 40, "send", { weight: 600 }) +
+            D.text(10, 140, "upload", { weight: 600 }) +
+            D.box(80, 18, 190, 44, "lockAttachments", {
+              mono: true,
+              tone: "ok",
+              sub: "FOR KEY SHARE",
+            }) +
+            D.box(300, 18, 190, 44, "insert Messages", { mono: true }) +
+            D.box(520, 18, 220, 44, "linkAttachments", {
+              mono: true,
+              tone: "ok",
+              sub: "then commit",
+            }) +
+            D.box(220, 118, 300, 44, "deleteOrphanAttachments", {
+              mono: true,
+              tone: "warn",
+              sub: "FOR UPDATE SKIP LOCKED",
+            }) +
+            D.arrow(270, 40, 300, 40) +
+            D.arrow(490, 40, 520, 40) +
+            D.arrow(330, 118, 175, 64, { tone: "warn", dashed: true }) +
+            D.text(540, 140, "skips the locked file ✓", { tone: "ok", size: 13, weight: 600 }) +
+            D.text(
+              80,
+              186,
+              "one send transaction (top) · another user's upload, at the same moment (bottom)",
+              { tone: "muted", size: 12 },
+            ),
+          { label: "The send locks its attachments; the orphan cleanup skips locked rows" },
+        ),
+      );
+
+      // Section 4: the checks in order.
+      const step = (x, label, sub, tone = "") => D.box(x, 30, 170, 60, label, { sub, tone });
+      D.render(
+        "#checks",
+        D.svg(
+          760,
+          130,
+          step(5, "You own each file", "else 404") +
+            step(195, "Model reads its kind", "else 400", "accent") +
+            step(385, "Each file ≤ 5 MB", "else 400") +
+            step(575, "Branch ≤ 20 MB", "else 400") +
+            D.arrow(175, 60, 195, 60) +
+            D.arrow(365, 60, 385, 60) +
+            D.arrow(555, 60, 575, 60) +
+            D.text(380, 112, "all pass → load the bytes, then write the Messages", {
+              tone: "ok",
+              size: 12,
+              anchor: "middle",
+            }),
+          { label: "Four checks: owned, readable kind, 5 MB per file, 20 MB per Branch" },
+        ),
+      );
+
+      // Video.
+      Explainer.mount("#video", {
+        title: "Lesson 11 in about 1 minute",
+        width: 760,
+        height: 260,
+        scenes: [
+          {
+            say: "An attachment works like a coat check. You hand in the file first, and you get a ticket back.",
+            draw: (t, A) =>
+              D.box(A.lerp(40, 300, A.ease(A.step(t, 0, 0.5))), 90, 160, 56, "photo.png", {
+                tone: "accent",
+                mono: true,
+              }) +
+              A.fade(
+                t,
+                0.6,
+                0.85,
+                D.box(520, 90, 200, 56, "ticket: id", { tone: "ok", mono: true }),
+              ),
+          },
+          {
+            say: "The send shows only the ticket: a list of attachment ids in the chat command.",
+            show: "The send carries only attachmentIds in the ChatCommand.",
+            draw: (t, A) =>
+              D.box(200, 90, 360, 60, "attachmentIds: [id]", { mono: true, tone: "blue" }) +
+              D.arrow(A.lerp(40, 180, A.step(t, 0, 0.6)), 120, 200, 120, { tone: "ok" }),
+          },
+          {
+            say: "A join table links each Message to its files. An edit links the same file again, and nothing is copied.",
+            draw: (t, A) =>
+              D.box(40, 50, 160, 46, "M1", { mono: true }) +
+              A.fade(
+                t,
+                0.3,
+                0.55,
+                D.box(40, 150, 160, 46, "M1′ edit", { mono: true, tone: "blue" }),
+              ) +
+              D.box(540, 100, 180, 50, "photo.png", { tone: "accent", mono: true }) +
+              D.arrow(200, 73, 540, 118) +
+              A.fade(t, 0.55, 0.8, D.arrow(200, 173, 540, 132, { tone: "blue" })),
+          },
+          {
+            say: "Uploads clean up old orphans. The send locks its files first, so the cleanup skips them.",
+            draw: (t, A) =>
+              D.box(80, 60, 220, 56, "locked file", { tone: "ok", mono: true }) +
+              D.box(A.lerp(560, 330, A.ease(A.step(t, 0.1, 0.6))), 150, 200, 50, "cleanup", {
+                tone: "warn",
+                mono: true,
+              }) +
+              A.fade(
+                t,
+                0.7,
+                0.9,
+                D.text(420, 90, "skipped ✓", { tone: "ok", weight: 600, size: 18 }),
+              ),
+          },
+          {
+            say: "Before any write, the send checks each file. Now write check send, and test it on a real send.",
+            show: "Owned · readable kind · 5 MB each · 20 MB per Branch. Now write checkSend.",
+            draw: (t, A) =>
+              ["owned", "kind", "5 MB", "20 MB"]
+                .map((l, i) =>
+                  A.fade(
+                    t,
+                    i * 0.18,
+                    i * 0.18 + 0.15,
+                    D.box(40 + i * 180, 100, 150, 56, l + " ✓", { tone: "ok" }),
+                  ),
+                )
+                .join(""),
+          },
+        ],
+      });
+
+      // Try it: checkSend.
+      const HELPERS = `// Given: what a file is to the Provider, or undefined when it can't be attached.
+function kindOf(mediaType) {
+  if (["image/jpeg", "image/png", "image/gif", "image/webp"].includes(mediaType)) return "image";
+  if (mediaType === "application/pdf") return "pdf";
+  if (mediaType.startsWith("text/")) return "text";
+  return undefined;
+}
+const plural = { text: "text files", image: "images", pdf: "PDFs" };
+const MB = 1024 * 1024;`;
+      let learnerCheck = null;
+      Exercise.mount("#ex1", {
+        title: "Write checkSend(model, files, historyBytes)",
+        task: "Return the error message of the first check that fails, or <code>null</code> when the send may go on. Check each file in order (kind, then 5 MB), then the Branch total (more than 20 MB fails).",
+        storageKey: "ai-chat-l11-check-send",
+        fnName: "checkSend",
+        starter: `${HELPERS}
+
+// model: { label: "GPT", images: true, pdfs: false }
+// files: [{ filename: "report.pdf", mediaType: "application/pdf", size: 2 * MB }]
+// historyBytes: the size of every Attachment already on the Branch.
+// Example: checkSend(gpt, [report.pdf], 0) → "GPT can't read PDFs"
+// Hint: the accepted kinds are "text" always, plus "image" and "pdf" when the model says so.
+// The messages: \`\${model.label} can't read \${plural[kind]}\`, or \`… can't read "\${filename}"\`
+// when there is no kind; \`"\${filename}" is larger than 5 MB\`;
+// "Attachments on this Branch would pass 20 MB".
+function checkSend(model, files, historyBytes) {
+  return null;
+}`,
+        solution: `${HELPERS}
+
+function checkSend(model, files, historyBytes) {
+  const accepted = ["text", ...(model.images ? ["image"] : []), ...(model.pdfs ? ["pdf"] : [])];
+  for (const file of files) {
+    const kind = kindOf(file.mediaType);
+    if (!kind || !accepted.includes(kind)) {
+      return \`\${model.label} can't read \${kind ? plural[kind] : \`"\${file.filename}"\`}\`;
+    }
+    if (file.size > 5 * MB) return \`"\${file.filename}" is larger than 5 MB\`;
+  }
+  const total = files.reduce((sum, file) => sum + file.size, historyBytes);
+  if (total > 20 * MB) return "Attachments on this Branch would pass 20 MB";
+  return null;
+}`,
+        tests: (() => {
+          const MB = 1024 * 1024;
+          const gpt = { label: "GPT", images: true, pdfs: false };
+          const textOnly = { label: "Llama", images: false, pdfs: false };
+          const f = (filename, mediaType, mb) => ({ filename, mediaType, size: mb * MB });
+          return [
+            {
+              name: "a text file to a text-only Model → null (text is always read)",
+              args: [textOnly, [f("notes.md", "text/markdown", 1)], 0],
+              expect: null,
+            },
+            {
+              name: 'a PDF to GPT (pdfs: false) → "GPT can\'t read PDFs"',
+              args: [gpt, [f("report.pdf", "application/pdf", 2)], 0],
+              expect: "GPT can't read PDFs",
+            },
+            {
+              name: "an image to GPT (images: true) → null",
+              args: [gpt, [f("photo.png", "image/png", 2)], 0],
+              expect: null,
+            },
+            {
+              name: "a 6 MB PNG → the 5 MB error for big.png",
+              args: [gpt, [f("big.png", "image/png", 6)], 0],
+              expect: '"big.png" is larger than 5 MB',
+            },
+            {
+              name: "a zip file has no kind → GPT can't read x.zip",
+              args: [gpt, [f("x.zip", "application/zip", 1)], 0],
+              expect: 'GPT can\'t read "x.zip"',
+            },
+            {
+              name: "4 MB on top of 17 MB of history → the 20 MB Branch error",
+              args: [gpt, [f("photo.png", "image/png", 4)], 17 * MB],
+              expect: "Attachments on this Branch would pass 20 MB",
+            },
+            {
+              name: "exactly 20 MB in total → null (only more than 20 MB fails)",
+              args: [gpt, [f("photo.png", "image/png", 4)], 16 * MB],
+              expect: null,
+            },
+          ];
+        })(),
+        onResult(fn, all) {
+          learnerCheck = all ? fn : null;
+          runToy();
+        },
+      });
+
+      // Payoff toy.
+      const MODELS = {
+        claude: { label: "Claude", images: true, pdfs: true },
+        gpt: { label: "GPT", images: true, pdfs: false },
+        text: { label: "Text-only Model", images: false, pdfs: false },
+      };
+      const FILES = [
+        { filename: "notes.md", mediaType: "text/markdown", size: 0.2 * 1024 * 1024 },
+        { filename: "photo.png", mediaType: "image/png", size: 3 * 1024 * 1024 },
+        { filename: "report.pdf", mediaType: "application/pdf", size: 4 * 1024 * 1024 },
+        { filename: "huge.jpg", mediaType: "image/jpeg", size: 7 * 1024 * 1024 },
+      ];
+      document.getElementById("t-files").innerHTML = FILES.map(
+        (file, i) =>
+          `<label><input type="checkbox" data-i="${i}" ${i < 2 ? "checked" : ""}> ${file.filename} (${(file.size / 1024 / 1024).toFixed(1)} MB)</label>`,
+      ).join("");
+      function runToy() {
+        const out = document.getElementById("t-out");
+        if (!learnerCheck) {
+          out.innerHTML = "Pass the tests first. Then this send uses your <code>checkSend</code>.";
+          return;
+        }
+        const model = MODELS[document.getElementById("t-model").value];
+        const files = [...document.querySelectorAll("#t-files input:checked")].map(
+          (box) => FILES[Number(box.dataset.i)],
+        );
+        const history = Number(document.getElementById("t-history").value) * 1024 * 1024;
+        const error = learnerCheck(model, files, history);
+        out.innerHTML = error
+          ? `<strong style="color:var(--accent)">✗ 400:</strong> ${D.esc(error)}. Nothing is written.`
+          : `<strong style="color:var(--ok)">✓ Sent.</strong> ${files.length} link row${files.length === 1 ? "" : "s"} in <code>message_attachment</code>, no file copied.`;
+      }
+      document.querySelector("#payoff .toy-out").addEventListener("change", runToy);
+    </script>
+  </body>
+</html>

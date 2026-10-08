@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Names cheat sheet</title>
+    <link rel="stylesheet" href="../assets/style.css" />
+    <style>
+      .names-list .n {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--rule);
+        font: 15px/1.5 var(--sans);
+      }
+      .names-list .kind,
+      .names-list .ex {
+        color: var(--muted);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture · Reference</p>
+      <h1>Names</h1>
+      <p class="subtitle">Every code name the lessons teach, in lesson order.</p>
+      <div class="names-list" id="names"></div>
+      <p class="meta">
+        Domain words (Conversation, Message, Branch, …) are defined in the repo's
+        <a href="../../../CONTEXT.md"><code>CONTEXT.md</code></a
+        >.
+      </p>
+    </main>
+    <script src="../assets/names.js"></script>
+    <script>
+      renderNames(document.getElementById("names"));
+    </script>
+  </body>
+</html>

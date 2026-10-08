@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ai-chat architecture course</title>
+    <link rel="stylesheet" href="assets/style.css" />
+    <style>
+      ol.course {
+        padding-left: 0;
+        list-style: none;
+        counter-reset: l;
+      }
+      ol.course li {
+        counter-increment: l;
+        padding: 10px 0;
+        border-bottom: 1px solid var(--rule);
+      }
+      ol.course li::before {
+        content: counter(l, decimal-leading-zero);
+        font: 600 14px var(--sans);
+        color: var(--accent);
+        margin-right: 12px;
+      }
+      ol.course .why {
+        display: block;
+        margin-left: 34px;
+        font: 14px/1.4 var(--sans);
+        color: var(--muted);
+      }
+      .part {
+        font: 600 13px/1 var(--sans);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 28px 0 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="kicker">ai-chat architecture</p>
+      <h1>Own the chat feature</h1>
+      <p class="subtitle">Fourteen short lessons, from the package map to the test seams.</p>
+      <p class="meta">
+        10–15 minutes each · take them in order · ask your teacher (Claude) about anything unclear
+      </p>
+
+      <p class="part">Part 1 · The send path</p>
+      <ol class="course">
+        <li>
+          <a href="lessons/0001-the-package-map.html">The package map</a
+          ><span class="why">Seven packages, one rule: imports point down.</span>
+        </li>
+        <li>
+          <a href="lessons/0002-the-chat-command.html">The chat command</a
+          ><span class="why">The client sends a command, never the history.</span>
+        </li>
+        <li>
+          <a href="lessons/0003-handle-chat-checks-then-writes.html"
+            >handleChat: check, then write</a
+          ><span class="why">Every check before any write, then one locked transaction.</span>
+        </li>
+        <li>
+          <a href="lessons/0004-the-run.html">The run</a
+          ><span class="why">How a reply streams, snapshots and decides how it ended.</span>
+        </li>
+      </ol>
+      <p class="part">Part 2 · The Message tree</p>
+      <ol class="course" start="5" style="counter-reset: l 4">
+        <li>
+          <a href="lessons/0005-the-message-tree.html">The Message tree</a
+          ><span class="why">parentId, activeLeafId and walking up to a root.</span>
+        </li>
+        <li>
+          <a href="lessons/0006-branches.html">Branches</a
+          ><span class="why"
+            >Edit and regenerate add siblings; switching picks the newest leaf.</span
+          >
+        </li>
+        <li>
+          <a href="lessons/0007-runs-outlive-the-client.html">Runs outlive the client</a
+          ><span class="why">Reload, poll, Stop, the cap and the boot sweep.</span>
+        </li>
+      </ol>
+      <p class="part">Part 3 · Boundaries and features</p>
+      <ol class="course" style="counter-reset: l 7">
+        <li>
+          <a href="lessons/0008-the-parts-boundary.html">The parts boundary</a
+          ><span class="why">Our stored shape vs TanStack AI's, converted in one module.</span>
+        </li>
+        <li>
+          <a href="lessons/0009-provider-credentials.html">Provider credentials</a
+          ><span class="why">Encrypted on the server, write-only to the client.</span>
+        </li>
+        <li>
+          <a href="lessons/0010-web-search-and-sources.html">Web search and Sources</a
+          ><span class="why">A tool call recorded as a part, with numbered Sources.</span>
+        </li>
+        <li>
+          <a href="lessons/0011-attachments.html">Attachments</a
+          ><span class="why">Uploaded first, linked by a join table, never parts.</span>
+        </li>
+        <li>
+          <a href="lessons/0012-shared-links.html">Shared links</a
+          ><span class="why">A pointer into the tree, not a copy.</span>
+        </li>
+        <li>
+          <a href="lessons/0013-automatic-titles.html">Automatic titles</a
+          ><span class="why">The Title Model names a Conversation after its first run.</span>
+        </li>
+        <li>
+          <a href="lessons/0014-testing-seams.html">Testing seams</a
+          ><span class="why">AppDeps, the fake adapter and how to test a change.</span>
+        </li>
+      </ol>
+
+      <div class="footer-box">
+        <p>
+          <strong>Cheat sheets:</strong> <a href="reference/package-map.html">Package map</a> ·
+          <a href="reference/names.html">Names</a>
+        </p>
+        <p>
+          <strong>Ground truth:</strong> <a href="../../CONTEXT.md">CONTEXT.md</a> (domain words)
+          and <a href="../adr/">docs/adr/</a> (decisions).
+        </p>
+      </div>
+    </main>
+  </body>
+</html>
