@@ -1,6 +1,6 @@
 import type { AnyTextAdapter } from "@tanstack/ai";
 import { type AnthropicChatModel, createAnthropicChat } from "@tanstack/ai-anthropic";
-import { type BedrockConverseModels, createBedrockText } from "@tanstack/ai-bedrock";
+import { BedrockConverseTextAdapter, type BedrockConverseModels } from "@tanstack/ai-bedrock";
 import { createBytePlusText } from "@tanstack/ai-byteplus";
 import { createCloudflareText } from "@tanstack/ai-cloudflare";
 import { createGeminiChat, type GeminiTextModel } from "@tanstack/ai-gemini";
@@ -55,10 +55,9 @@ export function adapterFor(model: string, credentials: Credentials): AnyTextAdap
     case "grok":
       return createGrokText(modelId as ModelOf<typeof createGrokText>, apiKey);
     case "bedrock":
-      // The Converse API; `auth: "apikey"` keeps it off the server's AWS env credentials.
-      return createBedrockText(modelId as BedrockConverseModels, apiKey, {
+      return createAbortableBedrockText(modelId as BedrockConverseModels, {
+        apiKey,
         region: credentials.region,
-        auth: "apikey",
       });
     case "cloudflare":
       if (!credentials.accountId) throw new Error("The cloudflare credentials have no account id");
@@ -74,4 +73,45 @@ export function adapterFor(model: string, credentials: Credentials): AnyTextAdap
     default:
       throw new Error(`No adapter is available for the ${provider} Provider`);
   }
+}
+
+/**
+ * Bedrock's Converse adapter doesn't hand the run's abort signal to the AWS SDK, so Stop would
+ * leave the request to Bedrock running (issue #54). This one passes it to `send`. Each run builds
+ * its own adapter, so the signal of the run in progress fits on the instance.
+ */
+class AbortableBedrockConverseAdapter<
+  TModel extends BedrockConverseModels,
+> extends BedrockConverseTextAdapter<TModel> {
+  private signal: AbortSignal | undefined;
+
+  override async *chatStream(
+    options: Parameters<BedrockConverseTextAdapter<TModel>["chatStream"]>[0],
+  ) {
+    this.signal = options.request?.signal ?? undefined;
+    yield* super.chatStream(options);
+  }
+
+  protected override async sendStream(
+    input: Parameters<BedrockConverseTextAdapter<TModel>["sendStream"]>[0],
+  ) {
+    const { ConverseStreamCommand } = await this.importBedrockRuntime();
+    const client = await this.getClient();
+    const response = await client.send(new ConverseStreamCommand(input), {
+      abortSignal: this.signal,
+    });
+    if (!response.stream) throw new Error("Bedrock Converse: empty stream response");
+    return response.stream;
+  }
+}
+
+/**
+ * The Bedrock Converse adapter, with Stop cancelling the request. `auth: "apikey"` keeps it off
+ * the server's AWS env credentials. `baseURL` is for tests.
+ */
+export function createAbortableBedrockText(
+  model: BedrockConverseModels,
+  config: { apiKey: string; region?: string; baseURL?: string },
+): AnyTextAdapter {
+  return new AbortableBedrockConverseAdapter({ ...config, auth: "apikey" }, model);
 }
