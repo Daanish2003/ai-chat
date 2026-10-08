@@ -36,6 +36,10 @@ _Avoid_: Provider key, API key (ambiguous), token, BYOK key
 A user's own API key for a non-LLM service a tool needs, such as web search. Without it, that tool is unavailable to the user.
 _Avoid_: Search key, Provider credentials (those are for Providers only)
 
+**Source**:
+A web page a web search returned during an assistant Message, numbered within that Message and shown as a chip under the search and wherever the reply cites it.
+_Avoid_: Citation (that is the chip in the text pointing at a Source), result, reference
+
 **Shared link**:
 A public, read-only snapshot of a Conversation's Active Branch taken at the moment it is shared. A Conversation has at most one; sharing again moves it to the current Active Branch under the same link. It disappears when its Conversation is deleted.
 _Avoid_: Share, public chat, permalink
