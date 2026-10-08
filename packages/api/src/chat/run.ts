@@ -132,8 +132,10 @@ export function startRun(
 }
 
 /**
- * The stream's chunks until the signal aborts. Some adapters ignore the signal (Ollama's), so
- * the run stops reading instead of waiting for them, and leaves the stream behind.
+ * The stream's chunks until the signal aborts. An adapter that ignored the signal would keep the
+ * run waiting, so the run stops reading instead, and leaves the stream behind. The adapters that
+ * ignored it (Bedrock, Mistral, Ollama) are made to cancel the request: see `adapters.ts` and
+ * `patches/` (issue #54).
  */
 async function* untilAborted<T>(stream: AsyncIterable<T>, signal: AbortSignal) {
   const iterator = stream[Symbol.asyncIterator]();

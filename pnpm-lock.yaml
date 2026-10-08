@@ -216,6 +216,10 @@ catalogs:
       specifier: ^4.5.4
       version: 4.6.5
 
+patchedDependencies:
+  '@tanstack/ai-mistral@0.6.15': cf4156ba04dfd503d39ce5bfa1f31f6635f307c14ba91617590c54701d6e85e5
+  '@tanstack/ai-ollama@0.11.14': 55a42053fc0982b52dd25c2197076e02facc760cab32fc83be1179d3eab2b3a2
+
 importers:
 
   .:
@@ -437,10 +441,10 @@ importers:
         version: 0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-mistral':
         specifier: 0.6.15
-        version: 0.6.15(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)
+        version: 0.6.15(patch_hash=cf4156ba04dfd503d39ce5bfa1f31f6635f307c14ba91617590c54701d6e85e5)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)
       '@tanstack/ai-ollama':
         specifier: 0.11.14
-        version: 0.11.14(@tanstack/ai@0.66.0(zod@4.6.5))
+        version: 0.11.14(patch_hash=55a42053fc0982b52dd25c2197076e02facc760cab32fc83be1179d3eab2b3a2)(@tanstack/ai@0.66.0(zod@4.6.5))
       '@tanstack/ai-openai':
         specifier: 0.28.0
         version: 0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
@@ -6990,7 +6994,7 @@ snapshots:
       - ws
       - zod
 
-  '@tanstack/ai-mistral@0.6.15(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)':
+  '@tanstack/ai-mistral@0.6.15(patch_hash=cf4156ba04dfd503d39ce5bfa1f31f6635f307c14ba91617590c54701d6e85e5)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)':
     dependencies:
       '@mistralai/mistralai': 2.2.0
       '@tanstack/ai': 0.66.0(zod@4.6.5)
@@ -7001,7 +7005,7 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@tanstack/ai-ollama@0.11.14(@tanstack/ai@0.66.0(zod@4.6.5))':
+  '@tanstack/ai-ollama@0.11.14(patch_hash=55a42053fc0982b52dd25c2197076e02facc760cab32fc83be1179d3eab2b3a2)(@tanstack/ai@0.66.0(zod@4.6.5))':
     dependencies:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
       '@tanstack/ai-utils': 0.4.1
