@@ -26,3 +26,22 @@ catalog:
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.7
   drizzle-orm: 1.0.0-rc.4
+minimumReleaseAgeExclude:
+  - "@tanstack/ai-anthropic@0.20.0"
+  - "@tanstack/ai-bedrock@0.4.5"
+  - "@tanstack/ai-byteplus@0.6.2"
+  - "@tanstack/ai-client@0.39.0"
+  - "@tanstack/ai-cloudflare@0.2.5"
+  - "@tanstack/ai-gemini@0.37.0"
+  - "@tanstack/ai-grok@0.21.2"
+  - "@tanstack/ai-groq@0.8.5"
+  - "@tanstack/ai-llmgateway@0.2.5"
+  - "@tanstack/ai-lovable@0.5.2"
+  - "@tanstack/ai-mistral@0.6.15"
+  - "@tanstack/ai-ollama@0.11.14"
+  - "@tanstack/ai-openai@0.28.0"
+  - "@tanstack/ai-openrouter@0.21.2"
+  - "@tanstack/ai-react@0.30.1"
+  - "@tanstack/ai-vercel-gateway@0.3.7"
+  - "@tanstack/ai@0.66.0"
+  - "@tanstack/openai-base@0.12.6"
