@@ -41,8 +41,16 @@ One specific LLM offered by a Provider. A Conversation has a selected Model, and
 _Avoid_: Engine, LLM (as a noun for one choice)
 
 **Provider credentials**:
-What one user supplies to reach one Provider: usually an API key, sometimes with an account or region, or just a host for a local Provider. Every run uses the user's own Provider credentials; the app holds none of its own.
+What one user supplies to reach one Provider: usually an API key, sometimes with an account or region, or just a host for a local Provider. When a user has them for a Provider, their runs on it always use them and never count against their Quota.
 _Avoid_: Provider key, API key (ambiguous), token, BYOK key
+
+**Host credentials**:
+Provider or Tool credentials the Host supplies for all its users, with the Models it offers on them. Runs on them count against the user's Quota.
+_Avoid_: Server key, free tier key, platform key
+
+**Quota**:
+How much a user may spend on Host credentials per window (a day or a month), set by the Host per user. It is measured in money, and unlimited when the Host sets none.
+_Avoid_: Limit, allowance, credits, free tier
 
 **Tool credential**:
 A user's own API key for a non-LLM service a tool needs, such as web search. Without it, that tool is unavailable to the user.
