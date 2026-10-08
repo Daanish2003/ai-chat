@@ -4,6 +4,10 @@ A personal ChatGPT-style chat app: signed-in users talk to LLMs and keep their h
 
 ## Language
 
+**Host**:
+An app that embeds the chat SDK and supplies its users, its routes and a Postgres database. The web app in this repo is one Host.
+_Avoid_: Consumer, client app, integrator
+
 **Conversation**:
 One chat thread owned by a single user, listed in the sidebar.
 _Avoid_: Chat, thread, session
