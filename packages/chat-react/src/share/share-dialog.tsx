@@ -26,8 +26,8 @@ export function ShareButton({ conversationId }: { conversationId: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button variant="ghost" size="sm" onClick={() => setOpen(true)}>
-        <Share2Icon /> Share
+      <Button variant="ghost" size="sm" aria-label="Share" onClick={() => setOpen(true)}>
+        <Share2Icon /> <span className="max-sm:hidden">Share</span>
       </Button>
       <ShareDialog conversationId={conversationId} open={open} onOpenChange={setOpen} />
     </>
@@ -79,7 +79,7 @@ export function ShareDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Share "{title ?? "Untitled"}"</DialogTitle>
+          <DialogTitle className="pr-6 break-words">Share "{title ?? "Untitled"}"</DialogTitle>
           <DialogDescription>
             Anyone with the link sees this Branch up to its newest Message, read-only and without
             your name. Thinking is hidden, and attachments show as file names only: their contents
@@ -104,7 +104,7 @@ export function ShareDialog({
 
         {link ? (
           <>
-            <div className="flex flex-col gap-1.5">
+            <div className="flex min-w-0 flex-col gap-1.5">
               <div className="flex items-center gap-2 rounded-md border bg-background px-2.5 py-1.5">
                 <Link2Icon className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="flex-1 truncate font-mono">{url}</span>

@@ -43,3 +43,8 @@ export function missingCredentialsMessage(selected: string, available: CuratedMo
     ? addKeyMessage(provider)
     : "Pick another Model";
 }
+
+/** A Model's name to show: its curated label, else (a live-listed Model) its id without the Provider. */
+export function modelLabel(id: string) {
+  return findModel(id)?.label ?? parseModelId(id)?.modelId ?? id;
+}

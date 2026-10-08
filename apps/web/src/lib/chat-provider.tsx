@@ -38,7 +38,6 @@ function ChatLink({ page, activeClassName, ...props }: ChatLinkProps) {
 
 const pageTitles: Record<string, string> = {
   "/settings/keys": "Keys & settings",
-  "/dashboard": "Dashboard",
 };
 
 function useChatLocation(): ChatLocation {

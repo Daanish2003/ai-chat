@@ -164,12 +164,16 @@ export function ChatView({
     onFocused,
   });
 
-  // A new Conversation arrives here with its first Message still to send.
+  // A new Conversation arrives here with its first Message still to send. Taken a tick later:
+  // StrictMode's throwaway first mount would otherwise take it and drop it on unmount.
   const sendPendingFirstMessage = useEffectEvent(() => {
     const pending = takePendingFirstMessage(conversation.id);
     if (pending) void send(pending.text, pending.attachments);
   });
-  useEffect(() => sendPendingFirstMessage(), [conversation.id]);
+  useEffect(() => {
+    const timer = setTimeout(sendPendingFirstMessage);
+    return () => clearTimeout(timer);
+  }, [conversation.id]);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -194,33 +198,37 @@ export function ChatView({
           <ScrollButton />
         </div>
       </ChatContainerRoot>
-      <div className="flex flex-col gap-2 border-t bg-background px-6 py-3">
-        {error && !sending && (
-          <p role="alert" className="text-xs text-destructive">
-            {error.message}
-          </p>
-        )}
-        {blocked && <MissingCredentialsBanner message={blocked} />}
-        <Composer
-          onSend={(text) => {
-            void send(text, draft.uploaded);
-            draft.clear();
-          }}
-          attachments={<DraftAttachmentChips draft={draft} />}
-          attachmentsPending={draft.pending}
-          onStop={
-            stopRun.isPending
-              ? undefined
-              : () =>
-                  stop().catch((caught: Error) => toast.error(`Stopping failed: ${caught.message}`))
-          }
-          streaming={streaming}
-          // The next Message continues the Branch being switched to, so wait for it.
-          disabled={!!blocked || switchBranch.isPending}
-        >
-          <AttachButton draft={draft} disabled={!!blocked} />
-          <SearchToggle search={search} />
-        </Composer>
+      <div className="border-t bg-background px-3 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
+          {error && !sending && (
+            <p role="alert" className="text-xs text-destructive">
+              {error.message}
+            </p>
+          )}
+          {blocked && <MissingCredentialsBanner message={blocked} />}
+          <Composer
+            onSend={(text) => {
+              void send(text, draft.uploaded);
+              draft.clear();
+            }}
+            attachments={<DraftAttachmentChips draft={draft} />}
+            attachmentsPending={draft.pending}
+            onStop={
+              stopRun.isPending
+                ? undefined
+                : () =>
+                    stop().catch((caught: Error) =>
+                      toast.error(`Stopping failed: ${caught.message}`),
+                    )
+            }
+            streaming={streaming}
+            // The next Message continues the Branch being switched to, so wait for it.
+            disabled={!!blocked || switchBranch.isPending}
+          >
+            <AttachButton draft={draft} disabled={!!blocked} />
+            <SearchToggle search={search} />
+          </Composer>
+        </div>
       </div>
     </div>
   );

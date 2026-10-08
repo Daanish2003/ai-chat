@@ -1,5 +1,4 @@
 import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
-import { findModel } from "@ai-chat/api/chat/models";
 import { replySegments, sourcesOf } from "@ai-chat/api/chat/sources";
 import { webSearchOf } from "@ai-chat/api/chat/web-search";
 import { Button } from "@ai-chat/ui/components/button";
@@ -33,6 +32,7 @@ import {
   messageInfo,
   type MessageInfo,
 } from "@ai-chat/chat-core/chat";
+import { modelLabel } from "@ai-chat/chat-core/models";
 
 import {
   AttachButton,
@@ -98,116 +98,118 @@ export function MessageRow({
   const thinking = thinkingText(message);
   const attachments = messageAttachments(message);
   const isUser = message.role === "user";
-  const model = info.model ? (findModel(info.model)?.label ?? info.model) : null;
+  const model = info.model ? modelLabel(info.model) : null;
   const [editing, setEditing] = useState(false);
 
   return (
     <div
       data-message-id={message.id}
       className={cn(
-        "group relative flex gap-3 border-b border-border/50 px-6 py-4 transition-colors duration-500",
+        "group border-b border-border/50 px-4 py-4 transition-colors duration-500 sm:px-6",
         isUser && "bg-muted/30",
         highlighted && "bg-primary/10 ring-1 ring-primary/40 ring-inset",
       )}
     >
-      <div
-        className={cn(
-          "flex size-7 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-secondary" : "bg-primary/15 text-primary",
-        )}
-      >
-        {isUser ? <UserIcon className="size-3.5" /> : <BotIcon className="size-3.5" />}
-      </div>
-      <div className="flex min-w-0 flex-1 flex-col gap-2">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="font-medium">{isUser ? userLabel : "Assistant"}</span>
-          {!isUser && model && (
-            <span className="rounded-md border px-1.5 py-0.5 text-[10px] text-muted-foreground">
-              {model}
-            </span>
+      <div className="mx-auto flex w-full max-w-4xl gap-3">
+        <div
+          className={cn(
+            "flex size-7 shrink-0 items-center justify-center rounded-full",
+            isUser ? "bg-secondary" : "bg-primary/15 text-primary",
           )}
-          {message.createdAt && (
-            <time
-              className="text-[10px] text-muted-foreground"
-              dateTime={message.createdAt.toISOString()}
-            >
-              {message.createdAt.toLocaleTimeString(undefined, {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </time>
-          )}
-          {actions && (
-            <BranchArrows
-              message={message}
-              disabled={actions.streaming}
-              onSwitch={actions.onSwitchBranch}
+        >
+          {isUser ? <UserIcon className="size-3.5" /> : <BotIcon className="size-3.5" />}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex min-h-6 items-center gap-2 text-xs">
+            <span className="font-medium">{isUser ? userLabel : "Assistant"}</span>
+            {!isUser && model && (
+              <span className="rounded-md border px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                {model}
+              </span>
+            )}
+            {message.createdAt && (
+              <time
+                className="text-[10px] text-muted-foreground"
+                dateTime={message.createdAt.toISOString()}
+              >
+                {message.createdAt.toLocaleTimeString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </time>
+            )}
+            {actions && (
+              <BranchArrows
+                message={message}
+                disabled={actions.streaming}
+                onSwitch={actions.onSwitchBranch}
+              />
+            )}
+            {!editing && actions && (
+              <div className="ml-auto flex overflow-hidden rounded-md border bg-background opacity-0 shadow-sm group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100">
+                <CopyButton text={text} disabled={actions.streaming} />
+                {isUser ? (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    disabled={actions.streaming}
+                    onClick={() => setEditing(true)}
+                    title="Edit (new Branch)"
+                    aria-label="Edit"
+                  >
+                    <PencilIcon />
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    disabled={actions.streaming}
+                    onClick={actions.onRegenerate}
+                    title="Regenerate (new Branch)"
+                    aria-label="Regenerate"
+                  >
+                    <RefreshCwIcon />
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+          {editing && actions ? (
+            <EditBox
+              initial={text}
+              initialAttachments={attachments.flatMap(({ id, size, ...chip }) =>
+                id !== undefined && size !== undefined ? [{ id, size, ...chip }] : [],
+              )}
+              model={actions.model}
+              onCancel={() => setEditing(false)}
+              onSave={(edited, kept) => {
+                setEditing(false);
+                actions.onEdit(edited, kept);
+              }}
+              saveDisabled={actions.streaming}
             />
-          )}
-        </div>
-        {editing && actions ? (
-          <EditBox
-            initial={text}
-            initialAttachments={attachments.flatMap(({ id, size, ...chip }) =>
-              id !== undefined && size !== undefined ? [{ id, size, ...chip }] : [],
-            )}
-            model={actions.model}
-            onCancel={() => setEditing(false)}
-            onSave={(edited, kept) => {
-              setEditing(false);
-              actions.onEdit(edited, kept);
-            }}
-            saveDisabled={actions.streaming}
-          />
-        ) : isUser ? (
-          <>
-            <AttachmentChips attachments={attachments} />
-            <p className="max-w-[80ch] text-sm whitespace-pre-wrap">{text}</p>
-          </>
-        ) : (
-          <>
-            {thinking && (
-              <Thinking text={thinking} inProgress={info.status === "streaming" && !text} />
-            )}
-            <AssistantParts parts={message.parts} />
-            {info.status === "streaming" && !thinking && waitingForText(message.parts) && (
-              <Loader variant="typing" size="sm" />
-            )}
-            {info.status === "stopped" && (
-              <span className="text-xs text-muted-foreground italic">Stopped</span>
-            )}
-            {info.status === "error" && <ErrorMessage info={info} />}
-          </>
-        )}
-      </div>
-      {!editing && actions && (
-        <div className="absolute top-3 right-4 flex overflow-hidden rounded-md border bg-background opacity-0 shadow-sm group-focus-within:opacity-100 group-hover:opacity-100">
-          <CopyButton text={text} disabled={actions.streaming} />
-          {isUser ? (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              disabled={actions.streaming}
-              onClick={() => setEditing(true)}
-              title="Edit (new Branch)"
-              aria-label="Edit"
-            >
-              <PencilIcon />
-            </Button>
+          ) : isUser ? (
+            <>
+              <AttachmentChips attachments={attachments} />
+              <p className="max-w-[80ch] text-sm whitespace-pre-wrap">{text}</p>
+            </>
           ) : (
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              disabled={actions.streaming}
-              onClick={actions.onRegenerate}
-              title="Regenerate (new Branch)"
-              aria-label="Regenerate"
-            >
-              <RefreshCwIcon />
-            </Button>
+            <>
+              {thinking && (
+                <Thinking text={thinking} inProgress={info.status === "streaming" && !text} />
+              )}
+              <AssistantParts parts={message.parts} />
+              {info.status === "streaming" && !thinking && waitingForText(message.parts) && (
+                <Loader variant="typing" size="sm" />
+              )}
+              {info.status === "stopped" && (
+                <span className="text-xs text-muted-foreground italic">Stopped</span>
+              )}
+              {info.status === "error" && <ErrorMessage info={info} />}
+            </>
           )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

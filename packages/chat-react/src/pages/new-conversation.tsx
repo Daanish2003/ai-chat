@@ -49,17 +49,19 @@ export function NewConversationPage() {
       <main className="flex flex-1 items-center justify-center p-6">
         <Welcome onSuggest={(text) => void start(text)} disabled={disabled} />
       </main>
-      <div className="flex flex-col gap-2 border-t bg-background px-6 py-3">
-        {blocked && <MissingCredentialsBanner message={blocked} />}
-        <Composer
-          onSend={(text) => void start(text)}
-          disabled={disabled}
-          attachments={<DraftAttachmentChips draft={draft} />}
-          attachmentsPending={draft.pending}
-        >
-          <AttachButton draft={draft} disabled={!model || !!blocked} />
-          <SearchToggle search={search} />
-        </Composer>
+      <div className="border-t bg-background px-3 py-3 sm:px-6">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
+          {blocked && <MissingCredentialsBanner message={blocked} />}
+          <Composer
+            onSend={(text) => void start(text)}
+            disabled={disabled}
+            attachments={<DraftAttachmentChips draft={draft} />}
+            attachmentsPending={draft.pending}
+          >
+            <AttachButton draft={draft} disabled={!model || !!blocked} />
+            <SearchToggle search={search} />
+          </Composer>
+        </div>
       </div>
     </div>
   );

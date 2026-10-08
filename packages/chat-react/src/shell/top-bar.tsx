@@ -2,8 +2,8 @@ import { missingCredentialsMessage } from "@ai-chat/chat-core/models";
 import { awaitingTitle, titleWaitMs } from "@ai-chat/chat-core/title";
 import { Button } from "@ai-chat/ui/components/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { PanelLeftIcon, PencilIcon, SearchIcon } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { MenuIcon, PanelLeftIcon, PencilIcon, SearchIcon } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "../conversation-list";
@@ -15,41 +15,59 @@ import { ModelPicker } from "./model-picker";
 /** The bar above the page: the Conversation title (renamed inline) or the page's name. */
 export function TopBar({
   panelOpen,
+  drawerOpen,
   onOpenPanel,
+  onOpenDrawer,
   onOpenSearch,
   userMenu,
 }: {
   panelOpen: boolean;
+  /** The small-screen drawer (rail and Conversation panel) is open. */
+  drawerOpen: boolean;
   onOpenPanel: () => void;
+  onOpenDrawer: () => void;
   /** Opens the ⌘K palette. */
   onOpenSearch: () => void;
   /** The host app's account menu, at the right end. */
   userMenu?: ReactNode;
 }) {
   const { conversationId: id, newConversation, pageTitle } = useChatLocation();
+  const modKey = useModKey();
 
   return (
-    <header className="flex h-11 shrink-0 items-center gap-2 border-b px-2">
+    <header className="flex h-11 shrink-0 items-center gap-1 border-b px-2 sm:gap-2">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        aria-label="Menu"
+        aria-controls="app-drawer"
+        aria-expanded={drawerOpen}
+        onClick={onOpenDrawer}
+        className="md:hidden"
+      >
+        <MenuIcon />
+      </Button>
       {!panelOpen && (
         <Button
           variant="ghost"
           size="icon-sm"
           aria-label="Show Conversations"
           onClick={onOpenPanel}
+          className="max-md:hidden"
         >
           <PanelLeftIcon />
         </Button>
       )}
       {id ? (
-        <ConversationTitle key={id} id={id} />
+        <ConversationTitle key={`title:${id}`} id={id} />
       ) : (
-        <span className="px-2 text-sm text-muted-foreground">
+        <span className="truncate px-2 text-sm text-muted-foreground">
           {newConversation ? "New Conversation" : pageTitle}
         </span>
       )}
-      {(id || newConversation) && <span className="text-muted-foreground">/</span>}
+      {(id || newConversation) && <span className="text-muted-foreground max-sm:hidden">/</span>}
       {id ? (
-        <ConversationModelPicker key={id} id={id} />
+        <ConversationModelPicker key={`model:${id}`} id={id} />
       ) : (
         newConversation && <NewConversationModelPicker />
       )}
@@ -58,15 +76,34 @@ export function TopBar({
         variant="ghost"
         size="sm"
         aria-haspopup="dialog"
-        title="Search (⌘K / Ctrl+K)"
+        aria-label="Search"
+        title={modKey ? `Search (${modKey}K)` : "Search"}
         onClick={onOpenSearch}
       >
-        <SearchIcon /> Search
-        <kbd className="rounded-sm border px-1 text-[10px] text-muted-foreground">⌘K</kbd>
+        <SearchIcon /> <span className="max-sm:hidden">Search</span>
+        {modKey && (
+          <kbd className="rounded-sm border px-1 text-[10px] text-muted-foreground max-sm:hidden">
+            {modKey}K
+          </kbd>
+        )}
       </Button>
-      {id && <ShareButton key={id} conversationId={id} />}
+      {id && <ShareButton key={`share:${id}`} conversationId={id} />}
       {userMenu}
     </header>
+  );
+}
+
+const subscribeToNothing = () => () => {};
+
+/**
+ * The palette shortcut's modifier as this device labels it: "⌘" on Apple devices, "Ctrl+"
+ * elsewhere. `undefined` on the server, which can't tell.
+ */
+function useModKey() {
+  return useSyncExternalStore(
+    subscribeToNothing,
+    () => (/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+"),
+    () => undefined,
   );
 }
 
@@ -177,7 +214,7 @@ function ConversationTitle({ id }: { id: string }) {
         aria-label="Conversation title"
         defaultValue={title ?? ""}
         maxLength={200}
-        className="h-7 w-72 rounded-md border bg-background px-2 text-sm outline-none"
+        className="h-7 w-72 min-w-0 rounded-md border bg-background px-2 text-sm outline-none"
         onBlur={(event) => save(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Escape") event.currentTarget.value = title ?? "";
@@ -192,11 +229,11 @@ function ConversationTitle({ id }: { id: string }) {
       type="button"
       title="Rename"
       disabled={!conversation.isSuccess}
-      className="group flex min-w-0 items-center gap-1.5 px-2 text-sm font-medium"
+      className="group flex min-w-16 items-center gap-1.5 px-2 text-sm font-medium"
       onClick={() => setRenaming(true)}
     >
       <span className="truncate">{title ?? "Untitled"}</span>
-      <PencilIcon className="size-3 shrink-0 opacity-0 group-hover:opacity-60" />
+      <PencilIcon className="size-3 shrink-0 opacity-0 group-hover:opacity-60 pointer-coarse:opacity-60" />
     </button>
   );
 }
