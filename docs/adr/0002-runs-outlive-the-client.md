@@ -1,3 +1,7 @@
+---
+Status: accepted, amended by ADR 0006 (the registry, boot sweep and polling are replaced)
+---
+
 # Assistant runs outlive the client; Stop is an explicit call
 
 TanStack AI's default ties a run to its HTTP request: when the client disconnects (Stop, reload, closed tab), the response stream's `cancel()` aborts the provider call. We decouple them instead. `/api/chat` keeps draining `chat()` to the end whether or not anyone is reading the SSE stream, and snapshots the assistant Message's `parts` to Postgres at most once a second. A reloaded page polls the Active Branch until nothing is `streaming`. Stop is an explicit oRPC `chat.stop({ messageId })` that aborts the run through an in-process `AbortController` registry, so the server alone decides how a run ends (`complete`, `stopped` or `error`) and the client just sees the stream close.

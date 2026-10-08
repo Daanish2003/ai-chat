@@ -20,6 +20,10 @@ _Avoid_: Chat, thread, session
 One turn in a Conversation, authored by either the user or the assistant.
 _Avoid_: Turn, reply, prompt
 
+**Run**:
+The generation of one assistant Message, from the moment it's sent until it ends `complete`, `stopped` or `error`. It goes on without a reader, and anyone can join it while it's live.
+_Avoid_: Job, generation, stream
+
 **Branch**:
 One path through a Conversation's tree of Messages, created when a Message is edited or regenerated.
 _Avoid_: Fork, version, variant
