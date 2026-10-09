@@ -13,7 +13,7 @@ export const chatRouter = {
   stop: protectedProcedure
     .input(z.object({ messageId: z.uuid() }))
     .handler(async ({ context, input }) => {
-      const owned = await findMessage(context.deps, context.session.user.id, input.messageId);
+      const owned = await findMessage(context.deps, context.user.id, input.messageId);
       if (!owned) throw new ORPCError("NOT_FOUND", { message: "Message not found" });
       await stopRun(context.deps, owned.id);
     }),

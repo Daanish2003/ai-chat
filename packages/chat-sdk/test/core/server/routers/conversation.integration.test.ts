@@ -9,7 +9,7 @@ import { insertConversation, insertMessage } from "../../../support/conversation
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
 import { liveModelsFetch } from "../../../support/live-models";
-import { createTestClient, insertUser, sessionFor } from "../../../support/router-client";
+import { createTestClient, insertUser, chatUserFor } from "../../../support/router-client";
 
 async function signedIn() {
   const user = await insertUser();
@@ -408,7 +408,7 @@ describe("conversation.setModel", () => {
             },
           }),
         }),
-        sessionFor(user),
+        chatUserFor(user),
         deps,
       );
       await response.text();

@@ -7,7 +7,7 @@ import type { AppDeps } from "../../../../core/server/deps";
 import { insertConversation } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
-import { insertUser, sessionFor, type TestUser } from "../../../support/router-client";
+import { insertUser, chatUserFor, type TestUser } from "../../../support/router-client";
 import { handleChat } from "../../../../core/server/chat/handle-chat";
 import { handleJoin } from "../../../../core/server/chat/join-run";
 
@@ -48,7 +48,7 @@ async function setup() {
           },
         }),
       }),
-      sessionFor(user),
+      chatUserFor(user),
       deps,
     );
   return { user, deps, fake, conv, send };
@@ -74,7 +74,7 @@ describe("joining a Run", () => {
     const reply = await assistantIdOf(deps, conv.id);
 
     await fake.release(3);
-    const join = await handleJoin(joinRequest(reply.id), sessionFor(user), deps);
+    const join = await handleJoin(joinRequest(reply.id), chatUserFor(user), deps);
     expect(join.status).toBe(200);
     expect(join.headers.get("content-type")).toContain("text/event-stream");
     expect(await assistantIdOf(deps, conv.id)).toMatchObject({ status: "streaming" });
@@ -96,7 +96,7 @@ describe("joining a Run", () => {
     const posted = await posting.text();
     const reply = await assistantIdOf(deps, conv.id);
 
-    const join = await handleJoin(joinRequest(reply.id), sessionFor(user), deps);
+    const join = await handleJoin(joinRequest(reply.id), chatUserFor(user), deps);
 
     expect(await join.text()).toBe(posted);
   });
@@ -111,7 +111,7 @@ describe("joining a Run", () => {
 
     const join = await handleJoin(
       joinRequest(reply.id, { "Last-Event-ID": firstId }),
-      sessionFor(user),
+      chatUserFor(user),
       deps,
     );
     const resumed = await join.text();
@@ -129,20 +129,8 @@ describe("joining a Run", () => {
     const reply = await assistantIdOf(deps, conv.id);
     const someoneElse: TestUser = await insertUser();
 
-    const join = await handleJoin(joinRequest(reply.id), sessionFor(someoneElse), deps);
+    const join = await handleJoin(joinRequest(reply.id), chatUserFor(someoneElse), deps);
 
     expect(join.status).toBe(404);
-  });
-
-  it("refuses a join without a session", async () => {
-    const { deps, fake, conv, send } = await setup();
-    const posting = await send();
-    await fake.releaseAll();
-    await posting.text();
-    const reply = await assistantIdOf(deps, conv.id);
-
-    const join = await handleJoin(joinRequest(reply.id), null, deps);
-
-    expect(join.status).toBe(401);
   });
 });

@@ -22,6 +22,6 @@ export const searchRouter = {
       if (input.cursor !== undefined && !cursor) {
         throw new ORPCError("BAD_REQUEST", { message: "Invalid cursor" });
       }
-      return searchMessages(context.deps, context.session.user.id, input.q, cursor);
+      return searchMessages(context.deps, context.user.id, input.q, cursor);
     }),
 };

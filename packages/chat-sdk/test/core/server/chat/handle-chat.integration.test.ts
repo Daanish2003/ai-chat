@@ -11,7 +11,7 @@ import { createFakeAdapter, round, runError, text, thinking } from "../../../sup
 import {
   createTestClient,
   insertUser,
-  sessionFor,
+  chatUserFor,
   type TestUser,
 } from "../../../support/router-client";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
@@ -61,7 +61,7 @@ async function setup({
     // Titled, so no automatic title call takes the scripted adapter (see title.integration.test.ts).
     title: "Test Conversation",
   });
-  const send = (command: Partial<ChatCommand> = {}, as: TestUser | null = user) =>
+  const send = (command: Partial<ChatCommand> = {}, as: TestUser = user) =>
     handleChat(
       chatRequest({
         conversationId: conv.id,
@@ -72,7 +72,7 @@ async function setup({
         webSearch: false,
         ...command,
       }),
-      as ? sessionFor(as) : null,
+      chatUserFor(as),
       deps,
     );
   return { user, deps, fake, adapterCalls, conv, send };
@@ -196,7 +196,7 @@ describe("handleChat", () => {
         },
         { messages: [{ id: "x", role: "user", parts: [{ type: "text", content: "Injected" }] }] },
       ),
-      sessionFor(user),
+      chatUserFor(user),
       deps,
     );
     await response.text();
@@ -437,15 +437,6 @@ describe("chat.stop", () => {
 });
 
 describe("handleChat refuses", () => {
-  it("a caller without a session with 401", async () => {
-    const { deps, conv, send } = await setup();
-
-    const response = await send({}, null);
-
-    expect(response.status).toBe(401);
-    expect(await messagesOf(deps, conv.id)).toEqual([]);
-  });
-
   it("another user's Conversation with 404", async () => {
     const { deps, conv, send } = await setup();
     const stranger = await insertUser();

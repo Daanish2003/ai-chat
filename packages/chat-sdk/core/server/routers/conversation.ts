@@ -22,7 +22,7 @@ export const conversationRouter = {
   create: protectedProcedure
     .input(z.object({ model: z.string() }))
     .handler(async ({ context, input }) => {
-      if (!(await resolveModel(context.deps, context.session.user.id, input.model))) {
+      if (!(await resolveModel(context.deps, context.user.id, input.model))) {
         throw new ORPCError("BAD_REQUEST", {
           message: `"${input.model}" is not an available Model`,
         });
@@ -30,18 +30,18 @@ export const conversationRouter = {
       const id = uuidv7();
       await context.deps.db
         .insert(conversation)
-        .values({ id, userId: context.session.user.id, model: input.model });
+        .values({ id, userId: context.user.id, model: input.model });
       return { id };
     }),
 
   /** The caller's Conversations for the Conversation panel, newest Message first. */
   list: protectedProcedure.handler(({ context }) =>
-    listConversations(context.deps, context.session.user.id),
+    listConversations(context.deps, context.user.id),
   ),
 
   /** The Conversation with its Active Branch, oldest Message first. */
   get: protectedProcedure.input(z.object({ id: z.uuid() })).handler(async ({ context, input }) => {
-    const row = await findConversation(context.deps, context.session.user.id, input.id);
+    const row = await findConversation(context.deps, context.user.id, input.id);
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
     const messages = await loadActiveBranch(context.deps, row.id, row.activeLeafId);
     return {
@@ -59,7 +59,7 @@ export const conversationRouter = {
   switchBranch: protectedProcedure
     .input(z.object({ messageId: z.uuid() }))
     .handler(async ({ context, input }) => {
-      const result = await switchBranch(context.deps, context.session.user.id, input.messageId);
+      const result = await switchBranch(context.deps, context.user.id, input.messageId);
       if (result === "not_found")
         throw new ORPCError("NOT_FOUND", { message: "Message not found" });
       if (result === "streaming") {
@@ -75,7 +75,7 @@ export const conversationRouter = {
     .handler(async ({ context, input }) => {
       const renamed = await renameConversation(
         context.deps,
-        context.session.user.id,
+        context.user.id,
         input.id,
         input.title,
       );
@@ -86,7 +86,7 @@ export const conversationRouter = {
   setModel: protectedProcedure
     .input(z.object({ id: z.uuid(), model: z.string() }))
     .handler(async ({ context, input }) => {
-      const userId = context.session.user.id;
+      const userId = context.user.id;
       if (!(await findConversation(context.deps, userId, input.id))) {
         throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
       }
@@ -107,7 +107,7 @@ export const conversationRouter = {
   delete: protectedProcedure
     .input(z.object({ id: z.uuid() }))
     .handler(async ({ context, input }) => {
-      const deleted = await deleteConversation(context.deps, context.session.user.id, input.id);
+      const deleted = await deleteConversation(context.deps, context.user.id, input.id);
       if (!deleted) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
     }),
 };

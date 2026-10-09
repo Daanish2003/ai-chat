@@ -1,6 +1,5 @@
-import type { MessageRow } from "../../server/db/schema/chat";
-
 import type { AttachmentInfo } from "../attachments/kinds";
+import type { MessageRecord } from "../chat/message-record";
 import { parseStoredParts, toUIParts } from "../chat/parts";
 import { redactAttachmentsForShare, redactForShare } from "./redact";
 
@@ -10,7 +9,7 @@ import { redactAttachmentsForShare, redactForShare } from "./redact";
  */
 export function toSharedConversation(
   link: { title: string; updatedAt: Date },
-  path: MessageRow[],
+  path: MessageRecord[],
   attachments: Map<string, AttachmentInfo[]>,
 ) {
   return {

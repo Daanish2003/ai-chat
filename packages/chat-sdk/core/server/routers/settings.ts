@@ -6,9 +6,7 @@ import { protectedProcedure } from "../procedures";
 import { loadSettings, saveTitleModel } from "../settings/store";
 
 export const settingsRouter = {
-  get: protectedProcedure.handler(({ context }) =>
-    loadSettings(context.deps, context.session.user.id),
-  ),
+  get: protectedProcedure.handler(({ context }) => loadSettings(context.deps, context.user.id)),
 
   /**
    * Chooses the Model that writes automatic titles; `null` is "Same as first reply". Credentials
@@ -22,6 +20,6 @@ export const settingsRouter = {
           message: `"${input.titleModel}" is not an available Model`,
         });
       }
-      await saveTitleModel(context.deps, context.session.user.id, input.titleModel);
+      await saveTitleModel(context.deps, context.user.id, input.titleModel);
     }),
 };

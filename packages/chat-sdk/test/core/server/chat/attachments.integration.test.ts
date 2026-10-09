@@ -13,7 +13,7 @@ import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
 import {
   createTestClient,
   insertUser,
-  sessionFor,
+  chatUserFor,
   type TestUser,
 } from "../../../support/router-client";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
@@ -57,7 +57,7 @@ async function setup() {
           },
         }),
       }),
-      sessionFor(as),
+      chatUserFor(as),
       deps,
     );
   return { user, deps, fake, conv, send, client: createTestClient({ user, deps }) };

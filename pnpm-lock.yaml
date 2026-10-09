@@ -167,13 +167,7 @@ catalogs:
     '@orpc/client':
       specifier: ^1.15.0
       version: 1.15.4
-    '@orpc/openapi':
-      specifier: ^1.15.0
-      version: 1.15.4
     '@orpc/server':
-      specifier: ^1.15.0
-      version: 1.15.4
-    '@orpc/zod':
       specifier: ^1.15.0
       version: 1.15.4
     '@types/react':
@@ -279,18 +273,12 @@ importers:
       '@orpc/client':
         specifier: 'catalog:'
         version: 1.15.4
-      '@orpc/openapi':
-        specifier: 'catalog:'
-        version: 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
       '@orpc/server':
         specifier: 'catalog:'
         version: 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
       '@orpc/tanstack-query':
         specifier: ^1.15.0
         version: 1.15.4(@orpc/client@1.15.4)(@tanstack/query-core@5.104.1)
-      '@orpc/zod':
-        specifier: 'catalog:'
-        version: 1.15.4(@orpc/contract@1.15.4)(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)(zod@4.6.5)
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
@@ -416,27 +404,18 @@ importers:
 
   packages/chat-sdk:
     dependencies:
-      '@ai-chat/auth':
-        specifier: workspace:*
-        version: link:../auth
       '@ai-chat/db':
         specifier: workspace:*
         version: link:../db
       '@orpc/client':
         specifier: 'catalog:'
         version: 1.15.4
-      '@orpc/openapi':
-        specifier: 'catalog:'
-        version: 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
       '@orpc/server':
         specifier: 'catalog:'
         version: 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
       '@orpc/tanstack-query':
         specifier: ^1.15.0
         version: 1.15.4(@orpc/client@1.15.4)(@tanstack/query-core@5.104.1)
-      '@orpc/zod':
-        specifier: 'catalog:'
-        version: 1.15.4(@orpc/contract@1.15.4)(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai':
         specifier: 0.66.0
         version: 0.66.0(zod@4.6.5)
@@ -1366,15 +1345,6 @@ packages:
   '@orpc/interop@1.15.4':
     resolution: {integrity: sha512-ZCTNPenr1clZ2RBCJxsCsvS3eS8MJIDSx/LH1AIAKj9RjvfOXI/BnjHmgD4jUEIa6FcG+c2LV/1IXVJpC6NoTw==}
 
-  '@orpc/json-schema@1.15.4':
-    resolution: {integrity: sha512-UIPzRBWuSkWejOJwIAGFkW8H0iOvqobGJnVGRbpKOGAw1kiJW2EqHQ+2ZhE2o/cTi/A+HnQj0YG9tmrk5Vytnw==}
-
-  '@orpc/openapi-client@1.15.4':
-    resolution: {integrity: sha512-z+8gRUp9bhVuA2tFlzJDCaUbLV/whZec25fmYb0VtP2N6iPfY0d7hYZvX47F/WrcuwaLCTqkbVAzK8Xb2cKF/w==}
-
-  '@orpc/openapi@1.15.4':
-    resolution: {integrity: sha512-+J2skkYlqcB7O9nUJ9rhV1IvisimIwxyn21nAWP/jvSg5PN/klqSO2r6XkxiAaCukw/QE5BFMbN8c0ZdLrMEnw==}
-
   '@orpc/server@1.15.4':
     resolution: {integrity: sha512-Ccs2Pdwql2XRtk7bzkiZohoYuUVNcffydbswhz75rdepCQt0HmKosfVhsqjAqCKDDB7c84ct7Q7c5Z/xQak7pQ==}
     peerDependencies:
@@ -1422,13 +1392,6 @@ packages:
     peerDependencies:
       '@orpc/client': 1.15.4
       '@tanstack/query-core': '>=5.80.2'
-
-  '@orpc/zod@1.15.4':
-    resolution: {integrity: sha512-k7W5yvagfcGztACr7qpB7Yyp3iMF9BzCJX9uDH9EEouuM2gt/WzsGtkDw//LTpPPsJQerltdKrdGfaWnbrGBhQ==}
-    peerDependencies:
-      '@orpc/contract': 1.15.4
-      '@orpc/server': 1.15.4
-      zod: '>=3.25.0'
 
   '@oxc-project/types@0.152.0':
     resolution: {integrity: sha512-oM/5rLBm2tPkg0iBgkH/FOeR3PCDpY19GTgAZjMFM8h9WI9VW7cLgzp6nwtarYKmovavIQZ+Fe/RKX/8C8O/Rw==}
@@ -4678,9 +4641,6 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
-  rou3@0.7.12:
-    resolution: {integrity: sha512-iFE4hLDuloSWcD7mjdCDhx2bKcIsYbtOTpfH5MHHLSKMOUyjqQXTeZVa289uuwEGEKFoE/BAPbhaU4B774nceg==}
-
   rou3@0.8.1:
     resolution: {integrity: sha512-ePa+XGk00/3HuCqrEnK3LxJW7I0SdNg6EFzKUJG73hMAdDcOUC/i/aSz7LSDwLrGr33kal/rqOGydzwl6U7zBA==}
 
@@ -5287,9 +5247,6 @@ packages:
     resolution: {integrity: sha512-Tb2FUhB4vUsGQlfSquQLYkApkuPAFQXGFzxWKHHumVz2dK+X1RUm/HnID4+TfIGYJ1kTcwOaCk/buYCEJr6YjQ==}
     engines: {node: '>=20.11'}
     hasBin: true
-
-  wildcard-match@5.1.6:
-    resolution: {integrity: sha512-Dh5N543my42ynFsbT0v6iPpaqJt95MOK1n/lhojVTe/hS3gpP6e938bbzsfaS0goLlJbhEOCIJPe/Tc3hckoaQ==}
 
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
@@ -6212,46 +6169,6 @@ snapshots:
 
   '@orpc/interop@1.15.4': {}
 
-  '@orpc/json-schema@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)':
-    dependencies:
-      '@orpc/contract': 1.15.4
-      '@orpc/interop': 1.15.4
-      '@orpc/openapi': 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
-      '@orpc/server': 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
-      '@orpc/shared': 1.15.4
-      json-schema-typed: 8.0.2
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-      - crossws
-      - fastify
-      - ws
-
-  '@orpc/openapi-client@1.15.4':
-    dependencies:
-      '@orpc/client': 1.15.4
-      '@orpc/contract': 1.15.4
-      '@orpc/shared': 1.15.4
-      '@orpc/standard-server': 1.15.4
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-
-  '@orpc/openapi@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)':
-    dependencies:
-      '@orpc/client': 1.15.4
-      '@orpc/contract': 1.15.4
-      '@orpc/interop': 1.15.4
-      '@orpc/openapi-client': 1.15.4
-      '@orpc/server': 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
-      '@orpc/shared': 1.15.4
-      '@orpc/standard-server': 1.15.4
-      json-schema-typed: 8.0.2
-      rou3: 0.7.12
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-      - crossws
-      - fastify
-      - ws
-
   '@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)':
     dependencies:
       '@orpc/client': 1.15.4
@@ -6329,22 +6246,6 @@ snapshots:
       '@tanstack/query-core': 5.104.1
     transitivePeerDependencies:
       - '@opentelemetry/api'
-
-  '@orpc/zod@1.15.4(@orpc/contract@1.15.4)(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@orpc/contract': 1.15.4
-      '@orpc/json-schema': 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
-      '@orpc/openapi': 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
-      '@orpc/server': 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
-      '@orpc/shared': 1.15.4
-      escape-string-regexp: 5.0.0
-      wildcard-match: 5.1.6
-      zod: 4.6.5
-    transitivePeerDependencies:
-      - '@opentelemetry/api'
-      - crossws
-      - fastify
-      - ws
 
   '@oxc-project/types@0.152.0': {}
 
@@ -9518,8 +9419,6 @@ snapshots:
       '@rolldown/binding-win32-arm64-msvc': 1.2.12
       '@rolldown/binding-win32-x64-msvc': 1.2.12
 
-  rou3@0.7.12: {}
-
   rou3@0.8.1: {}
 
   rou3@0.9.2: {}
@@ -10054,8 +9953,6 @@ snapshots:
       isexe: 3.1.5
 
   why-is-node-running@3.2.1: {}
-
-  wildcard-match@5.1.6: {}
 
   wrappy@1.0.2: {}
 

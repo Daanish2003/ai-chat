@@ -1,14 +1,15 @@
 import {
-  type ChatAdapter,
   type ChatLinkProps,
   type ChatLocation,
   type ChatPage,
   ChatProvider,
+  type ChatRouter,
 } from "@ai-chat/chat-sdk/client";
+import type { QueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useParams, useRouter, useSearch } from "@tanstack/react-router";
 import { type ReactNode, useMemo } from "react";
 
-import { orpc } from "@/utils/orpc";
+import { chatClient } from "@/utils/orpc";
 
 /** The web app's route for each chat page. */
 function routeOf(page: ChatPage) {
@@ -52,13 +53,17 @@ function useChatLocation(): ChatLocation {
   };
 }
 
-/** The chat UI wired to this app's oRPC client and TanStack Router routes. */
-export function WebChatProvider({ children }: { children: ReactNode }) {
+/** The chat UI wired to this app's chat client and TanStack Router routes. */
+export function WebChatProvider({
+  children,
+  queryClient,
+}: {
+  children: ReactNode;
+  queryClient: QueryClient;
+}) {
   const router = useRouter();
-  const adapter = useMemo<ChatAdapter>(
+  const chatRouter = useMemo<ChatRouter>(
     () => ({
-      orpc,
-      chatUrl: "/api/chat",
       shareUrl: (token) => `${window.location.origin}/share/${token}`,
       Link: ChatLink,
       navigate: (page, options) => router.navigate({ ...routeOf(page), ...options }),
@@ -66,5 +71,9 @@ export function WebChatProvider({ children }: { children: ReactNode }) {
     }),
     [router],
   );
-  return <ChatProvider adapter={adapter}>{children}</ChatProvider>;
+  return (
+    <ChatProvider client={chatClient} router={chatRouter} queryClient={queryClient}>
+      {children}
+    </ChatProvider>
+  );
 }

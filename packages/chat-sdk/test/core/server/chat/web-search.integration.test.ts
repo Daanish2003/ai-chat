@@ -9,7 +9,7 @@ import { insertConversation, insertMessage } from "../../../support/conversation
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text, toolCall } from "../../../support/fake-adapter";
 import { createFakeSearchClient } from "../../../support/fake-search-client";
-import { createTestClient, insertUser, sessionFor } from "../../../support/router-client";
+import { createTestClient, insertUser, chatUserFor } from "../../../support/router-client";
 import { citationPrompt } from "../../../../core/shared/chat/citations";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
 import { handleChat } from "../../../../core/server/chat/handle-chat";
@@ -86,7 +86,7 @@ async function setup({
           },
         }),
       }),
-      sessionFor(user),
+      chatUserFor(user),
       deps,
     );
   return { user, deps, fake, conv, send };

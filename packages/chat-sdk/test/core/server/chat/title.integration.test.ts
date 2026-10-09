@@ -9,7 +9,7 @@ import { saveTitleModel } from "../../../../core/server/settings/store";
 import { insertConversation, insertMessage } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, runError, text } from "../../../support/fake-adapter";
-import { createTestClient, insertUser, sessionFor } from "../../../support/router-client";
+import { createTestClient, insertUser, chatUserFor } from "../../../support/router-client";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
 import { handleChat } from "../../../../core/server/chat/handle-chat";
 import { titleConversation } from "../../../../core/server/chat/title";
@@ -75,7 +75,7 @@ async function setup({
           },
         }),
       }),
-      sessionFor(user),
+      chatUserFor(user),
       deps,
     );
     await response.text();

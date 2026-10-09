@@ -18,12 +18,12 @@ describe("privateData", () => {
   });
 
   it("returns the signed-in user", async () => {
-    const user = await insertUser({ name: "Ada", email: "ada@example.com" });
+    const user = await insertUser();
     const client = createTestClient({ user });
 
     const result = await client.privateData();
 
     expect(result.message).toBe("This is private");
-    expect(result.user).toMatchObject({ id: user.id, name: "Ada", email: "ada@example.com" });
+    expect(result.user).toEqual({ id: user.id });
   });
 });
