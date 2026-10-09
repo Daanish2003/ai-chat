@@ -6,6 +6,7 @@ import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
 import { createAppDeps, type AppDeps } from "./deps";
+import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
 
@@ -71,7 +72,13 @@ export function createChatHandler(
  * The Chat SDK for a Host. Nothing connects, starts or queries until the first request, so the
  * Host can build it at import time.
  */
-export function createChat(options: CreateChatOptions): { handler: ChatHandler } {
+export function createChat(options: CreateChatOptions): {
+  handler: ChatHandler;
+  /** Creates the `chat` schema and applies the bundled migrations. Run it at deploy time. */
+  migrate: () => Promise<void>;
+  /** Refuses (throws) while the `chat` schema is behind the bundled migrations. */
+  start: () => Promise<void>;
+} {
   let handler: ChatHandler | undefined;
   return {
     handler: (request) => {
@@ -85,6 +92,8 @@ export function createChat(options: CreateChatOptions): { handler: ChatHandler }
       );
       return handler(request);
     },
+    migrate: () => migrateSchema(options.databaseUrl),
+    start: () => assertMigrated(options.databaseUrl),
   };
 }
 

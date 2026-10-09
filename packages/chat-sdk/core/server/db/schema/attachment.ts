@@ -1,15 +1,6 @@
-import {
-  bytea,
-  index,
-  integer,
-  pgTable,
-  primaryKey,
-  text,
-  timestamp,
-  uuid,
-} from "drizzle-orm/pg-core";
+import { bytea, index, integer, primaryKey, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-import { user } from "@ai-chat/db/schema/auth";
+import { chatSchema } from "./chat-schema";
 import { message } from "./chat";
 
 /**
@@ -17,14 +8,13 @@ import { message } from "./chat";
  * through `message_attachment`, never copy it (ADR 0001). The bytes live in `attachment_blob`, so
  * reading the metadata never loads them.
  */
-export const attachment = pgTable(
+export const attachment = chatSchema.table(
   "attachment",
   {
     /** uuidv7, generated in app code. */
     id: uuid("id").primaryKey(),
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    /** The Host's user id, with no foreign key. */
+    userId: text("user_id").notNull(),
     filename: text("filename").notNull(),
     mediaType: text("media_type").notNull(),
     /** Size in bytes. */
@@ -35,7 +25,7 @@ export const attachment = pgTable(
 );
 
 /** An attachment's bytes, one row per attachment. */
-export const attachmentBlob = pgTable("attachment_blob", {
+export const attachmentBlob = chatSchema.table("attachment_blob", {
   attachmentId: uuid("attachment_id")
     .primaryKey()
     .references(() => attachment.id, { onDelete: "cascade" }),
@@ -46,7 +36,7 @@ export const attachmentBlob = pgTable("attachment_blob", {
  * Which attachments a Message carries, in order. Goes with its Message; an attachment can't be
  * deleted while a Message uses it (default `NO ACTION`).
  */
-export const messageAttachment = pgTable(
+export const messageAttachment = chatSchema.table(
   "message_attachment",
   {
     messageId: uuid("message_id")

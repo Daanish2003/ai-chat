@@ -1,17 +1,16 @@
-import { boolean, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
-import { user } from "@ai-chat/db/schema/auth";
+import { chatSchema } from "./chat-schema";
 
 /**
  * A user's Provider credentials or Tool credential for one service (ADR 0003).
  * `encrypted` is the AES-256-GCM encrypted JSON of the service's fields; the client only sees `hint`.
  */
-export const userCredentials = pgTable(
+export const userCredentials = chatSchema.table(
   "user_credentials",
   {
-    userId: text("user_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    /** The Host's user id, with no foreign key. */
+    userId: text("user_id").notNull(),
     /** A Provider id (`"anthropic"`, …) or a tool service (`"tavily"`). */
     service: text("service").notNull(),
     encrypted: text("encrypted").notNull(),
