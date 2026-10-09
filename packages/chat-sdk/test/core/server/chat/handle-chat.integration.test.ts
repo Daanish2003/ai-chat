@@ -8,20 +8,15 @@ import { insertConversation, insertMessage } from "../../../support/conversation
 import { createTestDeps } from "../../../support/deps";
 import { liveModelsFetch } from "../../../support/live-models";
 import { createFakeAdapter, round, runError, text, thinking } from "../../../support/fake-adapter";
-import {
-  createTestClient,
-  insertUser,
-  chatUserFor,
-  type TestUser,
-} from "../../../support/router-client";
+import { insertUser, type TestUser } from "../../../support/users";
+import { chatRpc, sendAs } from "../../../support/sdk";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
-import { handleChat } from "../../../../core/server/chat/handle-chat";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
 
 function chatRequest(command: Partial<ChatCommand> & Record<string, unknown>, extra = {}) {
   // useChat posts an AG-UI RunAgentInput; our command rides in `forwardedProps`.
-  return new Request("http://localhost/api/chat", {
+  return new Request("http://localhost/api/chat/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages: [], forwardedProps: command, ...extra }),
@@ -62,7 +57,7 @@ async function setup({
     title: "Test Conversation",
   });
   const send = (command: Partial<ChatCommand> = {}, as: TestUser = user) =>
-    handleChat(
+    sendAs(
       chatRequest({
         conversationId: conv.id,
         parentId: null,
@@ -72,7 +67,7 @@ async function setup({
         webSearch: false,
         ...command,
       }),
-      chatUserFor(as),
+      as,
       deps,
     );
   return { user, deps, fake, adapterCalls, conv, send };
@@ -91,7 +86,7 @@ async function conversationRow(deps: AppDeps, id: string) {
   return row!;
 }
 
-describe("handleChat", () => {
+describe("the Run endpoint", () => {
   it("streams the assistant Message as server-sent events and saves it complete", async () => {
     const { deps, conv, send } = await setup();
 
@@ -184,7 +179,7 @@ describe("handleChat", () => {
     // Another Branch that must not be sent.
     await insertMessage({ conversationId: conv.id, role: "user", text: "Other Branch" });
 
-    const response = await handleChat(
+    const response = await sendAs(
       chatRequest(
         {
           conversationId: conv.id,
@@ -196,7 +191,7 @@ describe("handleChat", () => {
         },
         { messages: [{ id: "x", role: "user", parts: [{ type: "text", content: "Injected" }] }] },
       ),
-      chatUserFor(user),
+      user,
       deps,
     );
     await response.text();
@@ -241,7 +236,6 @@ describe("handleChat", () => {
         status: "complete",
         parts: { parts: [{ type: "text", text: "Hello there!" }] },
       });
-    expect(deps.runs.size).toBe(0);
   });
 
   it("ends a run that hits the cap as error, timed out, keeping the text that arrived", async () => {
@@ -260,7 +254,6 @@ describe("handleChat", () => {
       errorReason: null,
       parts: { parts: [{ type: "text", text: "Hello" }] },
     });
-    expect(deps.runs.size).toBe(0);
   });
 
   it.each([
@@ -308,16 +301,15 @@ describe("handleChat", () => {
     });
   });
 
-  it("registers the run in deps.runs until it ends", async () => {
+  it("keeps the Message streaming until the reply ends", async () => {
     const { deps, conv, fake, send } = await setup({ manual: true });
 
     const response = await send();
-    const [, reply] = await messagesOf(deps, conv.id);
-    expect([...deps.runs.keys()]).toEqual([reply!.id]);
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({ status: "streaming" });
 
     await fake.releaseAll();
     await response.text();
-    expect(deps.runs.size).toBe(0);
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({ status: "complete" });
   });
 });
 
@@ -338,9 +330,11 @@ describe("chat.stop", () => {
     const { user, deps, conv, send } = await setup({ deps: { adapterFor: deafAdapter } });
     const response = await send();
     const [, reply] = await messagesOf(deps, conv.id);
-    await expect.poll(() => deps.runs.has(reply!.id)).toBe(true);
+    await expect
+      .poll(async () => (await messagesOf(deps, conv.id))[1], { interval: 10 })
+      .toMatchObject({ parts: { parts: [{ type: "text", text: "Hello" }] } });
 
-    await createTestClient({ user, deps }).chat.stop({ messageId: reply!.id });
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply!.id });
 
     await response.text();
     expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
@@ -353,9 +347,11 @@ describe("chat.stop", () => {
     const { user, deps, conv, send } = await setup({ deps: { adapterFor: deafAdapter } });
     const response = await send();
     const [, reply] = await messagesOf(deps, conv.id);
-    await expect.poll(() => deps.runs.has(reply!.id)).toBe(true);
+    await expect
+      .poll(async () => (await messagesOf(deps, conv.id))[1], { interval: 10 })
+      .toMatchObject({ parts: { parts: [{ type: "text", text: "Hello" }] } });
 
-    await createTestClient({ user, deps }).chat.stop({ messageId: reply!.id });
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply!.id });
 
     expect(await response.text()).toContain('"type":"RUN_FINISHED"');
   });
@@ -379,7 +375,7 @@ describe("chat.stop", () => {
     const [, reply] = await messagesOf(deps, conv.id);
     await fake.release(3);
 
-    await createTestClient({ user, deps }).chat.stop({ messageId: reply!.id });
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply!.id });
 
     await response.text();
     expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
@@ -387,7 +383,6 @@ describe("chat.stop", () => {
       error: null,
       parts: { parts: [{ type: "text", text: "Hello" }] },
     });
-    expect(deps.runs.size).toBe(0);
   });
 
   it("marks a streaming Message with no run in this process stopped", async () => {
@@ -402,7 +397,7 @@ describe("chat.stop", () => {
       status: "streaming",
     });
 
-    await createTestClient({ user, deps }).chat.stop({ messageId: reply.id });
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply.id });
 
     expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
       status: "stopped",
@@ -415,7 +410,7 @@ describe("chat.stop", () => {
     const conv = await insertConversation(user);
     const reply = await insertMessage({ conversationId: conv.id, role: "assistant", text: "Done" });
 
-    await createTestClient({ user, deps }).chat.stop({ messageId: reply.id });
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply.id });
 
     expect((await messagesOf(deps, conv.id))[0]).toMatchObject({ status: "complete" });
   });
@@ -427,16 +422,19 @@ describe("chat.stop", () => {
     const stranger = await insertUser();
 
     await expect(
-      createTestClient({ user: stranger, deps }).chat.stop({ messageId: reply!.id }),
+      chatRpc({ user: stranger, deps }).chat.stop({ messageId: reply!.id }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
 
-    expect(deps.runs.has(reply!.id)).toBe(true);
     await fake.releaseAll();
     await response.text();
+    expect((await messagesOf(deps, conv.id))[1]).toMatchObject({
+      status: "complete",
+      parts: { parts: [{ type: "text", text: "Hello there!" }] },
+    });
   });
 });
 
-describe("handleChat refuses", () => {
+describe("the Run endpoint refuses", () => {
   it("another user's Conversation with 404", async () => {
     const { deps, conv, send } = await setup();
     const stranger = await insertUser();
@@ -537,7 +535,7 @@ async function seedExchange(conversationId: string) {
   return { question, reply };
 }
 
-describe("handleChat Branches", () => {
+describe("the Run endpoint Branches", () => {
   it("edits a Message into a sibling Branch, keeping the old one", async () => {
     const { deps, conv, fake, send } = await setup();
     const { question, reply } = await seedExchange(conv.id);
@@ -632,7 +630,7 @@ describe("handleChat Branches", () => {
       createdAt: ago(8),
       active: true,
     });
-    const client = createTestClient({ user, deps });
+    const client = chatRpc({ user, deps });
 
     await client.conversation.switchBranch({ messageId: reply.id });
     // The client sends the next Message under the last one it shows.
@@ -655,7 +653,7 @@ describe("handleChat Branches", () => {
   });
 });
 
-describe("handleChat thinking", () => {
+describe("the Run endpoint thinking", () => {
   /** A first send whose reply thinks before it answers, then a follow-up on `model`. */
   async function thinkThenFollowUp(model: string) {
     const ctx = await setup({
@@ -713,7 +711,7 @@ describe("handleChat thinking", () => {
   });
 });
 
-describe("handleChat with live-listed Models", () => {
+describe("the Run endpoint with live-listed Models", () => {
   it("streams a reply from a Model installed on the user's Ollama host", async () => {
     const live = liveModelsFetch({ ollama: ["qwen3:8b"] });
     const { user, deps, adapterCalls, conv, send } = await setup({ deps: { fetch: live.fetch } });

@@ -10,14 +10,9 @@ import { insertAttachment, linkTestAttachments } from "../../../support/attachme
 import { insertConversation, insertMessage } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
-import {
-  createTestClient,
-  insertUser,
-  chatUserFor,
-  type TestUser,
-} from "../../../support/router-client";
+import { insertUser, type TestUser } from "../../../support/users";
+import { chatRpc, sendAs } from "../../../support/sdk";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
-import { handleChat } from "../../../../core/server/chat/handle-chat";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
 const openaiModel = "openai:gpt-5.6";
@@ -40,8 +35,8 @@ async function setup() {
   // Titled, so no title is generated in the background (a second adapter call).
   const conv = await insertConversation(user, { title: "Attachments" });
   const send = (command: Partial<ChatCommand> = {}, as: TestUser = user) =>
-    handleChat(
-      new Request("http://localhost/api/chat", {
+    sendAs(
+      new Request("http://localhost/api/chat/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -57,10 +52,10 @@ async function setup() {
           },
         }),
       }),
-      chatUserFor(as),
+      as,
       deps,
     );
-  return { user, deps, fake, conv, send, client: createTestClient({ user, deps }) };
+  return { user, deps, fake, conv, send, client: chatRpc({ user, deps }) };
 }
 
 async function messagesOf(deps: AppDeps, conversationId: string) {
@@ -80,7 +75,7 @@ async function linksOf(deps: AppDeps, messageId: string) {
   return rows.map((row) => row.attachmentId);
 }
 
-describe("handleChat attachments", () => {
+describe("the Run endpoint attachments", () => {
   it("sends uploaded files with the Message and links them to it", async () => {
     const { deps, fake, conv, send, client } = await setup();
     const image = await client.attachment.upload({

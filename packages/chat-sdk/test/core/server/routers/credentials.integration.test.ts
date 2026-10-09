@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { loadCredentials } from "../../../../core/server/credentials/store";
 import { createTestDeps } from "../../../support/deps";
-import { createTestClient, insertUser } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc } from "../../../support/sdk";
 
 const goodKey = "sk-ant-api03-secret-good-1234";
 
@@ -20,7 +21,7 @@ async function signedIn(status = 200) {
   const user = await insertUser();
   const provider = providerAnswering(status);
   const deps = createTestDeps({ fetch: provider.fetch });
-  return { user, deps, provider, client: createTestClient({ user, deps }) };
+  return { user, deps, provider, client: chatRpc({ user, deps }) };
 }
 
 describe("credentials", () => {
@@ -115,11 +116,11 @@ describe("credentials", () => {
 
   it("keeps the saved credentials when a replacement is rejected", async () => {
     const user = await insertUser();
-    const accepting = createTestClient({
+    const accepting = chatRpc({
       user,
       deps: createTestDeps({ fetch: providerAnswering(200).fetch }),
     });
-    const rejecting = createTestClient({
+    const rejecting = chatRpc({
       user,
       deps: createTestDeps({ fetch: providerAnswering(401).fetch }),
     });
@@ -213,7 +214,7 @@ describe("credentials", () => {
     await client.credentials.save({ service: "anthropic", fields: { apiKey: goodKey } });
     const rotated = createTestDeps({ keyEncryptionSecret: "a-different-secret-of-32-characters!" });
 
-    await expect(createTestClient({ user, deps: rotated }).credentials.list()).resolves.toEqual([]);
+    await expect(chatRpc({ user, deps: rotated }).credentials.list()).resolves.toEqual([]);
     await expect(loadCredentials(rotated, user.id, "anthropic")).resolves.toBeNull();
   });
 
@@ -232,7 +233,7 @@ describe("credentials", () => {
   });
 
   it("rejects signed-out callers", async () => {
-    const client = createTestClient();
+    const client = chatRpc();
 
     await expect(client.credentials.list()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     await expect(

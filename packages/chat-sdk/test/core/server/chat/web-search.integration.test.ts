@@ -9,10 +9,10 @@ import { insertConversation, insertMessage } from "../../../support/conversation
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text, toolCall } from "../../../support/fake-adapter";
 import { createFakeSearchClient } from "../../../support/fake-search-client";
-import { createTestClient, insertUser, chatUserFor } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc, sendAs } from "../../../support/sdk";
 import { citationPrompt } from "../../../../core/shared/chat/citations";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
-import { handleChat } from "../../../../core/server/chat/handle-chat";
 import { curatedModels } from "../../../../core/shared/chat/models";
 import { sweepInterruptedRuns } from "../../../../core/server/chat/run";
 
@@ -69,8 +69,8 @@ async function setup({
   // Titled, so a complete run doesn't call the adapter again to title it (#26).
   const conv = await insertConversation(user, { title: "Web search" });
   const send = (command: Partial<ChatCommand> = {}) =>
-    handleChat(
-      new Request("http://localhost/api/chat", {
+    sendAs(
+      new Request("http://localhost/api/chat/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -86,7 +86,7 @@ async function setup({
           },
         }),
       }),
-      chatUserFor(user),
+      user,
       deps,
     );
   return { user, deps, fake, conv, send };
@@ -211,7 +211,7 @@ describe("the web_search tool", () => {
       .toEqual(storedParts([search({ state: "running", results: [] })]));
     const reply = await replyOf(deps, conv.id);
 
-    await createTestClient({ user, deps }).chat.stop({ messageId: reply.id });
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply.id });
 
     await response.text();
     expect(await replyOf(deps, conv.id)).toMatchObject({

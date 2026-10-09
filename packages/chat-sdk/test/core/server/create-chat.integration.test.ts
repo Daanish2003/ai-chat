@@ -1,31 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { createChatClient } from "../../../core/client/chat-client";
-import { createChat, createChatHandler } from "../../../core/server/create-chat";
+import { createChat } from "../../../core/server/create-chat";
 import { saveCredentials } from "../../../core/server/credentials/store";
-import type { AppDeps } from "../../../core/server/deps";
 import { message } from "../../../core/server/db/schema/chat";
 import { eq } from "drizzle-orm";
 import { insertConversation, insertMessage } from "../../support/conversations";
 import { createTestDeps } from "../../support/deps";
 import { createFakeAdapter, round, text } from "../../support/fake-adapter";
-import { insertUser, type TestUser } from "../../support/router-client";
+import { insertUser } from "../../support/users";
+import { createTestChat } from "../../support/sdk";
 import { getTestDb } from "../../support/test-database";
 
 const basePath = "/api/chat";
 const baseUrl = `http://localhost${basePath}`;
-
-/**
- * A browser client whose fetch is the handler, so no HTTP server runs. `user` is who `getUser`
- * returns; `null` is a signed-out caller.
- */
-function chatFor(user: TestUser | null, deps: AppDeps = createTestDeps()) {
-  const handler = createChatHandler(deps, {
-    basePath,
-    getUser: () => (user ? { id: user.id } : null),
-  });
-  return createChatClient({ baseUrl, fetch: handler });
-}
 
 describe("createChat", () => {
   it("opens no connection until the first request", () => {
@@ -42,7 +29,7 @@ describe("createChat", () => {
 
 describe("the chat handler", () => {
   it("answers 401 to every request without a user, except the public Shared link read", async () => {
-    const client = chatFor(null);
+    const client = createTestChat({ user: null });
 
     const rpc = await client.fetch(
       new Request(`${baseUrl}/rpc/healthCheck`, { method: "POST", body: "{}" }),
@@ -57,7 +44,7 @@ describe("the chat handler", () => {
     const user = await insertUser();
     const conv = await insertConversation(user, { title: "Hello" });
 
-    const list = await chatFor(user).rpc.conversation.list();
+    const list = await createTestChat({ user }).rpc.conversation.list();
 
     expect(list.map(({ id }) => id)).toEqual([conv.id]);
   });
@@ -74,7 +61,7 @@ describe("the chat handler", () => {
     });
     // A titled Conversation, so no automatic title call takes the scripted adapter.
     const conv = await insertConversation(user, { title: "Test Conversation" });
-    const client = chatFor(user, deps);
+    const client = createTestChat({ user, deps });
 
     const response = await client.fetch(
       new Request(client.chatUrl, {
@@ -112,9 +99,11 @@ describe("the chat handler", () => {
     const deps = createTestDeps();
     const conv = await insertConversation(owner, { title: "Recursive CTEs" });
     await insertMessage({ conversationId: conv.id, role: "user", text: "Hi", active: true });
-    const link = await chatFor(owner, deps).rpc.share.upsert({ conversationId: conv.id });
+    const link = await createTestChat({ user: owner, deps }).rpc.share.upsert({
+      conversationId: conv.id,
+    });
 
-    const shared = await chatFor(null, deps).rpc.share.get({ token: link.token });
+    const shared = await createTestChat({ user: null, deps }).rpc.share.get({ token: link.token });
 
     expect(shared.title).toBe("Recursive CTEs");
     expect(shared.messages.map(({ parts }) => parts)).toEqual([[{ type: "text", content: "Hi" }]]);

@@ -9,9 +9,9 @@ import { saveTitleModel } from "../../../../core/server/settings/store";
 import { insertConversation, insertMessage } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, runError, text } from "../../../support/fake-adapter";
-import { createTestClient, insertUser, chatUserFor } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc, sendAs } from "../../../support/sdk";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
-import { handleChat } from "../../../../core/server/chat/handle-chat";
 import { titleConversation } from "../../../../core/server/chat/title";
 
 const replyModel = "anthropic:claude-sonnet-5-5";
@@ -58,8 +58,8 @@ async function setup({
   await addAnthropicKey(user.id);
   const conv = await insertConversation(user, { model: replyModel });
   const send = async (command: Partial<ChatCommand> = {}) => {
-    const response = await handleChat(
-      new Request("http://localhost/api/chat", {
+    const response = await sendAs(
+      new Request("http://localhost/api/chat/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -75,7 +75,7 @@ async function setup({
           },
         }),
       }),
-      chatUserFor(user),
+      user,
       deps,
     );
     await response.text();
@@ -199,7 +199,7 @@ describe("titleConversation", () => {
 
     const job = titleConversation(deps, reply.id);
     await vi.waitFor(() => expect(titleAdapter.calls).toHaveLength(1));
-    await createTestClient({ user, deps }).conversation.rename({ id: conv.id, title: "Mine" });
+    await chatRpc({ user, deps }).conversation.rename({ id: conv.id, title: "Mine" });
     await titleAdapter.releaseAll();
     await job;
 

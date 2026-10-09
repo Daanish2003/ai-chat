@@ -10,7 +10,8 @@ import {
 } from "../../../../core/server/attachments/store";
 import { insertAttachment, linkTestAttachments } from "../../../support/attachments";
 import { insertConversation, insertMessage } from "../../../support/conversations";
-import { createTestClient, insertUser } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc } from "../../../support/sdk";
 
 const file = (contents: string | Uint8Array<ArrayBuffer>, name: string, type: string) =>
   new File([contents], name, { type });
@@ -18,7 +19,7 @@ const file = (contents: string | Uint8Array<ArrayBuffer>, name: string, type: st
 describe("attachment.upload", () => {
   it("stores the file and returns its id and metadata", async () => {
     const user = await insertUser();
-    const client = createTestClient({ user });
+    const client = chatRpc({ user });
 
     const uploaded = await client.attachment.upload({
       file: file("# Notes", "notes.md", "text/markdown"),
@@ -38,7 +39,7 @@ describe("attachment.upload", () => {
   });
 
   it("stores a text file the browser gave no type as text/plain", async () => {
-    const client = createTestClient({ user: await insertUser() });
+    const client = chatRpc({ user: await insertUser() });
 
     const uploaded = await client.attachment.upload({ file: file("fn main() {}", "main.rs", "") });
 
@@ -46,7 +47,7 @@ describe("attachment.upload", () => {
   });
 
   it("refuses a type that can't be attached", async () => {
-    const client = createTestClient({ user: await insertUser() });
+    const client = chatRpc({ user: await insertUser() });
 
     await expect(
       client.attachment.upload({ file: file("<svg/>", "a.svg", "image/svg+xml") }),
@@ -54,7 +55,7 @@ describe("attachment.upload", () => {
   });
 
   it("refuses a text file that isn't UTF-8 text", async () => {
-    const client = createTestClient({ user: await insertUser() });
+    const client = chatRpc({ user: await insertUser() });
 
     await expect(
       client.attachment.upload({ file: file(new Uint8Array([0xff, 0xfe, 0xfd]), "a.txt", "") }),
@@ -62,7 +63,7 @@ describe("attachment.upload", () => {
   });
 
   it("refuses a file over 5 MB", async () => {
-    const client = createTestClient({ user: await insertUser() });
+    const client = chatRpc({ user: await insertUser() });
 
     await expect(
       client.attachment.upload({
@@ -73,7 +74,7 @@ describe("attachment.upload", () => {
 
   it("refuses a signed-out caller", async () => {
     await expect(
-      createTestClient().attachment.upload({ file: file("x", "a.txt", "text/plain") }),
+      chatRpc().attachment.upload({ file: file("x", "a.txt", "text/plain") }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
@@ -87,7 +88,7 @@ describe("attachment.upload", () => {
     const sent = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
     await linkTestAttachments(sent.id, [oldLinked.id]);
 
-    const uploaded = await createTestClient({ user }).attachment.upload({
+    const uploaded = await chatRpc({ user }).attachment.upload({
       file: file("x", "b.txt", "text/plain"),
     });
 

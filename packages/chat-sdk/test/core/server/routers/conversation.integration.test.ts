@@ -3,17 +3,17 @@ import { getTestDb } from "../../../support/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
-import { handleChat } from "../../../../core/server/chat/handle-chat";
 import { saveCredentials } from "../../../../core/server/credentials/store";
 import { insertConversation, insertMessage } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
 import { liveModelsFetch } from "../../../support/live-models";
-import { createTestClient, insertUser, chatUserFor } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc, sendAs } from "../../../support/sdk";
 
 async function signedIn() {
   const user = await insertUser();
-  return { user, client: createTestClient({ user }) };
+  return { user, client: chatRpc({ user }) };
 }
 
 describe("conversation.create", () => {
@@ -109,7 +109,7 @@ describe("conversation.get", () => {
   });
 
   it("rejects signed-out callers", async () => {
-    const client = createTestClient();
+    const client = chatRpc();
 
     await expect(client.conversation.create({ model: "openai:gpt-5.6" })).rejects.toMatchObject({
       code: "UNAUTHORIZED",
@@ -210,7 +210,7 @@ describe("conversation.list", () => {
   });
 
   it("rejects signed-out callers", async () => {
-    await expect(createTestClient().conversation.list()).rejects.toMatchObject({
+    await expect(chatRpc().conversation.list()).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
   });
@@ -291,7 +291,7 @@ describe("conversation.delete", () => {
   });
 
   it("rejects signed-out callers for rename and delete", async () => {
-    const client = createTestClient();
+    const client = chatRpc();
     const id = "0190a000-0000-7000-8000-000000000000";
 
     await expect(client.conversation.rename({ id, title: "x" })).rejects.toMatchObject({
@@ -364,7 +364,7 @@ describe("conversation.setModel", () => {
     const conv = await insertConversation(await insertUser());
 
     await expect(
-      createTestClient().conversation.setModel({ id: conv.id, model: "openai:gpt-5.6" }),
+      chatRpc().conversation.setModel({ id: conv.id, model: "openai:gpt-5.6" }),
     ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
@@ -388,12 +388,12 @@ describe("conversation.setModel", () => {
         verified: true,
       });
     }
-    const client = createTestClient({ user, deps });
+    const client = chatRpc({ user, deps });
     // What the client does: send with the Conversation's selected Model, continuing the Active Branch.
     const sendNext = async (text: string) => {
       const current = await client.conversation.get({ id });
-      const response = await handleChat(
-        new Request("http://localhost/api/chat", {
+      const response = await sendAs(
+        new Request("http://localhost/api/chat/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -408,7 +408,7 @@ describe("conversation.setModel", () => {
             },
           }),
         }),
-        chatUserFor(user),
+        user,
         deps,
       );
       await response.text();
@@ -527,7 +527,7 @@ describe("live-listed Models", () => {
       hint: "…test",
       verified: true,
     });
-    return { user, client: createTestClient({ user, deps }) };
+    return { user, client: chatRpc({ user, deps }) };
   }
 
   it("creates a Conversation on a Model from OpenRouter's live list", async () => {
@@ -559,7 +559,7 @@ describe("live-listed Models", () => {
       hint: "http://ollama.test:11434",
       verified: true,
     });
-    const client = createTestClient({ user, deps });
+    const client = chatRpc({ user, deps });
     const conv = await insertConversation(user);
 
     await client.conversation.setModel({ id: conv.id, model: "ollama:qwen3:8b" });
