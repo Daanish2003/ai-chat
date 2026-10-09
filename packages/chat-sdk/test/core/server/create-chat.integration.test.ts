@@ -92,6 +92,8 @@ describe("the chat handler", () => {
       ["assistant", "complete"],
       ["user", "complete"],
     ]);
+    // The reply's heartbeat was set when its Run started (ADR 0006).
+    expect(replies.find(({ role }) => role === "assistant")?.heartbeatAt).toBeInstanceOf(Date);
   });
 
   it("serves a Shared link to a caller without a user", async () => {

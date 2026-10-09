@@ -93,7 +93,8 @@ await chat.migrate();
 
 // boot and shutdown
 await chat.start();
-process.on("SIGTERM", () => chat.stop()); // drains local Runs for up to 250 s
+// drains local Runs for up to 250 s; a SIGTERM listener stops Node from exiting by itself
+process.on("SIGTERM", () => void chat.stop().finally(() => process.exit(0)));
 
 // when your app deletes a user
 await chat.deleteUser(String(user.id));

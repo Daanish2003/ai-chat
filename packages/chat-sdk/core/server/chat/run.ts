@@ -7,7 +7,7 @@ import {
   type ModelMessage,
   type StreamChunk,
 } from "@tanstack/ai";
-import { and, eq, lt } from "drizzle-orm";
+import { and, eq, isNull, lt, or } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
 import { citationPrompt } from "../../shared/chat/citations";
@@ -47,6 +47,8 @@ export async function startRun(
   const abortController = new AbortController();
   await deps.runStreams.open(messageId);
   const unsubscribeStop = await listenForStop(deps, messageId, () => abortController.abort());
+  // Registered once nothing before the Run's own `finally` can throw, so it always leaves again.
+  deps.lifecycle.runs.set(messageId, abortController);
   const parts = createPartsBuilder();
 
   let writes = Promise.resolve();
@@ -65,10 +67,10 @@ export async function startRun(
 
   let changed = false;
   const snapshotTimer = setInterval(() => {
-    if (changed) {
-      changed = false;
-      void write(withParts());
-    }
+    // Every tick writes the heartbeat, even when nothing changed: it is the Run's lease (ADR 0006).
+    const heartbeat = { heartbeatAt: new Date() };
+    void write(changed ? withParts(heartbeat) : heartbeat);
+    changed = false;
     // The Stop signal is at most once, so a Stop it missed is found in the column.
     void stopRequested(deps, messageId)
       .then((requested) => {
@@ -126,15 +128,22 @@ export async function startRun(
       clearInterval(snapshotTimer);
       clearTimeout(capTimer);
       parts.cancelRunningSearches();
+      const interrupted = abortController.signal.reason === shutdownAbort;
       await write(
         withParts(
           timedOut
             ? { status: "error", error: "timed out" }
-            : abortController.signal.aborted
-              ? { status: "stopped" }
-              : error !== undefined
-                ? { status: "error", error: error.message, errorReason: errorReasonOf(error.code) }
-                : { status: "complete" },
+            : interrupted
+              ? { status: "error", error: "interrupted" }
+              : abortController.signal.aborted
+                ? { status: "stopped" }
+                : error !== undefined
+                  ? {
+                      status: "error",
+                      error: error.message,
+                      errorReason: errorReasonOf(error.code),
+                    }
+                  : { status: "complete" },
         ),
       );
       void unsubscribeStop().catch((error: unknown) =>
@@ -149,12 +158,13 @@ export async function startRun(
             messageId,
             endingChunk(
               ids ?? { threadId: messageId, runId: messageId },
-              timedOut ? "timed out" : error?.message,
+              timedOut ? "timed out" : interrupted ? "interrupted" : error?.message,
             ),
           )
           .catch((caught: unknown) => console.error(`Logging Message ${messageId} failed`, caught));
       }
       await deps.runStreams.close(messageId);
+      deps.lifecycle.runs.delete(messageId);
       // The run ended `complete`: title its Conversation, fire-and-forget.
       if (!timedOut && !abortController.signal.aborted && error === undefined) {
         void titleConversation(deps, messageId);
@@ -283,27 +293,44 @@ async function endOrphanedRun(deps: AppDeps, messageId: string) {
 }
 
 /**
- * Run at server start (ADR 0002): every `streaming` Message from before `bootedAt` was cut off by
- * a restart, so it ends as `error` "interrupted", and a search it left running is `cancelled`.
+ * The reason a Run is aborted with when `stop()` ends it after the drain, so the Run saves itself
+ * `error` "interrupted" rather than `stopped`.
  */
-export async function sweepInterruptedRuns(deps: Pick<AppDeps, "db">, bootedAt = new Date()) {
-  // Only Messages from before boot: a run started meanwhile is going, not interrupted.
-  const swept = await deps.db
+export const shutdownAbort = new Error("The chat SDK is stopping");
+
+/**
+ * Reaps the Runs whose owner has stopped heartbeating (ADR 0006), from any process: every
+ * `streaming` Message whose heartbeat is older than the lease, or was never written, ends as
+ * `error` "interrupted". A search it left running is `cancelled`, and its log ends with a
+ * `RUN_ERROR` and closes, so a reader doesn't reconnect into a Run that is gone.
+ */
+export async function reapStaleRuns(deps: AppDeps, now = new Date()) {
+  const cutoff = new Date(now.getTime() - deps.limits.leaseMs);
+  const reaped = await deps.db
     .update(message)
     .set({ status: "error", error: "interrupted" })
-    .where(and(eq(message.status, "streaming"), lt(message.createdAt, bootedAt)))
+    .where(
+      and(
+        eq(message.status, "streaming"),
+        or(isNull(message.heartbeatAt), lt(message.heartbeatAt, cutoff)),
+      ),
+    )
     .returning({ id: message.id, parts: message.parts });
-  for (const row of swept) {
-    // A row that doesn't parse holds no running search, and mustn't stop the sweep.
+  for (const row of reaped) {
+    // A row that doesn't parse holds no running search, and mustn't stop the reaper.
     const parsed = storedPartsSchema.safeParse(row.parts);
-    if (!parsed.success) continue;
-    const running = parsed.data.parts.some(
-      (part) => part.type === "web_search" && part.state === "running",
-    );
-    if (!running) continue;
-    await deps.db
-      .update(message)
-      .set({ parts: cancelRunningSearches(parsed.data) })
-      .where(eq(message.id, row.id));
+    if (
+      parsed.success &&
+      parsed.data.parts.some((part) => part.type === "web_search" && part.state === "running")
+    ) {
+      await deps.db
+        .update(message)
+        .set({ parts: cancelRunningSearches(parsed.data) })
+        .where(eq(message.id, row.id));
+    }
+    const ids = { threadId: row.id, runId: row.id };
+    await deps.runStreams.open(row.id);
+    await deps.runStreams.append(row.id, endingChunk(ids, "interrupted"));
+    await deps.runStreams.close(row.id);
   }
 }

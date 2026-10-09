@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { saveCredentials } from "../../../../core/server/credentials/store";
 import type { AppDeps, SearchClient } from "../../../../core/server/deps";
 import { insertConversation, insertMessage } from "../../../support/conversations";
-import { createTestDeps } from "../../../support/deps";
+import { createTestDeps, type TestDepsOverrides } from "../../../support/deps";
 import { createFakeAdapter, round, text, toolCall } from "../../../support/fake-adapter";
 import { createFakeSearchClient } from "../../../support/fake-search-client";
 import { insertUser } from "../../../support/users";
@@ -14,7 +14,7 @@ import { chatRpc, sendAs } from "../../../support/sdk";
 import { citationPrompt } from "../../../../core/shared/chat/citations";
 import type { ChatCommand } from "../../../../core/shared/chat/command";
 import { curatedModels } from "../../../../core/shared/chat/models";
-import { sweepInterruptedRuns } from "../../../../core/server/chat/run";
+import { reapStaleRuns } from "../../../../core/server/chat/run";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
 const tavilyKey = { apiKey: "tvly-test-key" };
@@ -47,7 +47,7 @@ async function setup({
   rounds: Parameters<typeof createFakeAdapter>[0]["rounds"];
   searchClient?: SearchClient;
   tavily?: boolean;
-  deps?: Partial<AppDeps>;
+  deps?: TestDepsOverrides;
 }) {
   const user = await insertUser();
   const fake = createFakeAdapter({ rounds });
@@ -326,40 +326,24 @@ describe("the citation prompt", () => {
   });
 });
 
-describe("sweepInterruptedRuns", () => {
-  it("still sweeps a reply whose stored parts don't parse", async () => {
+describe("reapStaleRuns", () => {
+  it("closes a search still running in a reaped reply as cancelled", async () => {
     const conv = await insertConversation(await insertUser());
-    const row = await insertMessage({
-      conversationId: conv.id,
-      role: "assistant",
-      text: "",
-      status: "streaming",
-      createdAt: new Date(Date.now() - 60_000),
-      parts: { schemaVersion: 99 } as never,
-    });
-
-    await sweepInterruptedRuns(createTestDeps());
-
-    const [after] = await createTestDeps().db.select().from(message).where(eq(message.id, row.id));
-    expect(after).toMatchObject({ status: "error", error: "interrupted" });
-  });
-
-  it("closes a search still running in an interrupted reply as cancelled", async () => {
-    const conv = await insertConversation(await insertUser());
+    const now = new Date("2026-10-09T12:00:00Z");
     const row = await insertMessage({
       conversationId: conv.id,
       role: "assistant",
       text: "",
       status: "streaming",
       // Set explicitly: the database clock (the default) may run ahead of this process.
-      createdAt: new Date(Date.now() - 60_000),
+      heartbeatAt: new Date(now.getTime() - 60_000),
       parts: storedParts([
         { type: "text", text: "Looking." },
         search({ state: "running", results: [] }),
       ]),
     });
 
-    await sweepInterruptedRuns(createTestDeps());
+    await reapStaleRuns(createTestDeps(), now);
 
     const [after] = await createTestDeps().db.select().from(message).where(eq(message.id, row.id));
     expect(after).toMatchObject({

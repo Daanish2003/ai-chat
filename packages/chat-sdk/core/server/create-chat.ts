@@ -6,6 +6,7 @@ import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
 import { createAppDeps, type AppDeps } from "./deps";
+import { createLifecycle } from "./lifecycle";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
@@ -63,7 +64,9 @@ export function createChatHandler(
       return result.matched ? result.response : notFound();
     }
     if (user && pathname === runPath) {
-      if (request.method === "POST") return handleChat(request, user, deps);
+      if (request.method === "POST") {
+        return deps.lifecycle.stopping ? shuttingDown() : handleChat(request, user, deps);
+      }
       if (request.method === "GET") return handleJoin(request, user, deps);
     }
     return notFound();
@@ -80,8 +83,16 @@ export function createChat(options: CreateChatOptions): {
   getSharedConversation: (token: string) => Promise<SharedConversation | null>;
   /** Creates the `chat` schema and applies the bundled migrations. Run it at deploy time. */
   migrate: () => Promise<void>;
-  /** Refuses (throws) while the `chat` schema is behind the bundled migrations. */
+  /**
+   * Refuses (throws) while the `chat` schema is behind the bundled migrations, then starts the
+   * reaper: now, and every 30 s (ADR 0006).
+   */
   start: () => Promise<void>;
+  /**
+   * Refuses new Runs with 503, lets local Runs finish for up to `drainMs` (250 s), then ends the
+   * rest as interrupted and stops the reaper. Call it on SIGTERM.
+   */
+  stop: () => Promise<void>;
 } {
   let deps: AppDeps | undefined;
   const getDeps = () => {
@@ -92,6 +103,8 @@ export function createChat(options: CreateChatOptions): {
     });
     return deps;
   };
+  let lifecycle: ReturnType<typeof createLifecycle> | undefined;
+  const getLifecycle = () => (lifecycle ??= createLifecycle(getDeps()));
   let handler: ChatHandler | undefined;
   return {
     handler: (request) => {
@@ -101,12 +114,23 @@ export function createChat(options: CreateChatOptions): {
     getSharedConversation: async (token) =>
       (await loadSharedConversation(getDeps(), token)) ?? null,
     migrate: () => migrateSchema(options.databaseUrl),
-    start: () => assertMigrated(options.databaseUrl),
+    start: async () => {
+      await assertMigrated(options.databaseUrl);
+      await getLifecycle().start();
+    },
+    stop: () => getLifecycle().stop(),
   };
 }
 
 function unauthorized() {
   return Response.json({ message: "Sign in to chat" }, { status: 401 });
+}
+
+function shuttingDown() {
+  return Response.json(
+    { message: "The chat is shutting down; try again shortly" },
+    { status: 503 },
+  );
 }
 
 function notFound() {
