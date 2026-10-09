@@ -1,9 +1,12 @@
 import { createAuth } from "@ai-chat/auth";
-import { createChat, createDb } from "@ai-chat/chat-sdk/server";
+import { createDb } from "@ai-chat/db";
+import { createChat, createDb as createChatDb } from "@ai-chat/chat-sdk/server";
 
 import { ENV } from "./env.server";
 
 export const db = createDb(ENV);
+/** The chat tables only, for the SDK's own queries (the boot sweep). */
+export const chatDb = createChatDb(ENV);
 export const auth = createAuth(ENV, db);
 export const chat = createChat({
   databaseUrl: ENV.DATABASE_URL,

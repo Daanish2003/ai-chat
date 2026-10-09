@@ -74,8 +74,8 @@ The `prompt-kit` components (`chat-container`, `loader`, `markdown`, `prompt-inp
 
 ## Postgres
 
-- The database needs the `pg_trgm` extension. The first migration runs `CREATE EXTENSION IF NOT EXISTS pg_trgm`, which needs a role allowed to create extensions.
-- The SDK's tables live in the Host's database, not in your ORM's schema. Your ORM's migrations never touch them.
+- The database needs the `pg_trgm` extension. `chat.migrate()` runs `CREATE EXTENSION IF NOT EXISTS pg_trgm` before its migrations and fails naming it, so a role allowed to create extensions (or a database that already has it) is needed.
+- The SDK's tables live in the `chat` schema of the Host's database, not in your ORM's schema. Your ORM's migrations never touch them.
 
 ## Host lifecycle
 

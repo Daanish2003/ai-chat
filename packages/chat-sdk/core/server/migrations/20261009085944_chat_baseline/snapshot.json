@@ -1,92 +1,74 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "babee8df-bce3-49dc-b45e-10ecd0e33b7c",
-  "prevIds": ["b7786204-01cd-45bd-b15a-408ed8784045"],
+  "id": "166dd970-fa64-4618-9c30-1d51583263f4",
+  "prevIds": ["00000000-0000-0000-0000-000000000000"],
   "ddl": [
     {
       "values": ["invalid_key", "rate_limited", "provider_error"],
       "name": "message_error_reason",
       "entityType": "enums",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "values": ["user", "assistant"],
       "name": "message_role",
       "entityType": "enums",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "values": ["streaming", "complete", "stopped", "error"],
       "name": "message_status",
       "entityType": "enums",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "isRlsEnabled": false,
       "name": "attachment",
       "entityType": "tables",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "isRlsEnabled": false,
       "name": "attachment_blob",
       "entityType": "tables",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "isRlsEnabled": false,
       "name": "message_attachment",
       "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "account",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "session",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "user",
-      "entityType": "tables",
-      "schema": "public"
-    },
-    {
-      "isRlsEnabled": false,
-      "name": "verification",
-      "entityType": "tables",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "isRlsEnabled": false,
       "name": "conversation",
       "entityType": "tables",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "isRlsEnabled": false,
       "name": "message",
       "entityType": "tables",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "isRlsEnabled": false,
       "name": "user_credentials",
       "entityType": "tables",
-      "schema": "public"
+      "schema": "chat"
+    },
+    {
+      "isRlsEnabled": false,
+      "name": "user_settings",
+      "entityType": "tables",
+      "schema": "chat"
     },
     {
       "isRlsEnabled": false,
       "name": "shared_link",
       "entityType": "tables",
-      "schema": "public"
+      "schema": "chat"
     },
     {
       "type": "uuid",
@@ -98,7 +80,7 @@
       "identity": null,
       "name": "id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment"
     },
     {
@@ -111,7 +93,7 @@
       "identity": null,
       "name": "user_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment"
     },
     {
@@ -124,7 +106,7 @@
       "identity": null,
       "name": "filename",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment"
     },
     {
@@ -137,7 +119,7 @@
       "identity": null,
       "name": "media_type",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment"
     },
     {
@@ -150,7 +132,7 @@
       "identity": null,
       "name": "size",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment"
     },
     {
@@ -163,7 +145,7 @@
       "identity": null,
       "name": "created_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment"
     },
     {
@@ -176,7 +158,7 @@
       "identity": null,
       "name": "attachment_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment_blob"
     },
     {
@@ -189,7 +171,7 @@
       "identity": null,
       "name": "bytes",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment_blob"
     },
     {
@@ -202,7 +184,7 @@
       "identity": null,
       "name": "message_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message_attachment"
     },
     {
@@ -215,7 +197,7 @@
       "identity": null,
       "name": "attachment_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message_attachment"
     },
     {
@@ -228,450 +210,8 @@
       "identity": null,
       "name": "position",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message_attachment"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "account_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "provider_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "refresh_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id_token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "access_token_expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "refresh_token_expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "scope",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "password",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "token",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "ip_address",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_agent",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "name",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "email",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "boolean",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "false",
-      "generated": null,
-      "identity": null,
-      "name": "email_verified",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "image",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "identifier",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "value",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "expires_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "created_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
-    },
-    {
-      "type": "timestamp",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": "now()",
-      "generated": null,
-      "identity": null,
-      "name": "updated_at",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "verification"
     },
     {
       "type": "uuid",
@@ -683,7 +223,7 @@
       "identity": null,
       "name": "id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -696,7 +236,7 @@
       "identity": null,
       "name": "user_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -709,7 +249,7 @@
       "identity": null,
       "name": "title",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -722,7 +262,7 @@
       "identity": null,
       "name": "model",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -735,7 +275,7 @@
       "identity": null,
       "name": "active_leaf_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -748,7 +288,7 @@
       "identity": null,
       "name": "last_message_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -761,7 +301,7 @@
       "identity": null,
       "name": "created_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -774,7 +314,7 @@
       "identity": null,
       "name": "updated_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -787,7 +327,7 @@
       "identity": null,
       "name": "id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -800,7 +340,7 @@
       "identity": null,
       "name": "conversation_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -813,12 +353,12 @@
       "identity": null,
       "name": "parent_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
       "type": "message_role",
-      "typeSchema": "public",
+      "typeSchema": "chat",
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -826,7 +366,7 @@
       "identity": null,
       "name": "role",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -839,7 +379,7 @@
       "identity": null,
       "name": "parts",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -852,12 +392,12 @@
       "identity": null,
       "name": "model",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
       "type": "message_status",
-      "typeSchema": "public",
+      "typeSchema": "chat",
       "notNull": true,
       "dimensions": 0,
       "default": null,
@@ -865,7 +405,7 @@
       "identity": null,
       "name": "status",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -878,12 +418,12 @@
       "identity": null,
       "name": "error",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
       "type": "message_error_reason",
-      "typeSchema": "public",
+      "typeSchema": "chat",
       "notNull": false,
       "dimensions": 0,
       "default": null,
@@ -891,7 +431,7 @@
       "identity": null,
       "name": "error_reason",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -904,7 +444,7 @@
       "identity": null,
       "name": "search_text",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -917,7 +457,33 @@
       "identity": null,
       "name": "created_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
+      "table": "message"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "cancel_requested_at",
+      "entityType": "columns",
+      "schema": "chat",
+      "table": "message"
+    },
+    {
+      "type": "timestamp with time zone",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "heartbeat_at",
+      "entityType": "columns",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -930,7 +496,7 @@
       "identity": null,
       "name": "user_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
     },
     {
@@ -943,7 +509,7 @@
       "identity": null,
       "name": "service",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
     },
     {
@@ -956,7 +522,7 @@
       "identity": null,
       "name": "encrypted",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
     },
     {
@@ -969,7 +535,7 @@
       "identity": null,
       "name": "hint",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
     },
     {
@@ -982,7 +548,7 @@
       "identity": null,
       "name": "verified",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
     },
     {
@@ -995,7 +561,7 @@
       "identity": null,
       "name": "created_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
     },
     {
@@ -1008,8 +574,34 @@
       "identity": null,
       "name": "updated_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": true,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "user_id",
+      "entityType": "columns",
+      "schema": "chat",
+      "table": "user_settings"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "title_model",
+      "entityType": "columns",
+      "schema": "chat",
+      "table": "user_settings"
     },
     {
       "type": "text",
@@ -1021,7 +613,7 @@
       "identity": null,
       "name": "token",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
@@ -1034,7 +626,7 @@
       "identity": null,
       "name": "conversation_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
@@ -1047,7 +639,7 @@
       "identity": null,
       "name": "leaf_message_id",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
@@ -1060,7 +652,7 @@
       "identity": null,
       "name": "title",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
@@ -1073,7 +665,7 @@
       "identity": null,
       "name": "created_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
@@ -1086,7 +678,7 @@
       "identity": null,
       "name": "updated_at",
       "entityType": "columns",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
@@ -1114,7 +706,7 @@
       "concurrently": false,
       "name": "attachment_user_id_created_at_idx",
       "entityType": "indexes",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment"
     },
     {
@@ -1135,71 +727,8 @@
       "concurrently": false,
       "name": "message_attachment_attachment_id_idx",
       "entityType": "indexes",
-      "schema": "public",
+      "schema": "chat",
       "table": "message_attachment"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "account_userId_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "user_id",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "session_userId_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "nameExplicit": true,
-      "columns": [
-        {
-          "value": "identifier",
-          "isExpression": false,
-          "asc": true,
-          "nullsFirst": false,
-          "opclass": null
-        }
-      ],
-      "isUnique": false,
-      "where": null,
-      "with": "",
-      "method": "btree",
-      "concurrently": false,
-      "name": "verification_identifier_idx",
-      "entityType": "indexes",
-      "schema": "public",
-      "table": "verification"
     },
     {
       "nameExplicit": true,
@@ -1226,7 +755,7 @@
       "concurrently": false,
       "name": "conversation_user_id_last_message_at_idx",
       "entityType": "indexes",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -1238,7 +767,7 @@
           "asc": true,
           "nullsFirst": false,
           "opclass": {
-            "name": "gin_trgm_ops",
+            "name": "public.gin_trgm_ops",
             "default": false
           }
         }
@@ -1250,7 +779,7 @@
       "concurrently": false,
       "name": "conversation_title_trgm_idx",
       "entityType": "indexes",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
@@ -1278,7 +807,7 @@
       "concurrently": false,
       "name": "message_conversation_id_parent_id_idx",
       "entityType": "indexes",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
@@ -1290,7 +819,7 @@
           "asc": true,
           "nullsFirst": false,
           "opclass": {
-            "name": "gin_trgm_ops",
+            "name": "public.gin_trgm_ops",
             "default": false
           }
         }
@@ -1302,176 +831,111 @@
       "concurrently": false,
       "name": "message_search_text_trgm_idx",
       "entityType": "indexes",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
       "nameExplicit": false,
-      "columns": ["user_id"],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "attachment_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "attachment"
-    },
-    {
-      "nameExplicit": false,
       "columns": ["attachment_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "attachment",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "attachment_blob_attachment_id_attachment_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment_blob"
     },
     {
       "nameExplicit": false,
       "columns": ["message_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "message",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "message_attachment_message_id_message_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "message_attachment"
     },
     {
       "nameExplicit": false,
       "columns": ["attachment_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "attachment",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "NO ACTION",
       "name": "message_attachment_attachment_id_attachment_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "message_attachment"
     },
     {
       "nameExplicit": false,
-      "columns": ["user_id"],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "account_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "account"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["user_id"],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "session_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "session"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["user_id"],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "conversation_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "conversation"
-    },
-    {
-      "nameExplicit": false,
       "columns": ["active_leaf_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "message",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "SET NULL",
       "name": "conversation_active_leaf_id_message_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation"
     },
     {
       "nameExplicit": false,
       "columns": ["conversation_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "conversation",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "message_conversation_id_conversation_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
       "nameExplicit": false,
       "columns": ["parent_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "message",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "message_parent_id_message_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "message"
     },
     {
       "nameExplicit": false,
-      "columns": ["user_id"],
-      "schemaTo": "public",
-      "tableTo": "user",
-      "columnsTo": ["id"],
-      "onUpdate": "NO ACTION",
-      "onDelete": "CASCADE",
-      "name": "user_credentials_user_id_user_id_fkey",
-      "entityType": "fks",
-      "schema": "public",
-      "table": "user_credentials"
-    },
-    {
-      "nameExplicit": false,
       "columns": ["conversation_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "conversation",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "shared_link_conversation_id_conversation_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
       "nameExplicit": false,
       "columns": ["leaf_message_id"],
-      "schemaTo": "public",
+      "schemaTo": "chat",
       "tableTo": "message",
       "columnsTo": ["id"],
       "onUpdate": "NO ACTION",
       "onDelete": "CASCADE",
       "name": "shared_link_leaf_message_id_message_id_fkey",
       "entityType": "fks",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link"
     },
     {
@@ -1479,7 +943,7 @@
       "nameExplicit": false,
       "name": "message_attachment_pkey",
       "entityType": "pks",
-      "schema": "public",
+      "schema": "chat",
       "table": "message_attachment"
     },
     {
@@ -1487,14 +951,14 @@
       "nameExplicit": false,
       "name": "user_credentials_pkey",
       "entityType": "pks",
-      "schema": "public",
+      "schema": "chat",
       "table": "user_credentials"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
       "name": "attachment_pkey",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment",
       "entityType": "pks"
     },
@@ -1502,47 +966,15 @@
       "columns": ["attachment_id"],
       "nameExplicit": false,
       "name": "attachment_blob_pkey",
-      "schema": "public",
+      "schema": "chat",
       "table": "attachment_blob",
       "entityType": "pks"
     },
     {
       "columns": ["id"],
       "nameExplicit": false,
-      "name": "account_pkey",
-      "schema": "public",
-      "table": "account",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "session_pkey",
-      "schema": "public",
-      "table": "session",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "user_pkey",
-      "schema": "public",
-      "table": "user",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
-      "name": "verification_pkey",
-      "schema": "public",
-      "table": "verification",
-      "entityType": "pks"
-    },
-    {
-      "columns": ["id"],
-      "nameExplicit": false,
       "name": "conversation_pkey",
-      "schema": "public",
+      "schema": "chat",
       "table": "conversation",
       "entityType": "pks"
     },
@@ -1550,42 +982,32 @@
       "columns": ["id"],
       "nameExplicit": false,
       "name": "message_pkey",
-      "schema": "public",
+      "schema": "chat",
       "table": "message",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["user_id"],
+      "nameExplicit": false,
+      "name": "user_settings_pkey",
+      "schema": "chat",
+      "table": "user_settings",
       "entityType": "pks"
     },
     {
       "columns": ["token"],
       "nameExplicit": false,
       "name": "shared_link_pkey",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link",
       "entityType": "pks"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["token"],
-      "nullsNotDistinct": false,
-      "name": "session_token_key",
-      "schema": "public",
-      "table": "session",
-      "entityType": "uniques"
-    },
-    {
-      "nameExplicit": false,
-      "columns": ["email"],
-      "nullsNotDistinct": false,
-      "name": "user_email_key",
-      "schema": "public",
-      "table": "user",
-      "entityType": "uniques"
     },
     {
       "nameExplicit": false,
       "columns": ["conversation_id"],
       "nullsNotDistinct": false,
       "name": "shared_link_conversation_id_key",
-      "schema": "public",
+      "schema": "chat",
       "table": "shared_link",
       "entityType": "uniques"
     }

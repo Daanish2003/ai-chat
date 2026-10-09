@@ -1,12 +1,13 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { text, timestamp, uuid } from "drizzle-orm/pg-core";
 
+import { chatSchema } from "./chat-schema";
 import { conversation, message } from "./chat";
 
 /**
  * A Shared link: a pointer at a Conversation's Branch, not a copy of its Messages (ADR 0004).
  * At most one per Conversation; it goes when its Conversation does.
  */
-export const sharedLink = pgTable("shared_link", {
+export const sharedLink = chatSchema.table("shared_link", {
   /** 22 random base64url characters (128 bits), separate from any internal id. */
   token: text("token").primaryKey(),
   conversationId: uuid("conversation_id")

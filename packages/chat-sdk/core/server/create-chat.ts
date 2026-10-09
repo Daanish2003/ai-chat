@@ -6,6 +6,7 @@ import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
 import { createAppDeps, type AppDeps } from "./deps";
+import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
 import { loadSharedConversation } from "./share/store";
@@ -77,6 +78,10 @@ export function createChat(options: CreateChatOptions): {
   handler: ChatHandler;
   /** The public Shared link snapshot for a token, or `null` for an unknown or removed link. */
   getSharedConversation: (token: string) => Promise<SharedConversation | null>;
+  /** Creates the `chat` schema and applies the bundled migrations. Run it at deploy time. */
+  migrate: () => Promise<void>;
+  /** Refuses (throws) while the `chat` schema is behind the bundled migrations. */
+  start: () => Promise<void>;
 } {
   let deps: AppDeps | undefined;
   const getDeps = () => {
@@ -95,6 +100,8 @@ export function createChat(options: CreateChatOptions): {
     },
     getSharedConversation: async (token) =>
       (await loadSharedConversation(getDeps(), token)) ?? null,
+    migrate: () => migrateSchema(options.databaseUrl),
+    start: () => assertMigrated(options.databaseUrl),
   };
 }
 
