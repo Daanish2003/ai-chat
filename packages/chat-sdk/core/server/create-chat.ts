@@ -6,6 +6,7 @@ import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
 import { createAppDeps, type AppDeps } from "./deps";
+import { deleteUserData } from "./delete-user";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
@@ -82,6 +83,8 @@ export function createChat(options: CreateChatOptions): {
   migrate: () => Promise<void>;
   /** Refuses (throws) while the `chat` schema is behind the bundled migrations. */
   start: () => Promise<void>;
+  /** Deletes everything the SDK holds for a user, in one transaction. Idempotent. */
+  deleteUser: (userId: string) => Promise<void>;
 } {
   let deps: AppDeps | undefined;
   const getDeps = () => {
@@ -102,6 +105,7 @@ export function createChat(options: CreateChatOptions): {
       (await loadSharedConversation(getDeps(), token)) ?? null,
     migrate: () => migrateSchema(options.databaseUrl),
     start: () => assertMigrated(options.databaseUrl),
+    deleteUser: (userId) => deleteUserData(getDeps(), userId),
   };
 }
 
