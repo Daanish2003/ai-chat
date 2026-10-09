@@ -1,6 +1,12 @@
 import { storedPartsSchema } from "@ai-chat/db/message-parts";
 import { message } from "@ai-chat/db/schema/chat";
-import { type AnyTextAdapter, chat, EventType, type ModelMessage } from "@tanstack/ai";
+import {
+  type AnyTextAdapter,
+  chat,
+  EventType,
+  type ModelMessage,
+  type StreamChunk,
+} from "@tanstack/ai";
 import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
@@ -39,6 +45,7 @@ export async function startRun(
 ): Promise<void> {
   const abortController = new AbortController();
   deps.runs.set(messageId, abortController);
+
   await deps.runStreams.open(messageId);
   const parts = createPartsBuilder();
 
@@ -63,6 +70,9 @@ export async function startRun(
     void write(withParts());
   }, deps.limits.snapshotIntervalMs);
 
+  /** Whether the log already holds its own RUN_FINISHED or RUN_ERROR. */
+  let logEnded = false;
+  let ids: { threadId: string; runId: string } | undefined;
   let timedOut = false;
   const capTimer = setTimeout(() => {
     // A run that was stopped but hasn't ended yet stays stopped.
@@ -95,6 +105,10 @@ export async function startRun(
         if (chunk.type === EventType.RUN_ERROR) {
           error = { message: chunk.message, code: chunk.code ?? chunk.error?.code };
         }
+        if (chunk.type === EventType.RUN_FINISHED || chunk.type === EventType.RUN_ERROR) {
+          logEnded = true;
+        }
+        ids ??= runIdsOf(chunk);
         void deps.runStreams
           .append(messageId, chunk)
           .catch((error: unknown) => console.error(`Logging Message ${messageId} failed`, error));
@@ -117,6 +131,20 @@ export async function startRun(
         ),
       );
       deps.runs.delete(messageId);
+      // A Run that was stopped, timed out or threw has no terminal chunk of its own. A reader that
+      // sees its log end without one takes the stream as cut off and reconnects, which starts the
+      // Run again, so the log is ended explicitly.
+      if (!logEnded) {
+        void deps.runStreams
+          .append(
+            messageId,
+            endingChunk(
+              ids ?? { threadId: messageId, runId: messageId },
+              timedOut ? "timed out" : error?.message,
+            ),
+          )
+          .catch((caught: unknown) => console.error(`Logging Message ${messageId} failed`, caught));
+      }
       await deps.runStreams.close(messageId);
       // The run ended `complete`: title its Conversation, fire-and-forget.
       if (!timedOut && !abortController.signal.aborted && error === undefined) {
@@ -124,6 +152,25 @@ export async function startRun(
       }
     }
   })();
+}
+
+/** The thread and run ids a chat() chunk carries, so the ending chunk belongs to the same run. */
+function runIdsOf(chunk: StreamChunk) {
+  const { threadId, runId } = chunk as { threadId?: unknown; runId?: unknown };
+  return typeof threadId === "string" && typeof runId === "string"
+    ? { threadId, runId }
+    : undefined;
+}
+
+/** The chunk that ends a Run's log: a `RUN_ERROR` when it failed or timed out, else a `RUN_FINISHED`. */
+function endingChunk(
+  ids: { threadId: string; runId: string },
+  errorMessage: string | undefined,
+): StreamChunk {
+  const timestamp = Date.now();
+  return errorMessage === undefined
+    ? { type: EventType.RUN_FINISHED, ...ids, finishReason: "stop", timestamp }
+    : { type: EventType.RUN_ERROR, ...ids, message: errorMessage, timestamp };
 }
 
 /**

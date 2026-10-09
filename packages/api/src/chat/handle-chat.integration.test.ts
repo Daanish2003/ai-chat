@@ -343,6 +343,17 @@ describe("chat.stop", () => {
     });
   });
 
+  it("ends a stopped Run's log with a terminal chunk, so the client does not reconnect and start it again", async () => {
+    const { user, deps, conv, send } = await setup({ deps: { adapterFor: deafAdapter } });
+    const response = await send();
+    const [, reply] = await messagesOf(deps, conv.id);
+    await expect.poll(() => deps.runs.has(reply!.id)).toBe(true);
+
+    await createTestClient({ user, deps }).chat.stop({ messageId: reply!.id });
+
+    expect(await response.text()).toContain('"type":"RUN_FINISHED"');
+  });
+
   it("times out an adapter that ignores the abort signal", async () => {
     const { deps, conv, send } = await setup({
       deps: { adapterFor: deafAdapter, limits: { snapshotIntervalMs: 20, runCapMs: 100 } },
