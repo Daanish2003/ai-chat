@@ -1,5 +1,6 @@
 import { getTestDb } from "./test-database";
 
+import { createMemoryPubSub } from "../../core/server/chat/pubsub";
 import { createMemoryRunStreams } from "../../core/server/chat/run-streams";
 import type { AppDeps } from "../../core/server/deps";
 import { createFakeSearchClient } from "./fake-search-client";
@@ -18,8 +19,8 @@ export function createTestDeps(overrides: Partial<AppDeps> = {}): AppDeps {
       throw new Error(`No fake adapter for model "${model}"; pass adapterFor to createTestDeps`);
     },
     searchClient: createFakeSearchClient(),
-    runs: new Map(),
     runStreams: createMemoryRunStreams(),
+    pubsub: createMemoryPubSub(),
     limits: { snapshotIntervalMs: 20, runCapMs: 2_000 },
     fetch: async (input) => {
       throw new Error(`Unexpected network call in a test: ${String(input)}`);
