@@ -1,9 +1,9 @@
-import { attachment, attachmentBlob, messageAttachment } from "@ai-chat/db/schema/attachment";
+import { attachment, attachmentBlob, messageAttachment } from "../db/schema/attachment";
 import { and, asc, eq, inArray, lt, notExists } from "drizzle-orm";
 
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
-import type { AttachmentInfo } from "../shared/attachments/kinds";
+import type { AttachmentInfo } from "../../shared/attachments/kinds";
 
 /**
  * The attachment store: every read and write of attachments goes through here (ADR 0001).

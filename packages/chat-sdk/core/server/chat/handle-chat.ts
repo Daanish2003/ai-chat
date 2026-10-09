@@ -1,18 +1,18 @@
 import type { Session } from "@ai-chat/auth";
-import { storedParts } from "@ai-chat/db/message-parts";
-import { conversation, message } from "@ai-chat/db/schema/chat";
+import { storedParts } from "../../shared/message-parts";
+import { conversation, message } from "../db/schema/chat";
 import { resumeServerSentEventsResponse } from "@tanstack/ai";
 import { and, eq } from "drizzle-orm";
 
 import { attachmentsForSend } from "../attachments/send";
 import { linkAttachments, lockAttachments } from "../attachments/store";
-import { addKeyMessage, tavilyService } from "../shared/credentials/services";
+import { addKeyMessage, tavilyService } from "../../shared/credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
 import { resolveModel } from "./available-models";
-import { parseStoredParts, searchTextOf, toModelMessages } from "../shared/chat/parts";
-import { chatCommandSchema } from "../shared/chat/command";
+import { parseStoredParts, searchTextOf, toModelMessages } from "../../shared/chat/parts";
+import { chatCommandSchema } from "../../shared/chat/command";
 import { runStreamDurability, START } from "./run-streams";
 import { startRun } from "./run";
 import { findConversation, loadPath } from "./store";

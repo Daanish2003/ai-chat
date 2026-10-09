@@ -1,6 +1,5 @@
-import { createAppDeps } from "@ai-chat/api/deps";
 import { createAuth } from "@ai-chat/auth";
-import { createDb } from "@ai-chat/db";
+import { createAppDeps, createDb } from "@ai-chat/chat-sdk/server";
 
 import { ENV } from "./env.server";
 

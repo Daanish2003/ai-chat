@@ -1,5 +1,5 @@
-import { storedPartsSchema } from "@ai-chat/db/message-parts";
-import { message } from "@ai-chat/db/schema/chat";
+import { storedPartsSchema } from "../../shared/message-parts";
+import { message } from "../db/schema/chat";
 import {
   type AnyTextAdapter,
   chat,
@@ -10,8 +10,8 @@ import {
 import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
-import { citationPrompt } from "../shared/chat/citations";
-import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../shared/chat/parts";
+import { citationPrompt } from "../../shared/chat/citations";
+import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
 import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
 

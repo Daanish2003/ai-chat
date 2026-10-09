@@ -1,5 +1,5 @@
 import type { Session } from "@ai-chat/auth";
-import { conversation, message } from "@ai-chat/db/schema/chat";
+import { conversation, message } from "../db/schema/chat";
 import { resumeServerSentEventsResponse } from "@tanstack/ai";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";

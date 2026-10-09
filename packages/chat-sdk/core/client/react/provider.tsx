@@ -1,8 +1,8 @@
-import type { AppRouterClient } from "@ai-chat/api/routers/index";
+import type { AppRouterClient } from "../../server/routers/index";
 import type { RouterUtils } from "@orpc/tanstack-query";
 import { type ComponentType, createContext, type ReactNode, useContext } from "react";
 
-/** The oRPC TanStack Query utils for the `@ai-chat/api` router. */
+/** The oRPC TanStack Query utils for the app router. */
 export type ChatOrpc = RouterUtils<AppRouterClient>;
 
 /** A page the chat UI links or navigates to. The host app maps each to its own route. */

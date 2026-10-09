@@ -1,5 +1,4 @@
-import { handleChat } from "@ai-chat/api/chat/handle-chat";
-import { handleJoin } from "@ai-chat/api/chat/join-run";
+import { handleChat, handleJoin } from "@ai-chat/chat-sdk/server";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { auth, deps } from "../../services";

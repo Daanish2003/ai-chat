@@ -1,12 +1,12 @@
-import { conversation, message, type MessageRow } from "@ai-chat/db/schema/chat";
-import { sharedLink } from "@ai-chat/db/schema/share";
+import { conversation, message, type MessageRow } from "../db/schema/chat";
+import { sharedLink } from "../db/schema/share";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { attachmentsOfMessages } from "../attachments/store";
 import type { AppDeps } from "../deps";
-import { newestLeaf, pathTo, siblingPosition } from "../shared/chat/branches";
-import { type ActiveBranchMessage, toClientMessage } from "../shared/chat/client-message";
+import { newestLeaf, pathTo, siblingPosition } from "../../shared/chat/branches";
+import { type ActiveBranchMessage, toClientMessage } from "../../shared/chat/client-message";
 
 type Deps = Pick<AppDeps, "db">;
 

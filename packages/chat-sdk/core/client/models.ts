@@ -3,8 +3,8 @@ import {
   findModel,
   isLiveListProvider,
   parseModelId,
-} from "@ai-chat/api/shared/chat/models";
-import { addKeyMessage, providers } from "@ai-chat/api/shared/credentials/services";
+} from "../shared/chat/models";
+import { addKeyMessage, providers } from "../shared/credentials/services";
 
 export type ModelGroup = {
   provider: CuratedModel["provider"];

@@ -39,9 +39,11 @@ function e2eDatabaseUrl() {
 const databaseUrl = e2eDatabaseUrl();
 process.env.DATABASE_URL = databaseUrl;
 
-const migrationsFolder = fileURLToPath(
-  new URL("../../../packages/db/src/migrations", import.meta.url),
-);
+// Better Auth's tables first: the chat tables reference `user`.
+const migrationsFolders = [
+  fileURLToPath(new URL("../../../packages/db/src/migrations", import.meta.url)),
+  fileURLToPath(new URL("../../../packages/chat-sdk/core/server/migrations", import.meta.url)),
+];
 
 async function createDatabaseIfMissing() {
   const server = new URL(databaseUrl);
@@ -61,7 +63,9 @@ async function migrateAndEmpty() {
   // Drizzle opens its own pool: it doesn't recognise a client from another copy of `pg`.
   const db = drizzle(databaseUrl);
   try {
-    await migrate(db, { migrationsFolder });
+    for (const migrationsFolder of migrationsFolders) {
+      await migrate(db, { migrationsFolder });
+    }
     const { rows } = await db.$client.query(
       "select tablename from pg_tables where schemaname = 'public'",
     );

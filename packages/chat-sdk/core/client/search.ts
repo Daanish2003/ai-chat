@@ -1,4 +1,4 @@
-import type { AppRouterClient } from "@ai-chat/api/routers/index";
+import type { AppRouterClient } from "../server/routers/index";
 
 export type SearchHit = Awaited<ReturnType<AppRouterClient["search"]["query"]>>["hits"][number];
 

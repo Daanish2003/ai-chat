@@ -1,4 +1,4 @@
-import { sweepInterruptedRuns } from "@ai-chat/api/chat/run";
+import { sweepInterruptedRuns } from "@ai-chat/chat-sdk/server";
 import { definePlugin } from "nitro";
 
 import { deps } from "../../src/services";

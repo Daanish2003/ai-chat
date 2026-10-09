@@ -1,7 +1,7 @@
-import type { AttachmentInfo } from "@ai-chat/api/shared/attachments/kinds";
-import type { SiblingPosition } from "@ai-chat/api/shared/chat/branches";
-import type { ActiveBranchMessage, ClientMessage } from "@ai-chat/api/shared/chat/client-message";
-import type { SharedConversation } from "@ai-chat/api/shared/share/conversation";
+import type { AttachmentInfo } from "../shared/attachments/kinds";
+import type { SiblingPosition } from "../shared/chat/branches";
+import type { ActiveBranchMessage, ClientMessage } from "../shared/chat/client-message";
+import type { SharedConversation } from "../shared/share/conversation";
 import type { UIMessage } from "@tanstack/ai-client";
 
 /** What the server knows about a Message beyond its parts, kept in `UIMessage.metadata`. */

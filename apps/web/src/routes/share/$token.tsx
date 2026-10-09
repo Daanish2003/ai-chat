@@ -1,4 +1,4 @@
-import { SharedConversationPage, SharedLinkNotFound } from "@ai-chat/chat-react";
+import { SharedConversationPage, SharedLinkNotFound } from "@ai-chat/chat-sdk/ui";
 import { ORPCError } from "@orpc/client";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 

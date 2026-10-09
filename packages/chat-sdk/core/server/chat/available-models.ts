@@ -1,4 +1,4 @@
-import { conversation } from "@ai-chat/db/schema/chat";
+import { conversation } from "../db/schema/chat";
 import { desc, eq } from "drizzle-orm";
 
 import { listCredentials, loadCredentials } from "../credentials/store";
@@ -11,7 +11,7 @@ import {
   findModel,
   isLiveListProvider,
   parseModelId,
-} from "../shared/chat/models";
+} from "../../shared/chat/models";
 
 type Deps = Pick<AppDeps, "db" | "keyEncryptionSecret" | "fetch">;
 

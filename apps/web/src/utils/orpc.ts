@@ -1,4 +1,4 @@
-import { appRouter } from "@ai-chat/api/routers/index";
+import { appRouter } from "@ai-chat/chat-sdk/server";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import { createRouterClient } from "@orpc/server";
