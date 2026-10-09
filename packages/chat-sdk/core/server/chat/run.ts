@@ -252,8 +252,8 @@ function errorReasonOf(code: string | undefined): MessageErrorReason {
  * `status`, unless the Run's heartbeat has expired: then no owner is left, so the Message is
  * marked `stopped` here and its log is ended. Ended Messages stay as they are.
  */
-export async function stopRun(deps: AppDeps, messageId: string) {
-  const [requested] = await deps.db
+export async function stopRun(deps: AppDeps, messageId: string, db: Executor = deps.db) {
+  const [requested] = await db
     .update(message)
     .set({ cancelRequestedAt: new Date() })
     .where(and(eq(message.id, messageId), eq(message.status, "streaming")))
@@ -261,21 +261,24 @@ export async function stopRun(deps: AppDeps, messageId: string) {
   if (!requested) return;
   await deps.pubsub.publish(cancelChannel(messageId), "stop");
   if (!heartbeatExpired(requested)) return;
-  await endOrphanedRun(deps, messageId);
+  await endOrphanedRun(deps, messageId, db);
 }
+
+/** The database, or the transaction a caller is in (`deleteUser` stops Runs inside its own). */
+export type Executor = AppDeps["db"] | Parameters<Parameters<AppDeps["db"]["transaction"]>[0]>[0];
 
 /**
  * Saves a streaming Message whose owner is gone as `stopped`, cancels its running searches and
  * ends its log, so a reader does not reconnect and start it again (the #71 lesson).
  */
-async function endOrphanedRun(deps: AppDeps, messageId: string) {
-  const [row] = await deps.db
+async function endOrphanedRun(deps: AppDeps, messageId: string, db: Executor) {
+  const [row] = await db
     .select({ parts: message.parts })
     .from(message)
     .where(and(eq(message.id, messageId), eq(message.status, "streaming")));
   if (!row) return;
   const parsed = storedPartsSchema.safeParse(row.parts);
-  const ended = await deps.db
+  const ended = await db
     .update(message)
     .set({
       status: "stopped",
