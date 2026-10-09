@@ -9,7 +9,7 @@ import type { AppDeps } from "./deps";
 
 /**
  * Deletes everything the SDK holds for a user, in one transaction (spec #70). The Host calls it
- * when it deletes the user, and calling it again, or for an unknown id, does nothing.
+ * when it deletes the user, and calling it again, or for an unknown id, does nothing. (drift)
  *
  * Order matters: Runs stop first so their owners write nothing more; Conversations go before
  * Attachments, because a Message's link to an Attachment does not cascade.
