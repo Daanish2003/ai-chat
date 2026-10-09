@@ -4,7 +4,7 @@ import { sharedToUIMessages } from "../../core/client/chat";
 import { MessageRow } from "../chat/message-row";
 
 /** A Shared link's public, read-only page, outside the signed-in layout (ADR 0004). */
-export function SharedConversationPage({ shared }: { shared: SharedConversation }) {
+export function SharedConversationPage({ data }: { data: SharedConversation }) {
   return (
     <div className="h-full overflow-y-auto bg-background">
       <header className="border-b px-4 py-2 text-xs text-muted-foreground">
@@ -12,16 +12,16 @@ export function SharedConversationPage({ shared }: { shared: SharedConversation 
       </header>
       <article className="mx-auto max-w-4xl py-8">
         <div className="px-6 pb-6">
-          <h1 className="text-2xl font-semibold tracking-tight">{shared.title}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{data.title}</h1>
           <p className="mt-1 text-xs text-muted-foreground">
             Shared{" "}
-            <time dateTime={shared.sharedAt.toISOString()}>
-              {shared.sharedAt.toLocaleDateString(undefined, { dateStyle: "long" })}
+            <time dateTime={data.sharedAt.toISOString()}>
+              {data.sharedAt.toLocaleDateString(undefined, { dateStyle: "long" })}
             </time>
           </p>
         </div>
         <div className="border-t">
-          {sharedToUIMessages(shared.messages).map((message) => (
+          {sharedToUIMessages(data.messages).map((message) => (
             <MessageRow key={message.id} message={message} userLabel="User" />
           ))}
         </div>
