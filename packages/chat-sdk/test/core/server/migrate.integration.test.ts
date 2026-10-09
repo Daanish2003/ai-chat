@@ -6,6 +6,7 @@ import { Client } from "pg";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createChat } from "../../../core/server/create-chat";
+import { LATEST_MIGRATION } from "../../../core/server/migrate";
 import {
   dropScratchDatabase,
   freshDatabaseUrl,
@@ -171,6 +172,15 @@ describe("chat.migrate()", () => {
 });
 
 describe("chat.start()", () => {
+  it("checks against the newest migration folder, which the bundle can't read", () => {
+    const migrationsFolder = fileURLToPath(
+      new URL("../../../core/server/migrations", import.meta.url),
+    );
+    const newest = readdirSync(migrationsFolder).sort().at(-1);
+
+    expect(LATEST_MIGRATION).toBe(newest);
+  });
+
   it("throws on a database that was never migrated", async () => {
     const url = await scratchDatabase("start_empty");
 

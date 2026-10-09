@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - examples/*
   - packages/*
 allowBuilds:
   esbuild: true
@@ -8,6 +9,9 @@ allowBuilds:
   "@google/genai": false
   "@openrouter/sdk": false
   protobufjs: false
+  "@prisma/client": true
+  "@prisma/engines": true
+  prisma: true
 catalog:
   zod: ^4.5.4
   typescript: ^6.0.3
