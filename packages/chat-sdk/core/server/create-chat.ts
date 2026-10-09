@@ -8,6 +8,8 @@ import { createDb } from "./db/index";
 import { createAppDeps, type AppDeps } from "./deps";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
+import { loadSharedConversation } from "./share/store";
+import type { SharedConversation } from "../shared/share/conversation";
 
 export type ChatHandler = (request: Request) => Promise<Response>;
 
@@ -71,20 +73,28 @@ export function createChatHandler(
  * The Chat SDK for a Host. Nothing connects, starts or queries until the first request, so the
  * Host can build it at import time.
  */
-export function createChat(options: CreateChatOptions): { handler: ChatHandler } {
+export function createChat(options: CreateChatOptions): {
+  handler: ChatHandler;
+  /** The public Shared link snapshot for a token, or `null` for an unknown or removed link. */
+  getSharedConversation: (token: string) => Promise<SharedConversation | null>;
+} {
+  let deps: AppDeps | undefined;
+  const getDeps = () => {
+    deps ??= createAppDeps({
+      db: createDb({ DATABASE_URL: options.databaseUrl }),
+      keyEncryptionSecret: options.keyEncryptionSecret,
+      runtime: options.runtime ?? memoryRuntime(),
+    });
+    return deps;
+  };
   let handler: ChatHandler | undefined;
   return {
     handler: (request) => {
-      handler ??= createChatHandler(
-        createAppDeps({
-          db: createDb({ DATABASE_URL: options.databaseUrl }),
-          keyEncryptionSecret: options.keyEncryptionSecret,
-          runtime: options.runtime ?? memoryRuntime(),
-        }),
-        options,
-      );
+      handler ??= createChatHandler(getDeps(), options);
       return handler(request);
     },
+    getSharedConversation: async (token) =>
+      (await loadSharedConversation(getDeps(), token)) ?? null,
   };
 }
 
