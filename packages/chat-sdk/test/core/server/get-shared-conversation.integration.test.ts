@@ -6,8 +6,8 @@ import { createChat } from "../../../core/server/create-chat";
 import { conversation } from "../../../core/server/db/schema/chat";
 import { insertConversation, insertMessage } from "../../support/conversations";
 import { testKeyEncryptionSecret } from "../../support/deps";
-import { insertUser, type TestUser } from "../../support/router-client";
 import { getTestDb, testDatabaseUrl } from "../../support/test-database";
+import { insertUser, type TestUser } from "../../support/users";
 
 const basePath = "/api/chat";
 
