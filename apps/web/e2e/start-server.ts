@@ -12,7 +12,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const dbRequire = createRequire(new URL("../../../packages/db/package.json", import.meta.url));
 const { Client } = dbRequire("pg");
 const { drizzle } = dbRequire("drizzle-orm/node-postgres");
-const { migrate } = dbRequire("drizzle-orm/node-postgres/migrator");
 
 /**
  * `E2E_DATABASE_URL`, else `ai-chat_e2e` on the server of the app's `DATABASE_URL`. That one is
@@ -39,12 +38,6 @@ function e2eDatabaseUrl() {
 const databaseUrl = e2eDatabaseUrl();
 process.env.DATABASE_URL = databaseUrl;
 
-// Better Auth's tables first: the chat tables reference `user`.
-const migrationsFolders = [
-  fileURLToPath(new URL("../../../packages/db/src/migrations", import.meta.url)),
-  fileURLToPath(new URL("../../../packages/chat-sdk/core/server/migrations", import.meta.url)),
-];
-
 async function createDatabaseIfMissing() {
   const server = new URL(databaseUrl);
   const name = decodeURIComponent(server.pathname.slice(1));
@@ -59,17 +52,31 @@ async function createDatabaseIfMissing() {
   }
 }
 
-async function migrateAndEmpty() {
+/** The app's own migrate script: Better Auth's tables, then the chat schema. */
+async function runMigrateScript() {
+  execFileSync(
+    process.execPath,
+    [fileURLToPath(new URL("../scripts/migrate.ts", import.meta.url))],
+    {
+      env: { ...process.env, DATABASE_URL: databaseUrl },
+      stdio: "inherit",
+    },
+  );
+}
+
+/** Empties the app's tables and the chat schema's, but not the chat migration journal. */
+async function empty() {
   // Drizzle opens its own pool: it doesn't recognise a client from another copy of `pg`.
   const db = drizzle(databaseUrl);
   try {
-    for (const migrationsFolder of migrationsFolders) {
-      await migrate(db, { migrationsFolder });
-    }
     const { rows } = await db.$client.query(
-      "select tablename from pg_tables where schemaname = 'public'",
+      `select schemaname, tablename from pg_tables
+       where schemaname = 'public' or (schemaname = 'chat' and tablename <> '__migrations')`,
     );
-    const tables = rows.map((row: { tablename: string }) => `"public"."${row.tablename}"`);
+    const tables = rows.map(
+      ({ schemaname, tablename }: { schemaname: string; tablename: string }) =>
+        `"${schemaname}"."${tablename}"`,
+    );
     if (tables.length > 0) await db.$client.query(`truncate table ${tables.join(", ")} cascade`);
   } finally {
     await db.$client.end();
@@ -77,7 +84,8 @@ async function migrateAndEmpty() {
 }
 
 await createDatabaseIfMissing();
-await migrateAndEmpty();
+await runMigrateScript();
+await empty();
 await import(
   pathToFileURL(fileURLToPath(new URL("../.output/server/index.mjs", import.meta.url))).href
 );
