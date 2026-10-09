@@ -1,7 +1,7 @@
 import type { Session } from "@ai-chat/auth";
 import { storedParts } from "@ai-chat/db/message-parts";
 import { conversation, message } from "@ai-chat/db/schema/chat";
-import { toServerSentEventsResponse } from "@tanstack/ai";
+import { resumeServerSentEventsResponse } from "@tanstack/ai";
 import { and, eq } from "drizzle-orm";
 
 import { attachmentsForSend } from "../attachments/send";
@@ -13,6 +13,7 @@ import { uuidv7 } from "../lib/uuidv7";
 import { resolveModel } from "./available-models";
 import { parseStoredParts, searchTextOf, toModelMessages } from "../shared/chat/parts";
 import { chatCommandSchema } from "../shared/chat/command";
+import { runStreamDurability, START } from "./run-streams";
 import { startRun } from "./run";
 import { findConversation, loadPath } from "./store";
 
@@ -146,11 +147,14 @@ export async function handleChat(
   }
   if (started === "attachment_gone") return refuse(404, "Attachment not found");
 
-  const chunks = startRun(deps, {
+  await startRun(deps, {
     messageId: assistantMessageId,
     adapter,
     messages,
     webSearch: searchCredentials ?? undefined,
   });
-  return toServerSentEventsResponse(chunks);
+  // The response reads the Run's log from the start, like any joiner (ADR 0006).
+  return resumeServerSentEventsResponse({
+    adapter: runStreamDurability(deps.runStreams, assistantMessageId, START),
+  });
 }

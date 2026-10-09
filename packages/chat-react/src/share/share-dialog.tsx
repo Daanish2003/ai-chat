@@ -7,9 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@ai-chat/ui/components/dialog";
+import { fetchServerSentEvents } from "@tanstack/ai-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, CopyIcon, Link2Icon, Share2Icon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "../conversation-list";
@@ -36,8 +37,8 @@ export function ShareButton({ conversationId }: { conversationId: string }) {
 
 /**
  * Creates, updates or deletes the Conversation's Shared link (ADR 0004). Fetched fresh on every
- * open, and polled while a reply streams, so the link state and the reason sharing is blocked
- * are current.
+ * open. While a reply streams, the dialog joins its Run and fetches again once the reply ends, so
+ * the link state and the reason sharing is blocked are current (ADR 0006).
  */
 export function ShareDialog({
   conversationId,
@@ -49,14 +50,11 @@ export function ShareDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const { orpc, shareUrl } = useChatAdapter();
+  const { orpc, shareUrl, chatUrl } = useChatAdapter();
   const statusQuery = orpc.share.forConversation.queryOptions({ input: { conversationId } });
-  const status = useQuery({
-    ...statusQuery,
-    enabled: open,
-    staleTime: 0,
-    refetchInterval: (query) => (query.state.data?.blockedBy === "streaming" ? 1_000 : false),
-  });
+  const status = useQuery({ ...statusQuery, enabled: open, staleTime: 0 });
+  const conversationQuery = orpc.conversation.get.queryOptions({ input: { id: conversationId } });
+  const conversation = useQuery(conversationQuery);
   const callbacks = {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: statusQuery.queryKey });
@@ -67,10 +65,32 @@ export function ShareDialog({
   const upsert = useMutation(orpc.share.upsert.mutationOptions(callbacks));
   const remove = useMutation(orpc.share.delete.mutationOptions(callbacks));
 
-  const title = useQuery(orpc.conversation.get.queryOptions({ input: { id: conversationId } })).data
-    ?.title;
+  const title = conversation.data?.title;
   const link = status.data?.link;
   const blockedBy = status.data?.blockedBy;
+
+  // The reply sharing waits for. Its Message id is its Run's id, so the dialog joins the Run.
+  const streamingId =
+    blockedBy === "streaming"
+      ? conversation.data?.messages.find((message) => message.status === "streaming")?.id
+      : undefined;
+  const joinedRun = useRef<string>(undefined);
+  const replyEnded = useEffectEvent(async (runId: string) => {
+    try {
+      for await (const _chunk of fetchServerSentEvents(chatUrl).joinRun(runId)) {
+        // The reply is shown by its own page; the dialog only waits for its end.
+      }
+    } catch {
+      // A failed join ends the wait; the refetch below shows what is left.
+    }
+    await queryClient.invalidateQueries({ queryKey: statusQuery.queryKey });
+    await queryClient.invalidateQueries({ queryKey: conversationQuery.queryKey });
+  });
+  useEffect(() => {
+    if (!streamingId || joinedRun.current === streamingId) return;
+    joinedRun.current = streamingId;
+    void replyEnded(streamingId);
+  }, [streamingId]);
   const url = link ? shareUrl(link.token) : "";
   const busy = upsert.isPending || remove.isPending;
   const canShare = status.isSuccess && !blockedBy && !busy;

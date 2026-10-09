@@ -2,6 +2,7 @@ import type { Database } from "@ai-chat/db";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
 import { adapterFor } from "./chat/adapters";
+import { createMemoryRunStreams, type RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
 import type { SearchErrorReason, SearchResult } from "./shared/chat/web-search";
 
@@ -44,6 +45,8 @@ export type AppDeps = {
   searchClient: SearchClient;
   /** In-process abort registry of runs, keyed by the streaming assistant Message id. */
   runs: Map<string, AbortController>;
+  /** Every Run's chunk log, which its POST response and any joiner read (ADR 0006). */
+  runStreams: RunStreams;
   limits: Limits;
   fetch: typeof fetch;
   /** `KEY_ENCRYPTION_SECRET`: encrypts Provider credentials and Tool credentials at rest (ADR 0003). */
@@ -68,6 +71,7 @@ export function createAppDeps({
     adapterFor,
     searchClient: createTavilyClient(globalThis.fetch),
     runs: new Map(),
+    runStreams: createMemoryRunStreams(),
     limits: defaultLimits,
     fetch: globalThis.fetch,
     keyEncryptionSecret,

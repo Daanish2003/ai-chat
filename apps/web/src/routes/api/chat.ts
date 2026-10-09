@@ -1,15 +1,23 @@
 import { handleChat } from "@ai-chat/api/chat/handle-chat";
+import { handleJoin } from "@ai-chat/api/chat/join-run";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { auth, deps } from "../../services";
 
-/** Streams an assistant Message. A thin wrapper: everything happens in `handleChat` (ADR 0002). */
+/**
+ * Streams an assistant Message, and joins a live one (`GET ?runId=`). Thin wrappers: everything
+ * happens in `handleChat` and `handleJoin` (ADR 0002, ADR 0006).
+ */
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         const session = await auth.api.getSession({ headers: request.headers });
         return handleChat(request, session, deps);
+      },
+      GET: async ({ request }) => {
+        const session = await auth.api.getSession({ headers: request.headers });
+        return handleJoin(request, session, deps);
       },
     },
   },

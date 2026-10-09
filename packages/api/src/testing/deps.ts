@@ -1,5 +1,6 @@
 import { getTestDb } from "@ai-chat/db/testing/test-database";
 
+import { createMemoryRunStreams } from "../chat/run-streams";
 import type { AppDeps } from "../deps";
 import { createFakeSearchClient } from "./fake-search-client";
 
@@ -18,6 +19,7 @@ export function createTestDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     },
     searchClient: createFakeSearchClient(),
     runs: new Map(),
+    runStreams: createMemoryRunStreams(),
     limits: { snapshotIntervalMs: 20, runCapMs: 2_000 },
     fetch: async (input) => {
       throw new Error(`Unexpected network call in a test: ${String(input)}`);
