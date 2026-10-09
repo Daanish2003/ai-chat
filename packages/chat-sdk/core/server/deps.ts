@@ -1,10 +1,10 @@
-import type { Database } from "@ai-chat/db";
+import type { Database } from "./db/index";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
 import { adapterFor } from "./chat/adapters";
 import { createMemoryRunStreams, type RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
-import type { SearchErrorReason, SearchResult } from "./shared/chat/web-search";
+import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search";
 
 export type { SearchErrorReason, SearchResult };
 

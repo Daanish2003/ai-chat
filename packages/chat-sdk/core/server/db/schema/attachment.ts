@@ -9,7 +9,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { user } from "./auth";
+import { user } from "@ai-chat/db/schema/auth";
 import { message } from "./chat";
 
 /**

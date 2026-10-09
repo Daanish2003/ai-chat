@@ -1,6 +1,6 @@
 import { boolean, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
 
-import { user } from "./auth";
+import { user } from "@ai-chat/db/schema/auth";
 
 /**
  * A user's Provider credentials or Tool credential for one service (ADR 0003).

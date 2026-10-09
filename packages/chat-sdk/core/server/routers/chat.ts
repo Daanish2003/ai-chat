@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { stopRun } from "../chat/run";
 import { findMessage } from "../chat/store";
-import { protectedProcedure } from "../index";
+import { protectedProcedure } from "../procedures";
 
 export const chatRouter = {
   /**

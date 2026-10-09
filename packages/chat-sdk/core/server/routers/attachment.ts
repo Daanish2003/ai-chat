@@ -5,9 +5,9 @@ import {
   attachmentKind,
   maxAttachmentBytes,
   normalizedMediaType,
-} from "../shared/attachments/kinds";
+} from "../../shared/attachments/kinds";
 import { saveAttachment } from "../attachments/store";
-import { protectedProcedure } from "../index";
+import { protectedProcedure } from "../procedures";
 
 export const attachmentRouter = {
   /**

@@ -1,6 +1,6 @@
 import { pgTable, text } from "drizzle-orm/pg-core";
 
-import { user } from "./auth";
+import { user } from "@ai-chat/db/schema/auth";
 
 /** A user's settings; a user without a row has the defaults. */
 export const userSettings = pgTable("user_settings", {

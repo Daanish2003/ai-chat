@@ -9,8 +9,8 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import type { StoredParts } from "../message-parts";
-import { user } from "./auth";
+import type { StoredParts } from "../../../shared/message-parts";
+import { user } from "@ai-chat/db/schema/auth";
 
 /** A Conversation, owned by one user. Its Messages form a tree (ADR 0001). */
 export const conversation = pgTable(
