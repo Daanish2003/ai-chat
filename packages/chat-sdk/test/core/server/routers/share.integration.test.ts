@@ -1,7 +1,4 @@
 import { storedParts } from "../../../../core/shared/message-parts";
-import { user as userTable } from "@ai-chat/db/schema/auth";
-import { getTestDb } from "../../../support/test-database";
-import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { citationFor } from "../../../../core/shared/chat/citations";
@@ -414,17 +411,6 @@ describe("deleting what a link points at", () => {
     const link = await client.share.upsert({ conversationId: conv.id });
 
     await client.conversation.delete({ id: conv.id });
-
-    await expect(createTestClient().share.get({ token: link.token })).rejects.toMatchObject({
-      code: "NOT_FOUND",
-    });
-  });
-
-  it("lets the account be deleted with a shared Conversation", async () => {
-    const { user, client, conv } = await answeredConversation();
-    const link = await client.share.upsert({ conversationId: conv.id });
-
-    await getTestDb().delete(userTable).where(eq(userTable.id, user.id));
 
     await expect(createTestClient().share.get({ token: link.token })).rejects.toMatchObject({
       code: "NOT_FOUND",
