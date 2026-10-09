@@ -59,6 +59,22 @@ test("Stop ends a reply early and marks it Stopped", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
 });
 
+test("reloading during a streaming reply joins it live until it completes", async ({ page }) => {
+  await signUpWithModel(page);
+  await page.getByLabel("Message", { exact: true }).fill(`Keep going ${slowMarker}`);
+  await page.keyboard.press("Enter");
+  await expect(messageRows(page).last()).toContainText("You said");
+
+  await page.reload();
+
+  await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
+  await expect(messageRows(page).last()).toContainText("That's all.");
+  await expect(page.getByRole("button", { name: "Send" })).toBeVisible();
+  await page.reload();
+  await expect(messageRows(page)).toHaveCount(2);
+  await expect(messageRows(page).last()).toContainText("That's all.");
+});
+
 test("editing a Message and regenerating a reply each start a new Branch", async ({ page }) => {
   await signUpWithModel(page);
   await send(page, "Original question");

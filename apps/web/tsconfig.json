@@ -1,5 +1,4 @@
 {
-  "references": [{ "path": "../../packages/api" }],
   "include": ["**/*.ts", "**/*.tsx"],
   "compilerOptions": {
     "target": "ES2022",
@@ -22,6 +21,8 @@
     "noUncheckedSideEffectImports": true,
     "paths": {
       "@/*": ["./src/*"],
+      "@/components/ui/*": ["../../packages/ui/src/components/*"],
+      "@/lib/utils": ["../../packages/ui/src/lib/utils"],
       "@ai-chat/ui/*": ["../../packages/ui/src/*"]
     }
   }

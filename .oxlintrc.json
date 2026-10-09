@@ -5,6 +5,24 @@
     "correctness": "error"
   },
   "rules": {},
+  "overrides": [
+    {
+      "files": ["packages/chat-sdk/core/client/**", "packages/chat-sdk/ui/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/server/**", "!**/server/routers/index"],
+                "message": "Client code and ui/ never import core/server (ADR 0005). Only the type AppRouterClient may come from core/server/routers/index. Move shared code under core/shared/."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
   "env": {
     "builtin": true
   }

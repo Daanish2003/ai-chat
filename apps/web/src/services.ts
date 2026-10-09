@@ -1,9 +1,17 @@
-import { createAppDeps } from "@ai-chat/api/deps";
 import { createAuth } from "@ai-chat/auth";
 import { createDb } from "@ai-chat/db";
+import { createChat } from "@ai-chat/chat-sdk/server";
 
 import { ENV } from "./env.server";
 
 export const db = createDb(ENV);
 export const auth = createAuth(ENV, db);
-export const deps = createAppDeps({ db, keyEncryptionSecret: ENV.KEY_ENCRYPTION_SECRET });
+export const chat = createChat({
+  databaseUrl: ENV.DATABASE_URL,
+  keyEncryptionSecret: ENV.KEY_ENCRYPTION_SECRET,
+  basePath: "/api/chat",
+  getUser: async (request) => {
+    const session = await auth.api.getSession({ headers: request.headers });
+    return session?.user ? { id: session.user.id } : null;
+  },
+});

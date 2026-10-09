@@ -1,5 +1,6 @@
 packages:
   - apps/*
+  - examples/*
   - packages/*
 allowBuilds:
   esbuild: true
@@ -8,6 +9,9 @@ allowBuilds:
   "@google/genai": false
   "@openrouter/sdk": false
   protobufjs: false
+  "@prisma/client": true
+  "@prisma/engines": true
+  prisma: true
 catalog:
   zod: ^4.5.4
   typescript: ^6.0.3
@@ -20,8 +24,6 @@ catalog:
   tailwindcss: ^4.3.3
   "@orpc/server": ^1.15.0
   "@orpc/client": ^1.15.0
-  "@orpc/openapi": ^1.15.0
-  "@orpc/zod": ^1.15.0
   better-auth: 1.7.7
   "@types/react": ^19.2.18
   "@types/react-dom": ^19.2.7
