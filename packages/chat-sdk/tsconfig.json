@@ -15,6 +15,7 @@
     "ui/**/*.ts",
     "ui/**/*.tsx",
     "test/**/*.ts",
-    "test/**/*.tsx"
+    "test/**/*.tsx",
+    "scripts/**/*.ts"
   ]
 }
