@@ -19,8 +19,10 @@ const MIGRATION_LOCK_ID = 727_770_001;
 export const LATEST_MIGRATION = "20261009085944_chat_baseline";
 
 function migrationsFolder() {
-  // Only `migrate()` reads the folder, from a migrate script that runs the file unbundled.
-  return fileURLToPath(new URL("./migrations", /* turbopackIgnore: true */ import.meta.url));
+  // Only `migrate()` reads the folder, from a migrate script that runs the file unbundled. The
+  // path is a variable so a bundler doesn't try to resolve the folder at build time.
+  const folder = ["", "migrations"].join("./");
+  return fileURLToPath(new URL(folder, import.meta.url));
 }
 
 /** Milliseconds for a migration folder's `yyyymmddhhmmss` prefix, as drizzle records them. */

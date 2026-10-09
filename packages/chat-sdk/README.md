@@ -49,16 +49,15 @@ Install these in the Host. Versions come from `package.json` in this folder.
 
 **What the `prompt-kit` components need** (they are copied in with `ui/`, see below): `class-variance-authority`, `marked`, `react-markdown`, `remark-breaks`, `remark-gfm`, `shiki`, `use-stick-to-bottom`, `@tailwindcss/typography`.
 
-Known gap: `core/` still imports two repo-internal packages, `@ai-chat/auth` (type-only `Session`) and `@ai-chat/db/schema/auth` (the `user` table that chat foreign keys reference). A Host outside this repo cannot compile `core/` until those imports are removed. Until then, copying into another repo is not supported.
+`core/` imports only npm packages and its own files, so a Host outside this repo can copy and compile it. `examples/next-prisma` is a Host outside this repo that runs it.
 
 ## shadcn components
 
 `ui/` imports these from the Host's `@/components/ui/*` (and `@/lib/utils` for `cn`). Add them with the shadcn CLI, which also installs each component's own dependencies:
 
-- `button`, `dialog`, `input`, `label`, `popover`, `textarea`, `tooltip`, `attachment`
-- `prompt-kit/chat-container`, `prompt-kit/loader`, `prompt-kit/markdown`, `prompt-kit/prompt-input`, `prompt-kit/reasoning`, `prompt-kit/scroll-button`, `prompt-kit/source`, `prompt-kit/system-message`
+- `button`, `dialog`, `input`, `label`, `popover`, `textarea`, `tooltip`, `attachment`, `hover-card`
 
-The `prompt-kit` components (`chat-container`, `loader`, `markdown`, `prompt-input`, `reasoning`, `scroll-button`, `source`, `system-message`) live in this repo's `packages/ui/src/components/prompt-kit/`. Copy them into your `components/ui/prompt-kit/` and change their `@ai-chat/ui/...` imports to your `@/...` alias.
+The `prompt-kit` components (`chat-container`, `loader`, `markdown`, `prompt-input`, `reasoning`, `scroll-button`, `source`, `system-message`) live in this repo's `packages/ui/src/components/prompt-kit/`. Copy them into your `components/ui/prompt-kit/`, and copy two more files they import: `code-block.tsx` (used by `markdown`) into the same folder, and `packages/ui/src/lib/favicon.ts` to your `lib/favicon.ts` (used by `source`). Change their `@ai-chat/ui/...` imports to your `@/...` alias: `@ai-chat/ui/lib/utils` becomes `@/lib/utils`, and `@ai-chat/ui/components/x` becomes `@/components/ui/x`.
 
 ## Tailwind v4
 
