@@ -1,4 +1,3 @@
-import type { Session } from "@ai-chat/auth";
 import { storedParts } from "../../shared/message-parts";
 import { conversation, message } from "../db/schema/chat";
 import { resumeServerSentEventsResponse } from "@tanstack/ai";
@@ -9,6 +8,7 @@ import { linkAttachments, lockAttachments } from "../attachments/store";
 import { addKeyMessage, tavilyService } from "../../shared/credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
+import type { ChatUser } from "../context";
 import { uuidv7 } from "../lib/uuidv7";
 import { resolveModel } from "./available-models";
 import { parseStoredParts, searchTextOf, toModelMessages } from "../../shared/chat/parts";
@@ -19,14 +19,13 @@ import { findConversation, loadPath } from "./store";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 
-/** `/api/chat`: starts a run for the command and streams it back as server-sent events. */
+/** `POST ${basePath}/run`: starts a run for the command and streams it back as server-sent events. */
 export async function handleChat(
   request: Request,
-  session: Session | null,
+  user: ChatUser,
   deps: AppDeps,
 ): Promise<Response> {
-  if (!session?.user) return refuse(401, "Sign in to chat");
-  const userId = session.user.id;
+  const userId = user.id;
 
   const body: unknown = await request.json().catch(() => undefined);
   const parsed = chatCommandSchema.safeParse(

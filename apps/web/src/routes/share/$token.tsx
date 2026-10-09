@@ -2,7 +2,7 @@ import { SharedConversationPage, SharedLinkNotFound } from "@ai-chat/chat-sdk/ui
 import { ORPCError } from "@orpc/client";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
-import { client } from "@/utils/orpc";
+import { chatClient } from "@/utils/orpc";
 
 const noindex = { name: "robots", content: "noindex, nofollow" };
 
@@ -10,7 +10,7 @@ const noindex = { name: "robots", content: "noindex, nofollow" };
 export const Route = createFileRoute("/share/$token")({
   loader: async ({ params }) => {
     try {
-      return await client.share.get({ token: params.token });
+      return await chatClient.rpc.share.get({ token: params.token });
     } catch (error) {
       if (error instanceof ORPCError && error.code === "NOT_FOUND") throw notFound();
       throw error;

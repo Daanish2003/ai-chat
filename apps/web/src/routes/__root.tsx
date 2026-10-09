@@ -45,6 +45,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 });
 
 function RootDocument() {
+  const { queryClient } = Route.useRouteContext();
   return (
     <html lang="en" className="dark">
       <head>
@@ -52,7 +53,7 @@ function RootDocument() {
       </head>
       <body>
         <div className="flex h-svh flex-col">
-          <WebChatProvider>
+          <WebChatProvider queryClient={queryClient}>
             <Outlet />
           </WebChatProvider>
         </div>

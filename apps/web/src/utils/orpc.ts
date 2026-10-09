@@ -1,15 +1,10 @@
-import { appRouter } from "@ai-chat/chat-sdk/server";
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
-import { createRouterClient } from "@orpc/server";
-import type { RouterClient } from "@orpc/server";
-import { createTanstackQueryUtils } from "@orpc/tanstack-query";
+import { type ChatClient, createChatClient } from "@ai-chat/chat-sdk/client";
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 import { createIsomorphicFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { toast } from "sonner";
 
-import { createContext } from "../context";
+import { chat } from "../services";
 
 export function createQueryClient() {
   return new QueryClient({
@@ -29,28 +24,26 @@ export function createQueryClient() {
   });
 }
 
-const getORPCClient = createIsomorphicFn()
-  .server(() =>
-    createRouterClient(appRouter, {
-      context: async () => {
-        return createContext({ req: getRequest() });
+// On the server the client calls the chat handler in process; in the browser it calls the route.
+const getChatClient = createIsomorphicFn()
+  .server((): ChatClient =>
+    createChatClient({
+      baseUrl: "http://localhost/api/chat",
+      fetch: (request) => {
+        // A call made while rendering carries the page request's cookies, so `getUser` sees the session.
+        const headers = new Headers(request.headers);
+        const cookie = getRequest().headers.get("cookie");
+        if (cookie) headers.set("cookie", cookie);
+        return chat.handler(new Request(request, { headers }));
       },
     }),
   )
-  .client((): RouterClient<typeof appRouter> => {
-    const link = new RPCLink({
-      url: `${window.location.origin}/api/rpc`,
-      fetch(url, options) {
-        return fetch(url, {
-          ...options,
-          credentials: "include",
-        });
-      },
-    });
+  .client((): ChatClient =>
+    createChatClient({
+      baseUrl: `${window.location.origin}/api/chat`,
+    }),
+  );
 
-    return createORPCClient(link);
-  });
+export const chatClient = getChatClient();
 
-export const client: RouterClient<typeof appRouter> = getORPCClient();
-
-export const orpc = createTanstackQueryUtils(client);
+export const orpc = chatClient.orpc;

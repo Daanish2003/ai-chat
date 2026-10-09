@@ -30,7 +30,7 @@ export const attachmentRouter = {
       if (kind === "text" && !isUtf8(bytes)) {
         throw new ORPCError("BAD_REQUEST", { message: `"${file.name}" isn't a UTF-8 text file` });
       }
-      return saveAttachment(context.deps, context.session.user.id, {
+      return saveAttachment(context.deps, context.user.id, {
         filename: file.name,
         mediaType: normalizedMediaType(file.type, file.name),
         bytes,

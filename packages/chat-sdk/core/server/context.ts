@@ -1,8 +1,10 @@
-import type { Session } from "@ai-chat/auth";
-
 import type { AppDeps } from "./deps";
 
+/** The signed-in user, as the Host's `getUser` returns them. */
+export type ChatUser = { id: string };
+
 export type Context = {
-  session: Session | null;
+  /** `null` only for the public Shared link read. */
+  user: ChatUser | null;
   deps: AppDeps;
 };

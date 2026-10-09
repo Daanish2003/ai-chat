@@ -1,9 +1,16 @@
-import type { AppRouterClient } from "../../server/routers/index";
-import type { RouterUtils } from "@orpc/tanstack-query";
-import { type ComponentType, createContext, type ReactNode, useContext } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  type ComponentType,
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 
-/** The oRPC TanStack Query utils for the app router. */
-export type ChatOrpc = RouterUtils<AppRouterClient>;
+import type { ChatClient } from "../chat-client";
+
+export type { ChatOrpc } from "../chat-client";
 
 /** A page the chat UI links or navigates to. The host app maps each to its own route. */
 export type ChatPage =
@@ -34,23 +41,43 @@ export type ChatLocation = {
   pageTitle?: string;
 };
 
-export type ChatAdapter = {
-  orpc: ChatOrpc;
-  /** Where `useChat` posts commands and streams replies (`handleChat`). */
-  chatUrl: string;
-  /** A Shared link's public URL. */
-  shareUrl: (token: string) => string;
+/** The host app's routing, which the chat UI links and navigates through. */
+export type ChatRouter = {
   Link: ComponentType<ChatLinkProps>;
   navigate: (page: ChatPage, options?: { replace?: boolean }) => Promise<void> | void;
   /** A hook: called during render by the chat UI. */
   useLocation: () => ChatLocation;
+  /** A Shared link's public URL. */
+  shareUrl: (token: string) => string;
 };
+
+export type ChatAdapter = Pick<ChatClient, "orpc" | "chatUrl"> & ChatRouter;
 
 const ChatContext = createContext<ChatAdapter | null>(null);
 
-/** Gives the chat UI its API client and the host app's routing. */
-export function ChatProvider({ adapter, children }: { adapter: ChatAdapter; children: ReactNode }) {
-  return <ChatContext value={adapter}>{children}</ChatContext>;
+/** Gives the chat UI its client and the host app's routing. */
+export function ChatProvider({
+  client,
+  router,
+  queryClient,
+  children,
+}: {
+  client: ChatClient;
+  router: ChatRouter;
+  /** The Host's QueryClient, when it has one. Otherwise the provider makes its own. */
+  queryClient?: QueryClient;
+  children: ReactNode;
+}) {
+  const [ownQueryClient] = useState(() => new QueryClient());
+  const adapter = useMemo<ChatAdapter>(
+    () => ({ ...router, orpc: client.orpc, chatUrl: client.chatUrl }),
+    [client, router],
+  );
+  return (
+    <QueryClientProvider client={queryClient ?? ownQueryClient}>
+      <ChatContext value={adapter}>{children}</ChatContext>
+    </QueryClientProvider>
+  );
 }
 
 export function useChatAdapter() {

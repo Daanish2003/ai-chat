@@ -2,9 +2,10 @@ import type { Database } from "./db/index";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
 import { adapterFor } from "./chat/adapters";
-import { createMemoryRunStreams, type RunStreams } from "./chat/run-streams";
+import type { RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
 import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search";
+import type { ChatRuntime } from "./runtime";
 
 export type { SearchErrorReason, SearchResult };
 
@@ -62,16 +63,18 @@ export const defaultLimits: Limits = {
 export function createAppDeps({
   db,
   keyEncryptionSecret,
+  runtime,
 }: {
   db: Database;
   keyEncryptionSecret: string;
+  runtime: ChatRuntime;
 }): AppDeps {
   return {
     db,
     adapterFor,
     searchClient: createTavilyClient(globalThis.fetch),
     runs: new Map(),
-    runStreams: createMemoryRunStreams(),
+    runStreams: runtime.runStreams,
     limits: defaultLimits,
     fetch: globalThis.fetch,
     keyEncryptionSecret,

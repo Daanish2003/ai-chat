@@ -14,13 +14,10 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
-    "@ai-chat/auth": "workspace:*",
     "@ai-chat/db": "workspace:*",
     "@orpc/client": "catalog:",
-    "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/tanstack-query": "^1.15.0",
-    "@orpc/zod": "catalog:",
     "@tanstack/ai": "0.66.0",
     "@tanstack/ai-anthropic": "0.20.0",
     "@tanstack/ai-bedrock": "0.4.5",

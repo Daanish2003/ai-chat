@@ -1,11 +1,10 @@
-import type { MessageRow } from "../../server/db/schema/chat";
-
 import type { AttachmentInfo } from "../attachments/kinds";
+import type { MessageRecord } from "./message-record";
 import type { SiblingPosition } from "./branches";
 import { parseStoredParts, toUIParts } from "./parts";
 
 /** A Message as the client sees it, with `useChat` parts. */
-export function toClientMessage(row: MessageRow, attachments: AttachmentInfo[] = []) {
+export function toClientMessage(row: MessageRecord, attachments: AttachmentInfo[] = []) {
   return {
     id: row.id,
     parentId: row.parentId,

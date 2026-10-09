@@ -25,11 +25,7 @@ function conversationNotFound() {
 export const shareRouter = {
   /** Creates the link, or moves it to the current Active Branch under the same token. */
   upsert: protectedProcedure.input(conversationInput).handler(async ({ context, input }) => {
-    const result = await upsertSharedLink(
-      context.deps,
-      context.session.user.id,
-      input.conversationId,
-    );
+    const result = await upsertSharedLink(context.deps, context.user.id, input.conversationId);
     if (result.error === "not_found") throw conversationNotFound();
     if (result.error === "blocked") {
       throw new ORPCError("CONFLICT", { message: blockedMessages[result.blockedBy] });
@@ -39,11 +35,7 @@ export const shareRouter = {
 
   /** Revokes the link; its URL then answers 404. */
   delete: protectedProcedure.input(conversationInput).handler(async ({ context, input }) => {
-    const owned = await deleteSharedLink(
-      context.deps,
-      context.session.user.id,
-      input.conversationId,
-    );
+    const owned = await deleteSharedLink(context.deps, context.user.id, input.conversationId);
     if (!owned) throw conversationNotFound();
   }),
 
@@ -51,7 +43,7 @@ export const shareRouter = {
   forConversation: protectedProcedure
     .input(conversationInput)
     .handler(async ({ context, input }) => {
-      const status = await shareStatus(context.deps, context.session.user.id, input.conversationId);
+      const status = await shareStatus(context.deps, context.user.id, input.conversationId);
       if (!status) throw conversationNotFound();
       return status;
     }),
