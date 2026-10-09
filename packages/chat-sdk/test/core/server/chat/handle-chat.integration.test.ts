@@ -1,9 +1,12 @@
 import { conversation, message } from "../../../../core/server/db/schema/chat";
 import { asc, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
+import { EventType } from "@tanstack/ai";
 
 import { saveCredentials } from "../../../../core/server/credentials/store";
 import type { AppDeps } from "../../../../core/server/deps";
+import type { PubSub } from "../../../../core/server/chat/pubsub";
+import { START, type RunEntry } from "../../../../core/server/chat/run-streams";
 import { insertConversation, insertMessage } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { liveModelsFetch } from "../../../support/live-models";
@@ -313,6 +316,17 @@ describe("the Run endpoint", () => {
   });
 });
 
+/** A PubSub that discards every publish, so a Stop reaches its Run only through the column. */
+function discardingPubSub(): PubSub {
+  return { publish: async () => {}, subscribe: async () => async () => {} };
+}
+
+async function collect(entries: AsyncIterable<RunEntry>) {
+  const out: RunEntry[] = [];
+  for await (const entry of entries) out.push(entry);
+  return out;
+}
+
 /** An adapter that sends some text, then hangs and ignores the abort signal (like Ollama's). */
 function deafAdapter() {
   const fake = createFakeAdapter({ rounds: [] });
@@ -385,7 +399,7 @@ describe("chat.stop", () => {
     });
   });
 
-  it("marks a streaming Message with no run in this process stopped", async () => {
+  it("marks a Run whose heartbeat has expired stopped itself, and ends its log", async () => {
     const { user, deps } = await setup();
     const conv = await insertConversation(user);
     const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
@@ -395,6 +409,8 @@ describe("chat.stop", () => {
       role: "assistant",
       text: "Half",
       status: "streaming",
+      // No owner is alive: its last heartbeat is older than the 30 s lease.
+      heartbeatAt: new Date(Date.now() - 60_000),
     });
 
     await chatRpc({ user, deps }).chat.stop({ messageId: reply.id });
@@ -403,6 +419,52 @@ describe("chat.stop", () => {
       status: "stopped",
       parts: { parts: [{ type: "text", text: "Half" }] },
     });
+    const log = await collect(deps.runStreams.read(reply.id, START));
+    expect(log.at(-1)?.chunk.type).toBe(EventType.RUN_FINISHED);
+  });
+
+  it("leaves the status to the Run's owner when its heartbeat is live, and publishes Stop on its cancel channel", async () => {
+    const published: string[] = [];
+    const { user, deps } = await setup({
+      deps: {
+        pubsub: {
+          publish: async (channel) => void published.push(channel),
+          subscribe: async () => async () => {},
+        },
+      },
+    });
+    const conv = await insertConversation(user);
+    const reply = await insertMessage({
+      conversationId: conv.id,
+      role: "assistant",
+      text: "Half",
+      status: "streaming",
+      heartbeatAt: new Date(),
+    });
+
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply.id });
+
+    expect(published).toEqual([`run:${reply.id}:cancel`]);
+    expect((await messagesOf(deps, conv.id))[0]).toMatchObject({
+      status: "streaming",
+      cancelRequestedAt: expect.any(Date),
+    });
+  });
+
+  it("stops a Run within a snapshot interval when the Stop signal is dropped", async () => {
+    const { user, deps, conv, send } = await setup({
+      manual: true,
+      deps: { pubsub: discardingPubSub() },
+    });
+    const response = await send();
+    const [, reply] = await messagesOf(deps, conv.id);
+
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply!.id });
+
+    await expect
+      .poll(async () => (await messagesOf(deps, conv.id))[1]?.status, { timeout: 1_000 })
+      .toBe("stopped");
+    await response.text();
   });
 
   it("leaves a Message that already ended alone", async () => {

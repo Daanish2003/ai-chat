@@ -2,6 +2,7 @@ import type { Database } from "./db/index";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
 import { adapterFor } from "./chat/adapters";
+import type { PubSub } from "./chat/pubsub";
 import type { RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
 import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search";
@@ -44,10 +45,10 @@ export type AppDeps = {
   /** Builds the TanStack AI text adapter for a `"provider:model"` id. */
   adapterFor: (model: string, credentials: Credentials) => AnyTextAdapter;
   searchClient: SearchClient;
-  /** In-process abort registry of runs, keyed by the streaming assistant Message id. */
-  runs: Map<string, AbortController>;
   /** Every Run's chunk log, which its POST response and any joiner read (ADR 0006). */
   runStreams: RunStreams;
+  /** Control signals such as Stop, which a Run's owner subscribes to (ADR 0006). */
+  pubsub: PubSub;
   limits: Limits;
   fetch: typeof fetch;
   /** `KEY_ENCRYPTION_SECRET`: encrypts Provider credentials and Tool credentials at rest (ADR 0003). */
@@ -73,8 +74,8 @@ export function createAppDeps({
     db,
     adapterFor,
     searchClient: createTavilyClient(globalThis.fetch),
-    runs: new Map(),
     runStreams: runtime.runStreams,
+    pubsub: runtime.pubsub,
     limits: defaultLimits,
     fetch: globalThis.fetch,
     keyEncryptionSecret,

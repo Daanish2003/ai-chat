@@ -14,6 +14,7 @@ import { citationPrompt } from "../../shared/chat/citations";
 import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
 import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
+import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -22,8 +23,8 @@ type ProviderError = { message: string; code?: string };
 /**
  * Runs one assistant Message (ADR 0002). The run drains `chat()` to the end on its own,
  * whether or not anyone reads the returned chunks: it snapshots the streaming Message's parts
- * every `deps.limits.snapshotIntervalMs`, and finishes the row in `finally`. It is registered in
- * `deps.runs` under the Message id until it ends; aborting that controller stops it.
+ * every `deps.limits.snapshotIntervalMs`, and finishes the row in `finally`. A Stop aborts it, from
+ * the pub/sub signal or from `cancel_requested_at` read back on a snapshot tick (ADR 0006).
  *
  * Every chunk goes to the Run's log before anyone reads it (ADR 0006). The POST response and any
  * joiner read that log, so a reader that goes away only stops reading.
@@ -44,9 +45,8 @@ export async function startRun(
   },
 ): Promise<void> {
   const abortController = new AbortController();
-  deps.runs.set(messageId, abortController);
-
   await deps.runStreams.open(messageId);
+  const unsubscribeStop = await listenForStop(deps, messageId, () => abortController.abort());
   const parts = createPartsBuilder();
 
   let writes = Promise.resolve();
@@ -65,9 +65,16 @@ export async function startRun(
 
   let changed = false;
   const snapshotTimer = setInterval(() => {
-    if (!changed) return;
-    changed = false;
-    void write(withParts());
+    if (changed) {
+      changed = false;
+      void write(withParts());
+    }
+    // The Stop signal is at most once, so a Stop it missed is found in the column.
+    void stopRequested(deps, messageId)
+      .then((requested) => {
+        if (requested) abortController.abort();
+      })
+      .catch((error: unknown) => console.error(`Reading Stop of ${messageId} failed`, error));
   }, deps.limits.snapshotIntervalMs);
 
   /** Whether the log already holds its own RUN_FINISHED or RUN_ERROR. */
@@ -130,7 +137,9 @@ export async function startRun(
                 : { status: "complete" },
         ),
       );
-      deps.runs.delete(messageId);
+      void unsubscribeStop().catch((error: unknown) =>
+        console.error(`Unsubscribing Stop of ${messageId} failed`, error),
+      );
       // A Run that was stopped, timed out or threw has no terminal chunk of its own. A reader that
       // sees its log end without one takes the stream as cut off and reconnects, which starts the
       // Run again, so the log is ended explicitly.
@@ -228,19 +237,49 @@ function errorReasonOf(code: string | undefined): MessageErrorReason {
 }
 
 /**
- * Stops the run of a Message: aborts it when it runs in this process (it then saves itself
- * `stopped`), otherwise marks a leftover `streaming` row `stopped`. Ended Messages stay as they are.
+ * Stops the Run of a Message from any process (ADR 0006). It sets `cancel_requested_at` and
+ * publishes the Stop; the owning process aborts and saves the Message `stopped`. It never writes
+ * `status`, unless the Run's heartbeat has expired: then no owner is left, so the Message is
+ * marked `stopped` here and its log is ended. Ended Messages stay as they are.
  */
 export async function stopRun(deps: AppDeps, messageId: string) {
-  const run = deps.runs.get(messageId);
-  if (run) {
-    run.abort();
-    return;
-  }
-  await deps.db
+  const [requested] = await deps.db
     .update(message)
-    .set({ status: "stopped" })
+    .set({ cancelRequestedAt: new Date() })
+    .where(and(eq(message.id, messageId), eq(message.status, "streaming")))
+    .returning({ createdAt: message.createdAt, heartbeatAt: message.heartbeatAt });
+  if (!requested) return;
+  await deps.pubsub.publish(cancelChannel(messageId), "stop");
+  if (!heartbeatExpired(requested)) return;
+  await endOrphanedRun(deps, messageId);
+}
+
+/**
+ * Saves a streaming Message whose owner is gone as `stopped`, cancels its running searches and
+ * ends its log, so a reader does not reconnect and start it again (the #71 lesson).
+ */
+async function endOrphanedRun(deps: AppDeps, messageId: string) {
+  const [row] = await deps.db
+    .select({ parts: message.parts })
+    .from(message)
     .where(and(eq(message.id, messageId), eq(message.status, "streaming")));
+  if (!row) return;
+  const parsed = storedPartsSchema.safeParse(row.parts);
+  const ended = await deps.db
+    .update(message)
+    .set({
+      status: "stopped",
+      ...(parsed.success && { parts: cancelRunningSearches(parsed.data) }),
+    })
+    .where(and(eq(message.id, messageId), eq(message.status, "streaming")))
+    .returning({ id: message.id });
+  if (ended.length === 0) return;
+  await deps.runStreams.open(messageId);
+  await deps.runStreams.append(
+    messageId,
+    endingChunk({ threadId: messageId, runId: messageId }, undefined),
+  );
+  await deps.runStreams.close(messageId);
 }
 
 /**
