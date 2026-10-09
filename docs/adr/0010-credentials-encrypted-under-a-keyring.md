@@ -1,5 +1,5 @@
 ---
-Status: proposed
+Status: accepted
 ---
 
 # Stored secrets are encrypted under a keyring and rotated with `chat.rotateKeys()`
