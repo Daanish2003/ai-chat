@@ -7,19 +7,15 @@
   "rules": {},
   "overrides": [
     {
-      "files": ["packages/chat-core/src/**", "packages/chat-react/src/**"],
+      "files": ["packages/chat-sdk/core/client/**", "packages/chat-sdk/ui/**"],
       "rules": {
         "no-restricted-imports": [
           "error",
           {
             "patterns": [
               {
-                "group": [
-                  "@ai-chat/api/**",
-                  "!@ai-chat/api/shared/**",
-                  "!@ai-chat/api/routers/index"
-                ],
-                "message": "Client code imports only shared modules from @ai-chat/api (ADR 0005). Move isomorphic code under packages/api/src/shared/."
+                "group": ["**/server/**", "!**/server/routers/index"],
+                "message": "Client code and ui/ never import core/server (ADR 0005). Only the type AppRouterClient may come from core/server/routers/index. Move shared code under core/shared/."
               }
             ]
           }

@@ -1,4 +1,4 @@
-import { NewConversationPage } from "@ai-chat/chat-react";
+import { NewConversationPage } from "@ai-chat/chat-sdk/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 

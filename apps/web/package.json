@@ -3,18 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsc -b ../../packages/api && vite build",
+    "build": "vite build",
     "serve": "vite preview",
     "test:e2e": "playwright test",
     "dev": "vite dev",
-    "check-types": "tsc -b ../../packages/api && vite build && tsc --noEmit",
+    "check-types": "vite build && tsc --noEmit",
     "env:generate": "varlock codegen",
     "auth:generate": "varlock run -- pnpm dlx auth@latest generate --config src/services.ts --output ../../packages/db/src/schema/auth.ts --yes"
   },
   "dependencies": {
-    "@ai-chat/api": "workspace:*",
     "@ai-chat/auth": "workspace:*",
-    "@ai-chat/chat-react": "workspace:*",
+    "@ai-chat/chat-sdk": "workspace:*",
     "@ai-chat/db": "workspace:*",
     "@ai-chat/ui": "workspace:*",
     "@orpc/client": "catalog:",

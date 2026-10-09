@@ -1,4 +1,4 @@
-import { AppShell } from "@ai-chat/chat-react";
+import { AppShell } from "@ai-chat/chat-sdk/ui";
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
 
 import UserMenu from "@/components/user-menu";

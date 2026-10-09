@@ -1,4 +1,4 @@
-import type { Context as ApiContext } from "@ai-chat/api/context";
+import type { Context as ApiContext } from "@ai-chat/chat-sdk/server";
 
 import { auth, deps } from "./services";
 
