@@ -1,0 +1,119 @@
+# Chat SDK
+
+A chat feature a Host copies into its own source tree. The SDK is one folder with three parts:
+
+- `core/` (`shared`, `server`, `client`, including `client/react`): runtime code the Host never edits. Updating means copying it again.
+- `ui/`: React components the Host owns and may change. They sit on the Host's own shadcn primitives.
+- `package.json` and `README.md`: copied alongside, for reference. The Host installs the dependencies listed here.
+
+The SDK assumes nothing about the Host's stack beyond the npm packages below. It knows users only by an opaque id.
+
+## Adopting the SDK
+
+From this repo, run the copy script with the destination folder inside your Host:
+
+```sh
+pnpm -F @ai-chat/chat-sdk copy ../my-host/src/lib/chat-sdk
+```
+
+The destination is resolved from the folder you ran `pnpm` in. The script:
+
+- replaces `core/` on every run and writes `core/VERSION` with the commit hash and the date it was copied (`commit:` and `date:` lines);
+- copies `ui/` only when the destination has no `ui/` folder, so your edits to components and `theme.css` survive updates;
+- copies `package.json` and `README.md` to the destination root on every run;
+- never copies tests or test helpers (`*.test.*` files and `test`, `tests`, `testing`, `__tests__` folders).
+
+### Updating
+
+1. Run the copy script again. `core/VERSION` shows the commit you now run.
+2. Your `ui/` is untouched. If the release changed a component you also edited, merge that by hand: diff the new SDK's `ui/` against yours.
+3. Install any new dependencies listed below, then run your type check.
+
+## Dependencies
+
+Install these in the Host. Versions come from `package.json` in this folder.
+
+**What `core/` needs:**
+
+- `@tanstack/ai` and the provider packages it uses: `@tanstack/ai-anthropic`, `@tanstack/ai-bedrock`, `@tanstack/ai-byteplus`, `@tanstack/ai-client`, `@tanstack/ai-cloudflare`, `@tanstack/ai-gemini`, `@tanstack/ai-grok`, `@tanstack/ai-groq`, `@tanstack/ai-llmgateway`, `@tanstack/ai-lovable`, `@tanstack/ai-mistral`, `@tanstack/ai-ollama`, `@tanstack/ai-openai`, `@tanstack/ai-openrouter`, `@tanstack/ai-vercel-gateway`
+- `@tanstack/react-query`, `react`, `sonner`
+- `drizzle-orm` and `pg` (the Postgres driver it uses)
+- `@orpc/server`, `@orpc/tanstack-query`
+- `zod`
+
+**What `ui/` needs (on top of `core/`):**
+
+- `@tanstack/ai-react`
+- `lucide-react`
+- `sonner`, `react`, `@tanstack/react-query` (already listed above)
+
+**What the `prompt-kit` components need** (they are copied in with `ui/`, see below): `class-variance-authority`, `marked`, `react-markdown`, `remark-breaks`, `remark-gfm`, `shiki`, `use-stick-to-bottom`, `@tailwindcss/typography`.
+
+Known gap: `core/` still imports two repo-internal packages, `@ai-chat/auth` (type-only `Session`) and `@ai-chat/db/schema/auth` (the `user` table that chat foreign keys reference). A Host outside this repo cannot compile `core/` until those imports are removed. Until then, copying into another repo is not supported.
+
+## shadcn components
+
+`ui/` imports these from the Host's `@/components/ui/*` (and `@/lib/utils` for `cn`). Add them with the shadcn CLI, which also installs each component's own dependencies:
+
+- `button`, `dialog`, `input`, `label`, `popover`, `textarea`, `tooltip`, `attachment`
+- `prompt-kit/chat-container`, `prompt-kit/loader`, `prompt-kit/markdown`, `prompt-kit/prompt-input`, `prompt-kit/reasoning`, `prompt-kit/scroll-button`, `prompt-kit/source`, `prompt-kit/system-message`
+
+The `prompt-kit` components (`chat-container`, `loader`, `markdown`, `prompt-input`, `reasoning`, `scroll-button`, `source`, `system-message`) live in this repo's `packages/ui/src/components/prompt-kit/`. Copy them into your `components/ui/prompt-kit/` and change their `@ai-chat/ui/...` imports to your `@/...` alias.
+
+## Tailwind v4
+
+`ui/` uses Tailwind v4 classes. In your global stylesheet, import Tailwind and then the SDK's `theme.css`:
+
+```css
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "./lib/chat-sdk/ui/theme.css";
+```
+
+`theme.css` holds one line, `@source ".";`, which tells Tailwind to scan the `ui/` folder wherever it sits. Your shadcn theme variables (`--background`, `--primary`, and so on) must also be defined in your stylesheet. The `prompt-kit` message and reasoning components use the `prose` classes, so add `@plugin "@tailwindcss/typography";` as well.
+
+## Postgres
+
+- The database needs the `pg_trgm` extension. The first migration runs `CREATE EXTENSION IF NOT EXISTS pg_trgm`, which needs a role allowed to create extensions.
+- The SDK's tables live in the Host's database, not in your ORM's schema. Your ORM's migrations never touch them.
+
+## Host lifecycle
+
+The server API below is the spec for the SDK (spec #70). Some of it lands in later tickets; until then, `core/server` exports only the parts already built.
+
+```ts
+// server: construct at module load (no side effects)
+const chat = createChat({ databaseUrl, getUser, keyEncryptionSecret, basePath: "/api/chat" });
+
+// one catch-all route on your framework, for every chat call and the Shared link read
+export const handler = (request: Request) => chat.handler(request);
+
+// deploy step, once per deploy
+await chat.migrate();
+
+// boot and shutdown
+await chat.start();
+process.on("SIGTERM", () => chat.stop()); // drains local Runs for up to 250 s
+
+// when your app deletes a user
+await chat.deleteUser(String(user.id));
+
+// your own route for a Shared link page
+const data = await chat.getSharedConversation(token);
+```
+
+- `getUser(request)` returns `{ id } | null`. The handler answers 401 when it returns `null`.
+- `start()` refuses to run while the `chat` schema is behind the bundled migrations.
+- `stop()` refuses new Runs with 503 while it drains.
+
+Browser side: create a headless client and wrap your chat pages in the provider.
+
+```tsx
+const client = createChatClient({ baseUrl: "/api/chat" });
+
+<ChatProvider client={client} router={router}>
+  {children}
+</ChatProvider>;
+```
+
+The `router` adapter maps the chat pages (`new`, `conversation`, `keys`) to your URLs. It provides `Link`, `navigate(page)`, `useLocation()` and `shareUrl(token)`. Pass your own TanStack Query client as `queryClient` if you have one; otherwise the provider creates its own.

@@ -1,2 +1,2 @@
 @import "@ai-chat/ui/globals.css";
-@source "../../../packages/chat-sdk/ui";
+@import "../../../packages/chat-sdk/ui/theme.css";
