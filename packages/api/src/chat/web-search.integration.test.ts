@@ -10,9 +10,10 @@ import { createTestDeps } from "../testing/deps";
 import { createFakeAdapter, round, text, toolCall } from "../testing/fake-adapter";
 import { createFakeSearchClient } from "../testing/fake-search-client";
 import { createTestClient, insertUser, sessionFor } from "../testing/router-client";
-import { citationPrompt } from "./citations";
-import { type ChatCommand, handleChat } from "./handle-chat";
-import { curatedModels } from "./models";
+import { citationPrompt } from "../shared/chat/citations";
+import type { ChatCommand } from "../shared/chat/command";
+import { handleChat } from "./handle-chat";
+import { curatedModels } from "../shared/chat/models";
 import { sweepInterruptedRuns } from "./run";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";

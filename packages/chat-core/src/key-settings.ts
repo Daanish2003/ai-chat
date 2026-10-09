@@ -1,11 +1,11 @@
-import type { CredentialSummary } from "@ai-chat/api/credentials/store";
+import type { CredentialSummary } from "@ai-chat/api/shared/credentials/services";
 import {
   type CredentialService,
   isCredentialService,
   type ProviderId,
   providers,
   toolServices,
-} from "@ai-chat/api/credentials/services";
+} from "@ai-chat/api/shared/credentials/services";
 
 export type ProviderRowStatus = "verified" | "unverified" | "missing" | "coming_soon";
 

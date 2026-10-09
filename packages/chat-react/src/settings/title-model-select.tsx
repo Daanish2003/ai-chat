@@ -1,4 +1,4 @@
-import { findModel } from "@ai-chat/api/chat/models";
+import { findModel } from "@ai-chat/api/shared/chat/models";
 import { missingCredentialsMessage, modelGroups } from "@ai-chat/chat-core/models";
 import { Label } from "@ai-chat/ui/components/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";

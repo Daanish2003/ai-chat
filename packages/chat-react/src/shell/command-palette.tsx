@@ -1,4 +1,4 @@
-import { minSearchLength } from "@ai-chat/api/search/text";
+import { minSearchLength } from "@ai-chat/api/shared/search/text";
 import { relativeTime } from "@ai-chat/chat-core/relative-time";
 import { recentConversations, type SearchHit, splitSnippet } from "@ai-chat/chat-core/search";
 import { Dialog, DialogContent, DialogTitle } from "@ai-chat/ui/components/dialog";

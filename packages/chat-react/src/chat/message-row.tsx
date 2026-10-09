@@ -1,6 +1,6 @@
-import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
-import { replySegments, sourcesOf } from "@ai-chat/api/chat/sources";
-import { webSearchOf } from "@ai-chat/api/chat/web-search";
+import type { AttachmentInfo } from "@ai-chat/api/shared/attachments/kinds";
+import { replySegments, sourcesOf } from "@ai-chat/api/shared/chat/sources";
+import { webSearchOf } from "@ai-chat/api/shared/chat/web-search";
 import { Button } from "@ai-chat/ui/components/button";
 import { Loader } from "@ai-chat/ui/components/prompt-kit/loader";
 import { Markdown } from "@ai-chat/ui/components/prompt-kit/markdown";

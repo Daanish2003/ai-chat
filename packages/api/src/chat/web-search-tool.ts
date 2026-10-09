@@ -2,14 +2,14 @@ import { toolDefinition } from "@tanstack/ai";
 import { z } from "zod";
 
 import { type Credentials, type SearchClient, SearchError } from "../deps";
-import type { createPartsBuilder } from "./parts";
+import type { createPartsBuilder } from "../shared/chat/parts";
 import {
   maxSearchesPerReply,
   searchErrorMessages,
   searchLimitError,
   type WebSearchOutput,
   webSearchToolName,
-} from "./web-search";
+} from "../shared/chat/web-search";
 
 const webSearchDefinition = toolDefinition({
   name: webSearchToolName,

@@ -3,18 +3,12 @@ import type { AnyTextAdapter } from "@tanstack/ai";
 
 import { adapterFor } from "./chat/adapters";
 import { createTavilyClient } from "./chat/tavily";
+import type { SearchErrorReason, SearchResult } from "./shared/chat/web-search";
+
+export type { SearchErrorReason, SearchResult };
 
 /** Decrypted Provider credentials or Tool credential fields, keyed by field name. */
 export type Credentials = Record<string, string>;
-
-export type SearchResult = {
-  title: string;
-  url: string;
-  snippet: string;
-  publishedDate?: string;
-};
-
-export type SearchErrorReason = "invalid_key" | "quota_exhausted" | "failed";
 
 export class SearchError extends Error {
   readonly reason: SearchErrorReason;

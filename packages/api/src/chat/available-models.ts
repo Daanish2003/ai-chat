@@ -11,7 +11,7 @@ import {
   findModel,
   isLiveListProvider,
   parseModelId,
-} from "./models";
+} from "../shared/chat/models";
 
 type Deps = Pick<AppDeps, "db" | "keyEncryptionSecret" | "fetch">;
 

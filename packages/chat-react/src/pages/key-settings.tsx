@@ -2,7 +2,7 @@ import {
   type CredentialService,
   credentialForms,
   type SaveCredentialsInput,
-} from "@ai-chat/api/credentials/services";
+} from "@ai-chat/api/shared/credentials/services";
 import {
   type ProviderRow,
   type ProviderRowStatus,

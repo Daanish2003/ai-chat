@@ -1,4 +1,4 @@
-import { tavilyService } from "@ai-chat/api/credentials/services";
+import { tavilyService } from "@ai-chat/api/shared/credentials/services";
 import { searchToggle } from "@ai-chat/chat-core/web-search";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@ai-chat/ui/components/tooltip";
 import { cn } from "@ai-chat/ui/lib/utils";

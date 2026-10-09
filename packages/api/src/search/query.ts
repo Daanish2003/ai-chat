@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppDeps } from "../deps";
-import { escapeLike, snippetAround } from "./text";
+import { escapeLike, snippetAround } from "../shared/search/text";
 
 type Deps = Pick<AppDeps, "db">;
 

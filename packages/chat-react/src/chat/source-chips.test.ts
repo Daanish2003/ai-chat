@@ -1,4 +1,4 @@
-import type { Source } from "@ai-chat/api/chat/sources";
+import type { Source } from "@ai-chat/api/shared/chat/sources";
 import { Markdown } from "@ai-chat/ui/components/prompt-kit/markdown";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";

@@ -1,12 +1,19 @@
 import type { WebSearchPart } from "@ai-chat/db/message-parts";
 import type { MessagePart } from "@tanstack/ai";
 
-import type { SearchErrorReason, SearchResult } from "../deps";
-
 /**
  * The `web_search` tool's contract, shared by the server tool, the parts boundary and the web
  * app. No server code: safe to import into the browser.
  */
+
+export type SearchResult = {
+  title: string;
+  url: string;
+  snippet: string;
+  publishedDate?: string;
+};
+
+export type SearchErrorReason = "invalid_key" | "quota_exhausted" | "failed";
 
 export const webSearchToolName = "web_search";
 

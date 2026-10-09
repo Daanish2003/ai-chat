@@ -1,5 +1,5 @@
-import type { CredentialService } from "./services";
-import { providerLabel } from "./services";
+import type { CredentialService } from "../shared/credentials/services";
+import { providerLabel } from "../shared/credentials/services";
 
 export type CheckRejectionReason = "invalid_key" | "provider_error";
 

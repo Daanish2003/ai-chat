@@ -4,11 +4,10 @@ import { conversation, message } from "@ai-chat/db/schema/chat";
 import { sharedLink } from "@ai-chat/db/schema/share";
 import { and, eq } from "drizzle-orm";
 
-import { parseStoredParts, toUIParts } from "../chat/parts";
 import { loadPath } from "../chat/store";
 import { attachmentsOfMessages } from "../attachments/store";
 import type { AppDeps } from "../deps";
-import { redactAttachmentsForShare, redactForShare } from "./redact";
+import { toSharedConversation } from "../shared/share/conversation";
 
 type Deps = Pick<AppDeps, "db">;
 type Db = Deps["db"];
@@ -122,11 +121,7 @@ export async function deleteSharedLink(deps: Deps, userId: string, conversationI
   return true;
 }
 
-/**
- * What anyone with the token sees: the frozen title, the share date and the shared Branch, with
- * thinking and file contents stripped (attachments are filename chips) and no author or error details. `undefined` for an unknown
- * token.
- */
+/** What anyone with the token sees (see `toSharedConversation`). `undefined` for an unknown token. */
 export async function loadSharedConversation(deps: Deps, token: string) {
   const [link] = await deps.db.select().from(sharedLink).where(eq(sharedLink.token, token));
   if (!link) return undefined;
@@ -135,19 +130,5 @@ export async function loadSharedConversation(deps: Deps, token: string) {
     deps,
     path.map((row) => row.id),
   );
-  return {
-    title: link.title,
-    sharedAt: link.updatedAt,
-    messages: path.map((row) => ({
-      id: row.id,
-      role: row.role,
-      parts: redactForShare(toUIParts(parseStoredParts(row.parts))),
-      attachments: redactAttachmentsForShare(attachments.get(row.id) ?? []),
-      model: row.model,
-      status: row.status,
-      createdAt: row.createdAt,
-    })),
-  };
+  return toSharedConversation(link, path, attachments);
 }
-
-export type SharedConversation = NonNullable<Awaited<ReturnType<typeof loadSharedConversation>>>;

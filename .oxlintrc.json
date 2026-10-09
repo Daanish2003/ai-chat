@@ -5,6 +5,28 @@
     "correctness": "error"
   },
   "rules": {},
+  "overrides": [
+    {
+      "files": ["packages/chat-core/src/**", "packages/chat-react/src/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "@ai-chat/api/**",
+                  "!@ai-chat/api/shared/**",
+                  "!@ai-chat/api/routers/index"
+                ],
+                "message": "Client code imports only shared modules from @ai-chat/api (ADR 0005). Move isomorphic code under packages/api/src/shared/."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
   "env": {
     "builtin": true
   }

@@ -201,3 +201,6 @@ export function addKeyMessage(service: string) {
 export function credentialHint(fields: Record<string, string>) {
   return fields.apiKey ? `…${fields.apiKey.slice(-4)}` : (fields.host ?? "");
 }
+
+/** A Provider or Tool credential as the client sees it: its service, the key's hint and whether it verified. */
+export type CredentialSummary = { service: string; hint: string; verified: boolean };

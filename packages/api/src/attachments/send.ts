@@ -1,7 +1,7 @@
 import type { MessageRow } from "@ai-chat/db/schema/chat";
 
-import type { StoredAttachment } from "../chat/parts";
-import type { CuratedModel } from "../chat/models";
+import type { StoredAttachment } from "../shared/chat/parts";
+import type { CuratedModel } from "../shared/chat/models";
 import type { AppDeps } from "../deps";
 import {
   acceptedKinds,
@@ -9,7 +9,7 @@ import {
   kindLabelPlural,
   maxAttachmentBytes,
   maxBranchAttachmentBytes,
-} from "./kinds";
+} from "../shared/attachments/kinds";
 import { attachmentsOfMessages, findOwnedAttachments, loadAttachmentBytes } from "./store";
 
 type Deps = Pick<AppDeps, "db">;

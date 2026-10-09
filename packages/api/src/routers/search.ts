@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { protectedProcedure } from "../index";
 import { decodeCursor, searchMessages } from "../search/query";
-import { minSearchLength } from "../search/text";
+import { minSearchLength } from "../shared/search/text";
 
 export const searchRouter = {
   /**

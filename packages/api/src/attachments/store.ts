@@ -3,6 +3,7 @@ import { and, asc, eq, inArray, lt, notExists } from "drizzle-orm";
 
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
+import type { AttachmentInfo } from "../shared/attachments/kinds";
 
 /**
  * The attachment store: every read and write of attachments goes through here (ADR 0001).
@@ -12,9 +13,6 @@ import { uuidv7 } from "../lib/uuidv7";
 type Db = AppDeps["db"];
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type Deps = Pick<AppDeps, "db">;
-
-/** What the client and the Shared link see of an attachment: never its bytes. */
-export type AttachmentInfo = { id: string; filename: string; mediaType: string; size: number };
 
 const infoColumns = {
   id: attachment.id,

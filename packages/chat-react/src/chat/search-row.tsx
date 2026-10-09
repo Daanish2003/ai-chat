@@ -1,4 +1,4 @@
-import { sourceKey, type Source } from "@ai-chat/api/chat/sources";
+import { sourceKey, type Source } from "@ai-chat/api/shared/chat/sources";
 import type { WebSearchPart } from "@ai-chat/db/message-parts";
 import { cn } from "@ai-chat/ui/lib/utils";
 import { ChevronRightIcon, GlobeIcon, LoaderIcon } from "lucide-react";

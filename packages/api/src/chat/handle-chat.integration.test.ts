@@ -9,7 +9,8 @@ import { createTestDeps } from "../testing/deps";
 import { liveModelsFetch } from "../testing/live-models";
 import { createFakeAdapter, round, runError, text, thinking } from "../testing/fake-adapter";
 import { createTestClient, insertUser, sessionFor, type TestUser } from "../testing/router-client";
-import { type ChatCommand, handleChat } from "./handle-chat";
+import type { ChatCommand } from "../shared/chat/command";
+import { handleChat } from "./handle-chat";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
 
