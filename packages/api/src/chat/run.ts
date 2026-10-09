@@ -1,12 +1,6 @@
 import { storedPartsSchema } from "@ai-chat/db/message-parts";
 import { message } from "@ai-chat/db/schema/chat";
-import {
-  type AnyTextAdapter,
-  chat,
-  EventType,
-  type ModelMessage,
-  type StreamChunk,
-} from "@tanstack/ai";
+import { type AnyTextAdapter, chat, EventType, type ModelMessage } from "@tanstack/ai";
 import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
@@ -25,9 +19,10 @@ type ProviderError = { message: string; code?: string };
  * every `deps.limits.snapshotIntervalMs`, and finishes the row in `finally`. It is registered in
  * `deps.runs` under the Message id until it ends; aborting that controller stops it.
  *
- * Returns the run's chunks for the SSE response. A reader that goes away only stops reading.
+ * Every chunk goes to the Run's log before anyone reads it (ADR 0006). The POST response and any
+ * joiner read that log, so a reader that goes away only stops reading.
  */
-export function startRun(
+export async function startRun(
   deps: AppDeps,
   {
     messageId,
@@ -41,10 +36,10 @@ export function startRun(
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
     webSearch?: Credentials;
   },
-): AsyncIterable<StreamChunk> {
+): Promise<void> {
   const abortController = new AbortController();
   deps.runs.set(messageId, abortController);
-  const listener = createChunkChannel();
+  await deps.runStreams.open(messageId);
   const parts = createPartsBuilder();
 
   let writes = Promise.resolve();
@@ -100,7 +95,9 @@ export function startRun(
         if (chunk.type === EventType.RUN_ERROR) {
           error = { message: chunk.message, code: chunk.code ?? chunk.error?.code };
         }
-        listener.push(chunk);
+        void deps.runStreams
+          .append(messageId, chunk)
+          .catch((error: unknown) => console.error(`Logging Message ${messageId} failed`, error));
       }
     } catch (caught) {
       error = thrownError(caught);
@@ -120,15 +117,13 @@ export function startRun(
         ),
       );
       deps.runs.delete(messageId);
-      listener.close();
+      await deps.runStreams.close(messageId);
       // The run ended `complete`: title its Conversation, fire-and-forget.
       if (!timedOut && !abortController.signal.aborted && error === undefined) {
         void titleConversation(deps, messageId);
       }
     }
   })();
-
-  return listener.chunks;
 }
 
 /**
@@ -199,52 +194,6 @@ export async function stopRun(deps: AppDeps, messageId: string) {
     .update(message)
     .set({ status: "stopped" })
     .where(and(eq(message.id, messageId), eq(message.status, "streaming")));
-}
-
-/** Hands chunks to at most one reader; once the reader leaves, chunks are dropped. */
-function createChunkChannel() {
-  const buffer: StreamChunk[] = [];
-  let closed = false;
-  let detached = false;
-  let wake: (() => void) | undefined;
-
-  const notify = () => {
-    wake?.();
-    wake = undefined;
-  };
-
-  const done: IteratorReturnResult<undefined> = { done: true, value: undefined };
-  // A hand-written iterator, not an async generator: a generator's `return()` waits until the
-  // pending `next()` settles, so a client disconnect would hang until the run's next chunk.
-  const reader: AsyncIterator<StreamChunk> = {
-    async next() {
-      while (true) {
-        const chunk = buffer.shift();
-        if (chunk) return { done: false, value: chunk };
-        if (closed || detached) return done;
-        await new Promise<void>((resolve) => (wake = resolve));
-      }
-    },
-    async return() {
-      detached = true;
-      buffer.length = 0;
-      notify();
-      return done;
-    },
-  };
-
-  return {
-    chunks: { [Symbol.asyncIterator]: () => reader },
-    push(chunk: StreamChunk) {
-      if (detached) return;
-      buffer.push(chunk);
-      notify();
-    },
-    close() {
-      closed = true;
-      notify();
-    },
-  };
 }
 
 /**

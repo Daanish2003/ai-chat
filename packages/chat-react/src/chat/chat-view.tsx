@@ -29,8 +29,8 @@ export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"
 /**
  * One Conversation's Active Branch and composer. `useChat` is the truth while a run streams;
  * when it ends, the Active Branch is refetched and replaces `useChat`'s messages (ADR 0002).
- * A run this page didn't start (the page was reloaded mid-reply) is followed by polling the
- * Active Branch until nothing is `streaming`.
+ * A reply still streaming when the page opens (a reload, or a second tab) is joined from its
+ * Run's log, so it continues live (ADR 0006).
  */
 export function ChatView({
   conversation,
@@ -53,9 +53,16 @@ export function ChatView({
   const [connection] = useState(() =>
     fetchServerSentEvents(chatUrl, () => ({ body: command.current })),
   );
-  const { messages, sendMessage, reload, setMessages, error } = useChat({
+  // A reply that is streaming when the page opens is joined: its Message id is its Run's id.
+  const [joinedRunId] = useState(
+    () => conversation.messages.find((m) => m.status === "streaming")?.id,
+  );
+  const { messages, sendMessage, reload, setMessages, error, isLoading } = useChat({
     connection,
     initialMessages: toUIMessages(conversation.messages),
+    initialResumeSnapshot: joinedRunId
+      ? { resumeState: { threadId: conversation.id, runId: joinedRunId } }
+      : undefined,
     onChunk: () => {
       if (!awaitingFirstChunk.current) return;
       awaitingFirstChunk.current = false;
@@ -68,18 +75,27 @@ export function ChatView({
   const conversationQuery = orpc.conversation.get.queryOptions({ input: { id: conversation.id } });
   const fetchConversation = () => queryClient.fetchQuery({ ...conversationQuery, staleTime: 0 });
 
-  // Updates `conversation` (the route reads the same query) about every second.
-  const polling = !sending && serverStreaming;
-  useQuery({ ...conversationQuery, enabled: polling, refetchInterval: polling ? 1_000 : false });
-  const wasPolling = useRef(false);
   const showServerMessages = useEffectEvent((messages: ConversationData["messages"]) => {
     if (sending) return;
     setMessages(toUIMessages(messages));
-    // A run this page was polling just ended, so its Conversation panel row changed.
-    if (wasPolling.current && !polling) void invalidateConversationList(queryClient, orpc);
-    wasPolling.current = polling;
   });
   useEffect(() => showServerMessages(conversation.messages), [conversation.messages]);
+
+  // A joined reply ends when its log closes: refetch the Conversation so the reply, the streaming
+  // state and the Conversation panel row are final. A reply this page sent does this in `run`.
+  const joining = useRef(false);
+  const joinEnded = useEffectEvent(() => {
+    void fetchConversation().finally(() => invalidateConversationList(queryClient, orpc));
+  });
+  useEffect(() => {
+    if (isLoading) {
+      joining.current = true;
+      return;
+    }
+    if (!joining.current) return;
+    joining.current = false;
+    if (!sending) joinEnded();
+  }, [isLoading, sending]);
 
   const stopRun = useMutation(orpc.chat.stop.mutationOptions());
   const stop = async () => {
