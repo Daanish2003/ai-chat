@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { loadSettings } from "../settings/store";
-import { findModel } from "../../shared/chat/models";
+import { isKnownModel, providerOf } from "../../shared/chat/models";
 import { loadPath } from "./store";
 
 const titlePrompt =
@@ -65,13 +65,13 @@ async function generateTitle(
   reply: string,
 ) {
   const { titleModel } = await loadSettings(deps, userId);
-  const model = findModel(titleModel ?? replyModel ?? "");
-  if (!model) return "";
-  const credentials = await loadCredentials(deps, userId, model.provider);
+  const model = titleModel ?? replyModel ?? "";
+  if (!isKnownModel(model)) return "";
+  const credentials = await loadCredentials(deps, userId, providerOf(model));
   if (!credentials) return "";
   try {
     const { text } = await chat({
-      adapter: deps.adapterFor(model.id, credentials),
+      adapter: deps.adapterFor(model, credentials),
       systemPrompts: [titlePrompt],
       messages: [
         {
@@ -83,7 +83,7 @@ async function generateTitle(
     });
     return cleanTitle(text);
   } catch (error) {
-    console.error(`Generating a title with ${model.id} failed`, error);
+    console.error(`Generating a title with ${model} failed`, error);
     return "";
   }
 }

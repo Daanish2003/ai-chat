@@ -124,6 +124,12 @@ export function findModel(id: string): CuratedModel | undefined {
   return curatedModels.find((model) => model.id === id);
 }
 
+/** Whether `id` names a Model: a curated one, or any Model of a live-listed Provider. */
+export function isKnownModel(id: string) {
+  const parsed = parseModelId(id);
+  return !!parsed && (!!findModel(id) || isLiveListProvider(parsed.provider));
+}
+
 /** The Model a new Conversation starts on when the Provider is the first one the user added. */
 const providerDefaults: Partial<Record<ProviderId, string>> = {
   anthropic: "anthropic:claude-sonnet-5-5",

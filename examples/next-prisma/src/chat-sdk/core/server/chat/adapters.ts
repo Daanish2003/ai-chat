@@ -15,7 +15,7 @@ import { createOpenRouterText } from "@tanstack/ai-openrouter";
 import { createVercelGatewayText } from "@tanstack/ai-vercel-gateway";
 
 import type { Credentials } from "../deps";
-import { findModel, isLiveListProvider, parseModelId } from "../../shared/chat/models";
+import { isKnownModel, parseModelId } from "../../shared/chat/models";
 
 /** The model id type of an adapter factory. The ids are checked in `models.test.ts`. */
 type ModelOf<Factory extends (model: never, ...rest: never[]) => unknown> = Parameters<Factory>[0];
@@ -27,7 +27,7 @@ type ModelOf<Factory extends (model: never, ...rest: never[]) => unknown> = Para
  */
 export function adapterFor(model: string, credentials: Credentials): AnyTextAdapter {
   const parsed = parseModelId(model);
-  if (!parsed || (!findModel(model) && !isLiveListProvider(parsed.provider))) {
+  if (!parsed || !isKnownModel(model)) {
     throw new Error(`"${model}" is not an available Model`);
   }
   const { provider, modelId } = parsed;

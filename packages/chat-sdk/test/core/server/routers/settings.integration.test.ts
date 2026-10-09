@@ -37,6 +37,15 @@ describe("settings", () => {
     await expect(other.client.settings.get()).resolves.toEqual({ titleModel: null });
   });
 
+  it("saves a live-listed Title Model (OpenRouter, Ollama)", async () => {
+    const { client } = await signedIn();
+
+    await client.settings.setTitleModel({ titleModel: "openrouter:mistralai/mistral-large" });
+    await expect(client.settings.get()).resolves.toEqual({
+      titleModel: "openrouter:mistralai/mistral-large",
+    });
+  });
+
   it("rejects a Model that isn't on the list", async () => {
     const { client } = await signedIn();
 
