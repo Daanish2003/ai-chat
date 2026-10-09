@@ -8,11 +8,12 @@ import { citationFor } from "../../../../core/shared/chat/citations";
 import { replySegments, sourcesOf } from "../../../../core/shared/chat/sources";
 import { insertAttachment, linkTestAttachments } from "../../../support/attachments";
 import { insertConversation, insertMessage } from "../../../support/conversations";
-import { createTestClient, insertUser } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc } from "../../../support/sdk";
 
 async function signedIn() {
   const user = await insertUser();
-  return { user, client: createTestClient({ user }) };
+  return { user, client: chatRpc({ user }) };
 }
 
 /** A titled Conversation whose Active Branch is a question and a complete reply. */
@@ -37,7 +38,7 @@ describe("share.upsert", () => {
     const link = await client.share.upsert({ conversationId: conv.id });
 
     expect(link.token).toMatch(/^[\w-]{22}$/);
-    const shared = await createTestClient().share.get({ token: link.token });
+    const shared = await chatRpc().share.get({ token: link.token });
     expect(shared).toEqual({
       title: "Recursive CTEs",
       sharedAt: link.updatedAt,
@@ -72,7 +73,7 @@ describe("share.upsert", () => {
     const link = await client.share.upsert({ conversationId: conv.id });
     await client.conversation.rename({ id: conv.id, title: "Renamed later" });
 
-    await expect(createTestClient().share.get({ token: link.token })).resolves.toMatchObject({
+    await expect(chatRpc().share.get({ token: link.token })).resolves.toMatchObject({
       title: "Untitled",
     });
   });
@@ -92,7 +93,7 @@ describe("share.upsert", () => {
     const second = await client.share.upsert({ conversationId: conv.id });
 
     expect(second.token).toBe(first.token);
-    const shared = await createTestClient().share.get({ token: first.token });
+    const shared = await chatRpc().share.get({ token: first.token });
     expect(shared.title).toBe("New title");
     expect(shared.messages.map((m) => m.id)).toEqual([question.id, newer.id]);
   });
@@ -133,7 +134,7 @@ describe("share.upsert", () => {
     await expect(client.share.upsert({ conversationId: conv.id })).rejects.toMatchObject({
       code: "CONFLICT",
     });
-    const shared = await createTestClient().share.get({ token: link.token });
+    const shared = await chatRpc().share.get({ token: link.token });
     expect(shared.messages.at(-1)?.id).toBe(reply.id);
   });
 
@@ -152,7 +153,7 @@ describe("share.upsert", () => {
 
     const link = await client.share.upsert({ conversationId: conv.id });
 
-    await expect(createTestClient().share.get({ token: link.token })).resolves.toMatchObject({
+    await expect(chatRpc().share.get({ token: link.token })).resolves.toMatchObject({
       messages: [{ status: "complete" }, { status: "stopped" }],
     });
   });
@@ -249,7 +250,7 @@ describe("share.delete", () => {
 
     await client.share.delete({ conversationId: conv.id });
 
-    await expect(createTestClient().share.get({ token: link.token })).rejects.toMatchObject({
+    await expect(chatRpc().share.get({ token: link.token })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
     await expect(client.share.forConversation({ conversationId: conv.id })).resolves.toMatchObject({
@@ -265,7 +266,7 @@ describe("share.delete", () => {
     await expect(other.client.share.delete({ conversationId: conv.id })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
-    await expect(createTestClient().share.get({ token: link.token })).resolves.toMatchObject({
+    await expect(chatRpc().share.get({ token: link.token })).resolves.toMatchObject({
       title: "Recursive CTEs",
     });
   });
@@ -273,9 +274,9 @@ describe("share.delete", () => {
 
 describe("share.get", () => {
   it("answers NOT_FOUND for an unknown token", async () => {
-    await expect(
-      createTestClient().share.get({ token: "AAAAAAAAAAAAAAAAAAAAAA" }),
-    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(chatRpc().share.get({ token: "AAAAAAAAAAAAAAAAAAAAAA" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
   });
 
   it("never shows a reply's thinking", async () => {
@@ -295,7 +296,7 @@ describe("share.get", () => {
     });
 
     const link = await client.share.upsert({ conversationId: conv.id });
-    const shared = await createTestClient().share.get({ token: link.token });
+    const shared = await chatRpc().share.get({ token: link.token });
 
     expect(shared.messages[1]?.parts).toEqual([{ type: "text", content: "Hello!" }]);
     expect(JSON.stringify(shared)).not.toContain("Private musing");
@@ -315,7 +316,7 @@ describe("share.get", () => {
     await linkTestAttachments(question.id, [notes.id]);
 
     const link = await client.share.upsert({ conversationId: conv.id });
-    const shared = await createTestClient().share.get({ token: link.token });
+    const shared = await chatRpc().share.get({ token: link.token });
 
     expect(shared.messages[0]?.attachments).toEqual([
       { filename: "notes.txt", mediaType: "text/plain" },
@@ -354,7 +355,7 @@ describe("share.get", () => {
     });
 
     const link = await client.share.upsert({ conversationId: conv.id });
-    const shared = await createTestClient().share.get({ token: link.token });
+    const shared = await chatRpc().share.get({ token: link.token });
 
     expect(shared.messages[1]).toEqual({
       id: failed.id,
@@ -392,7 +393,7 @@ describe("share.get", () => {
     });
 
     const link = await client.share.upsert({ conversationId: conv.id });
-    const shared = await createTestClient().share.get({ token: link.token });
+    const shared = await chatRpc().share.get({ token: link.token });
     const parts = shared.messages[1]!.parts;
 
     const sources = sourcesOf(parts);
@@ -415,7 +416,7 @@ describe("deleting what a link points at", () => {
 
     await client.conversation.delete({ id: conv.id });
 
-    await expect(createTestClient().share.get({ token: link.token })).rejects.toMatchObject({
+    await expect(chatRpc().share.get({ token: link.token })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
   });
@@ -426,7 +427,7 @@ describe("deleting what a link points at", () => {
 
     await getTestDb().delete(userTable).where(eq(userTable.id, user.id));
 
-    await expect(createTestClient().share.get({ token: link.token })).rejects.toMatchObject({
+    await expect(chatRpc().share.get({ token: link.token })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
   });
@@ -434,7 +435,7 @@ describe("deleting what a link points at", () => {
 
 describe("signed-out callers", () => {
   it("can't create, read or delete a Conversation's link", async () => {
-    const client = createTestClient();
+    const client = chatRpc();
     const conversationId = "0190a000-0000-7000-8000-000000000000";
 
     await expect(client.share.upsert({ conversationId })).rejects.toMatchObject({

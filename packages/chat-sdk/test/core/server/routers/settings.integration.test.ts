@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { createTestDeps } from "../../../support/deps";
-import { createTestClient, insertUser } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc } from "../../../support/sdk";
 
 const deps = createTestDeps();
 
 async function signedIn() {
   const user = await insertUser();
-  return { user, client: createTestClient({ user, deps }) };
+  return { user, client: chatRpc({ user, deps }) };
 }
 
 describe("settings", () => {
@@ -45,7 +46,7 @@ describe("settings", () => {
   });
 
   it("rejects signed-out callers", async () => {
-    const client = createTestClient({ deps });
+    const client = chatRpc({ deps });
 
     await expect(client.settings.get()).rejects.toThrow();
     await expect(client.settings.setTitleModel({ titleModel: null })).rejects.toThrow();

@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { insertConversation, insertMessage } from "../../../support/conversations";
-import { createTestClient, insertUser } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
+import { chatRpc } from "../../../support/sdk";
 
 async function signedIn() {
   const user = await insertUser();
-  return { user, client: createTestClient({ user }) };
+  return { user, client: chatRpc({ user }) };
 }
 
 /** A minute after a fixed start, so ordering doesn't depend on the database clock. */
@@ -167,7 +168,7 @@ describe("search.query", () => {
   });
 
   it("requires a signed-in user", async () => {
-    await expect(createTestClient().search.query({ q: "anything" })).rejects.toMatchObject({
+    await expect(chatRpc().search.query({ q: "anything" })).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
   });

@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { insertConversation, insertMessage } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
-import { insertUser } from "../../../support/router-client";
+import { insertUser } from "../../../support/users";
 import { sweepInterruptedRuns } from "../../../../core/server/chat/run";
 
 async function rowOf(id: string) {

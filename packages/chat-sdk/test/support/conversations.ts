@@ -4,7 +4,7 @@ import { getTestDb } from "./test-database";
 import { eq } from "drizzle-orm";
 
 import { uuidv7 } from "../../core/server/lib/uuidv7";
-import type { TestUser } from "./router-client";
+import type { TestUser } from "./users";
 
 export const testModel = "anthropic:claude-sonnet-5-5";
 

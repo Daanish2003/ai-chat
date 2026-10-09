@@ -4,7 +4,8 @@ import { saveCredentials } from "../../../../core/server/credentials/store";
 import { insertConversation } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { liveModelsFetch } from "../../../support/live-models";
-import { createTestClient, insertUser, type TestUser } from "../../../support/router-client";
+import { insertUser, type TestUser } from "../../../support/users";
+import { chatRpc } from "../../../support/sdk";
 
 const deps = createTestDeps();
 
@@ -19,7 +20,7 @@ async function addCredentials(user: TestUser, service: "anthropic" | "openai") {
 
 async function signedIn() {
   const user = await insertUser();
-  return { user, client: createTestClient({ user, deps }) };
+  return { user, client: chatRpc({ user, deps }) };
 }
 
 describe("models.list", () => {
@@ -98,7 +99,7 @@ describe("models.list", () => {
   });
 
   it("rejects a caller without a session", async () => {
-    await expect(createTestClient({ deps }).models.list()).rejects.toMatchObject({
+    await expect(chatRpc({ deps }).models.list()).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
   });
@@ -108,7 +109,7 @@ describe("models.list with live lists", () => {
   async function signedInWith(fetch: typeof globalThis.fetch) {
     const user = await insertUser();
     const liveDeps = createTestDeps({ fetch });
-    return { user, deps: liveDeps, client: createTestClient({ user, deps: liveDeps }) };
+    return { user, deps: liveDeps, client: chatRpc({ user, deps: liveDeps }) };
   }
 
   it("lists OpenRouter's live Models for a user with OpenRouter credentials", async () => {

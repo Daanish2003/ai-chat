@@ -6,7 +6,7 @@ import {
 import { getTestDb } from "./test-database";
 
 import { uuidv7 } from "../../core/server/lib/uuidv7";
-import type { TestUser } from "./router-client";
+import type { TestUser } from "./users";
 
 /**
  * Inserts an attachment for `user` straight into the test database, skipping upload checks.

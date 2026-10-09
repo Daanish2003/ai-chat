@@ -7,9 +7,8 @@ import type { AppDeps } from "../../../../core/server/deps";
 import { insertConversation } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
-import { insertUser, chatUserFor, type TestUser } from "../../../support/router-client";
-import { handleChat } from "../../../../core/server/chat/handle-chat";
-import { handleJoin } from "../../../../core/server/chat/join-run";
+import { insertUser, type TestUser } from "../../../support/users";
+import { sendAs } from "../../../support/sdk";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
 
@@ -32,8 +31,8 @@ async function setup() {
     title: "Test Conversation",
   });
   const send = () =>
-    handleChat(
-      new Request("http://localhost/api/chat", {
+    sendAs(
+      new Request("http://localhost/api/chat/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -48,14 +47,14 @@ async function setup() {
           },
         }),
       }),
-      chatUserFor(user),
+      user,
       deps,
     );
   return { user, deps, fake, conv, send };
 }
 
 function joinRequest(runId: string, headers: Record<string, string> = {}) {
-  return new Request(`http://localhost/api/chat?offset=-1&runId=${runId}`, { headers });
+  return new Request(`http://localhost/api/chat/run?offset=-1&runId=${runId}`, { headers });
 }
 
 async function assistantIdOf(deps: AppDeps, conversationId: string) {
@@ -74,7 +73,7 @@ describe("joining a Run", () => {
     const reply = await assistantIdOf(deps, conv.id);
 
     await fake.release(3);
-    const join = await handleJoin(joinRequest(reply.id), chatUserFor(user), deps);
+    const join = await sendAs(joinRequest(reply.id), user, deps);
     expect(join.status).toBe(200);
     expect(join.headers.get("content-type")).toContain("text/event-stream");
     expect(await assistantIdOf(deps, conv.id)).toMatchObject({ status: "streaming" });
@@ -96,7 +95,7 @@ describe("joining a Run", () => {
     const posted = await posting.text();
     const reply = await assistantIdOf(deps, conv.id);
 
-    const join = await handleJoin(joinRequest(reply.id), chatUserFor(user), deps);
+    const join = await sendAs(joinRequest(reply.id), user, deps);
 
     expect(await join.text()).toBe(posted);
   });
@@ -109,11 +108,7 @@ describe("joining a Run", () => {
     const reply = await assistantIdOf(deps, conv.id);
     const firstId = /^id: (.+)$/m.exec(posted)![1]!;
 
-    const join = await handleJoin(
-      joinRequest(reply.id, { "Last-Event-ID": firstId }),
-      chatUserFor(user),
-      deps,
-    );
+    const join = await sendAs(joinRequest(reply.id, { "Last-Event-ID": firstId }), user, deps);
     const resumed = await join.text();
 
     expect(resumed).not.toContain(`id: ${firstId}\n`);
@@ -129,7 +124,7 @@ describe("joining a Run", () => {
     const reply = await assistantIdOf(deps, conv.id);
     const someoneElse: TestUser = await insertUser();
 
-    const join = await handleJoin(joinRequest(reply.id), chatUserFor(someoneElse), deps);
+    const join = await sendAs(joinRequest(reply.id), someoneElse, deps);
 
     expect(join.status).toBe(404);
   });
