@@ -9,6 +9,7 @@
     "check-types": "tsc --noEmit",
     "db:migrate": "prisma migrate deploy && node scripts/migrate.ts",
     "fake-provider": "node scripts/fake-ollama.ts",
+    "smoke": "node --import ./scripts/register-ts.mjs scripts/smoke.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

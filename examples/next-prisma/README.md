@@ -44,6 +44,24 @@ refuses to boot against an unmigrated `chat` schema.
    the user enters, so the fake Provider is selected there rather than by a server setting.
 4. Start a Conversation on `/c`. The Model `fake-model` streams a Markdown reply.
 
+## Account deletion and Shared links
+
+- `/settings/account` (linked from the header) deletes the signed-in user. It calls the SDK's
+  `chat.deleteUser` first, then deletes the Auth.js user, then signs out. A failure leaves the user
+  signed in, so the button can be pressed again.
+- `/share/<token>` is a server-rendered read-only page from `chat.getSharedConversation`. An unknown
+  or removed token answers 404.
+
+## Checks
+
+- `pnpm -F @ai-chat/example-next-prisma smoke`: recreates the `ai-chat_smoke` database on the server
+  in `SMOKE_ADMIN_URL` (default `localhost:5434`), runs `db:migrate` on it, then sends a Run through
+  the SDK handler to the fake Provider and checks the streamed reply and the saved Message. Start
+  the fake Provider first; the script waits 10 s for it, then fails.
+- The copy drift check (CI runs it): `pnpm -F @ai-chat/chat-sdk copy examples/next-prisma/src/chat-sdk`
+  and then fail if `git diff`/untracked files show a change under `src/chat-sdk`, except
+  `core/VERSION`, which records each copy's commit and time.
+
 ## Verified
 
 Checked with `next build` and `next start` on a free port, then curl against the handler: sign up
@@ -51,4 +69,6 @@ Checked with `next build` and `next start` on a free port, then curl against the
 wrong password), the 401 for an anonymous chat call, saving the fake Ollama credential, creating a
 Conversation, and a streamed Run (`RUN_STARTED`, `TEXT_MESSAGE_*`, `RUN_FINISHED`) whose reply was
 saved as the assistant Message. Signed-in `/c`, `/c/<id>` and `/settings/keys` returned 200.
-Browser interaction, Shared links and Stop were not exercised.
+Shared links (200 for a shared Conversation with its title as the page title, 404 for an unknown
+token) and account deletion (user, Conversations and the Shared link removed, session cleared) were
+checked the same way. Browser interaction and Stop were not exercised.
