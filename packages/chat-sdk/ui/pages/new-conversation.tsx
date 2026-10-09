@@ -1,5 +1,5 @@
-import { setPendingFirstMessage } from "@ai-chat/chat-core/chat";
-import { missingCredentialsMessage } from "@ai-chat/chat-core/models";
+import { setPendingFirstMessage } from "../../core/client/chat";
+import { missingCredentialsMessage } from "../../core/client/models";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -9,9 +9,9 @@ import { MissingCredentialsBanner } from "../chat/missing-credentials-banner";
 import { NoCredentials } from "../chat/no-credentials";
 import { SearchToggle, useWebSearch } from "../chat/search-toggle";
 import { Welcome } from "../chat/welcome";
-import { invalidateConversationList } from "../conversation-list";
-import { useNewConversationModel } from "../new-conversation-model";
-import { useChatAdapter } from "../provider";
+import { invalidateConversationList } from "../../core/client/react/conversation-list";
+import { useNewConversationModel } from "../../core/client/react/new-conversation-model";
+import { useChatAdapter } from "../../core/client/react/provider";
 
 /**
  * A new Conversation: type the first Message; it's created with the picked Model (the location's

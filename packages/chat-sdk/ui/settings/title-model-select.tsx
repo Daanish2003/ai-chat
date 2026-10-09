@@ -1,10 +1,10 @@
-import { findModel } from "@ai-chat/api/shared/chat/models";
-import { missingCredentialsMessage, modelGroups } from "@ai-chat/chat-core/models";
-import { Label } from "@ai-chat/ui/components/label";
+import { findModel } from "../../core/shared/chat/models";
+import { missingCredentialsMessage, modelGroups } from "../../core/client/models";
+import { Label } from "@/components/ui/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { useOrpc } from "../provider";
+import { useOrpc } from "../../core/client/react/provider";
 
 const sameAsFirstReply = "";
 

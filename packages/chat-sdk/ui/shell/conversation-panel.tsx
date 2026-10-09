@@ -1,13 +1,13 @@
-import type { AppRouterClient } from "@ai-chat/api/routers/index";
-import { modelLabel } from "@ai-chat/chat-core/models";
-import { relativeTime } from "@ai-chat/chat-core/relative-time";
-import { Button } from "@ai-chat/ui/components/button";
-import { cn } from "@ai-chat/ui/lib/utils";
+import type { AppRouterClient } from "../../core/server/routers/index";
+import { modelLabel } from "../../core/client/models";
+import { relativeTime } from "../../core/client/relative-time";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Share2Icon, Trash2Icon } from "lucide-react";
 
-import { useDeleteConversation } from "../delete-conversation";
-import { useChatAdapter, useOrpc } from "../provider";
+import { useDeleteConversation } from "../../core/client/react/delete-conversation";
+import { useChatAdapter, useOrpc } from "../../core/client/react/provider";
 
 type ConversationSummary = Awaited<ReturnType<AppRouterClient["conversation"]["list"]>>[number];
 

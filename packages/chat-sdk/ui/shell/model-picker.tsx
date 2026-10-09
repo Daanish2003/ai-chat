@@ -1,8 +1,8 @@
-import { type CuratedModel, findModel } from "@ai-chat/api/shared/chat/models";
-import { providerLabel } from "@ai-chat/api/shared/credentials/services";
-import { buttonVariants } from "@ai-chat/ui/components/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@ai-chat/ui/components/popover";
-import { cn } from "@ai-chat/ui/lib/utils";
+import { type CuratedModel, findModel } from "../../core/shared/chat/models";
+import { providerLabel } from "../../core/shared/credentials/services";
+import { buttonVariants } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -14,9 +14,9 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-import { modelGroups } from "@ai-chat/chat-core/models";
+import { modelGroups } from "../../core/client/models";
 
-import { useChatAdapter } from "../provider";
+import { useChatAdapter } from "../../core/client/react/provider";
 
 /**
  * The top-bar Model picker: a popover with a search box, the available Models grouped by

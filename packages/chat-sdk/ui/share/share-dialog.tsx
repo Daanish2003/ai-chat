@@ -1,20 +1,20 @@
-import { relativeTime } from "@ai-chat/chat-core/relative-time";
-import { Button, buttonVariants } from "@ai-chat/ui/components/button";
+import { relativeTime } from "../../core/client/relative-time";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@ai-chat/ui/components/dialog";
+} from "@/components/ui/dialog";
 import { fetchServerSentEvents } from "@tanstack/ai-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckIcon, CopyIcon, Link2Icon, Share2Icon } from "lucide-react";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { invalidateConversationList } from "../conversation-list";
-import { useChatAdapter } from "../provider";
+import { invalidateConversationList } from "../../core/client/react/conversation-list";
+import { useChatAdapter } from "../../core/client/react/provider";
 
 const blockedReasons = {
   empty: "Send a message before sharing.",

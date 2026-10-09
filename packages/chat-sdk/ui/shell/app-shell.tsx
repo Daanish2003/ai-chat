@@ -1,10 +1,10 @@
-import { Button, buttonVariants } from "@ai-chat/ui/components/button";
-import { cn } from "@ai-chat/ui/lib/utils";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { MessagesSquareIcon, PlusIcon, SearchIcon, SettingsIcon } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
-import { useChatAdapter } from "../provider";
+import { useChatAdapter } from "../../core/client/react/provider";
 import { CommandPalette } from "./command-palette";
 import { ConversationPanel } from "./conversation-panel";
 import { TopBar } from "./top-bar";

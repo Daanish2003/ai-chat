@@ -1,14 +1,14 @@
-import { missingCredentialsMessage } from "@ai-chat/chat-core/models";
-import { awaitingTitle, titleWaitMs } from "@ai-chat/chat-core/title";
-import { Button } from "@ai-chat/ui/components/button";
+import { missingCredentialsMessage } from "../../core/client/models";
+import { awaitingTitle, titleWaitMs } from "../../core/client/title";
+import { Button } from "@/components/ui/button";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { MenuIcon, PanelLeftIcon, PencilIcon, SearchIcon } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
-import { invalidateConversationList } from "../conversation-list";
-import { useNewConversationModel } from "../new-conversation-model";
-import { useChatLocation, useOrpc } from "../provider";
+import { invalidateConversationList } from "../../core/client/react/conversation-list";
+import { useNewConversationModel } from "../../core/client/react/new-conversation-model";
+import { useChatLocation, useOrpc } from "../../core/client/react/provider";
 import { ShareButton } from "../share/share-dialog";
 import { ModelPicker } from "./model-picker";
 

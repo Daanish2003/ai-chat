@@ -264,15 +264,12 @@ importers:
 
   apps/web:
     dependencies:
-      '@ai-chat/api':
-        specifier: workspace:*
-        version: link:../../packages/api
       '@ai-chat/auth':
         specifier: workspace:*
         version: link:../../packages/auth
-      '@ai-chat/chat-react':
+      '@ai-chat/chat-sdk':
         specifier: workspace:*
-        version: link:../../packages/chat-react
+        version: link:../../packages/chat-sdk
       '@ai-chat/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -296,10 +293,10 @@ importers:
         version: 1.15.4(@orpc/contract@1.15.4)(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)(zod@4.6.5)
       '@tailwindcss/vite':
         specifier: ^4.3.3
-        version: 4.3.3(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+        version: 4.3.3(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       '@tanstack/react-form':
         specifier: ^1.33.5
-        version: 1.33.5(@tanstack/react-start@1.168.60(crossws@0.4.12(srvx@1.0.5))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 1.33.5(@tanstack/react-start@1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-query':
         specifier: ^5.102.8
         version: 5.104.1(react@19.3.0)
@@ -311,16 +308,16 @@ importers:
         version: 1.167.3(@tanstack/query-core@5.104.1)(@tanstack/react-query@5.104.1(react@19.3.0))(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@tanstack/router-core@1.171.34)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start':
         specifier: ^1.168.49
-        version: 1.168.60(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+        version: 1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       '@varlock/vite-integration':
         specifier: 1.5.1
-        version: 1.5.1(varlock@1.18.0)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+        version: 1.5.1(varlock@1.18.0)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       better-auth:
         specifier: 'catalog:'
         version: 1.7.7(@tanstack/react-start@1.168.60(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5))(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.15)(vitest@5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))
       evlog:
         specifier: ^2.28.1
-        version: 2.30.0(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(@tanstack/start-client-core@1.170.34)(express@5.2.1)(hono@4.13.13)(nitro@3.0.260903-beta)(react@19.3.0)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+        version: 2.30.0(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(@tanstack/start-client-core@1.170.34)(express@5.2.1)(hono@4.13.13)(nitro@3.0.260903-beta)(react@19.3.0)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       lucide-react:
         specifier: 'catalog:'
         version: 1.52.0(@types/react@19.3.0)(react@19.3.0)
@@ -375,7 +372,7 @@ importers:
         version: 19.3.0(@types/react@19.3.0)
       '@vitejs/plugin-react':
         specifier: ^6.1.1
-        version: 6.1.2(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+        version: 6.1.2(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       jsdom:
         specifier: ^30.0.1
         version: 30.1.2(@noble/hashes@2.4.0)
@@ -384,12 +381,40 @@ importers:
         version: 6.0.3
       vite:
         specifier: ^8.2.2
-        version: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+        version: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
       web-vitals:
         specifier: ^6.2.1
         version: 6.2.3
 
-  packages/api:
+  packages/auth:
+    dependencies:
+      '@ai-chat/db':
+        specifier: workspace:*
+        version: link:../db
+      '@better-auth/core':
+        specifier: 1.7.7
+        version: 1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4)
+      '@better-auth/drizzle-adapter':
+        specifier: 1.7.7
+        version: 1.7.7(@better-auth/core@1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4))(@better-auth/utils@0.4.2)(drizzle-orm@1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5))
+      better-auth:
+        specifier: 'catalog:'
+        version: 1.7.7(@tanstack/react-start@1.168.60(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5))(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.15)(vitest@5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+    devDependencies:
+      '@ai-chat/config':
+        specifier: workspace:*
+        version: link:../config
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+
+  packages/chat-sdk:
     dependencies:
       '@ai-chat/auth':
         specifier: workspace:*
@@ -406,6 +431,9 @@ importers:
       '@orpc/server':
         specifier: 'catalog:'
         version: 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
+      '@orpc/tanstack-query':
+        specifier: ^1.15.0
+        version: 1.15.4(@orpc/client@1.15.4)(@tanstack/query-core@5.104.1)
       '@orpc/zod':
         specifier: 'catalog:'
         version: 1.15.4(@orpc/contract@1.15.4)(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)(zod@4.6.5)
@@ -421,6 +449,9 @@ importers:
       '@tanstack/ai-byteplus':
         specifier: 0.6.2
         version: 0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+      '@tanstack/ai-client':
+        specifier: 0.39.0
+        version: 0.39.0(zod@4.6.5)
       '@tanstack/ai-cloudflare':
         specifier: 0.2.5
         version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
@@ -451,12 +482,33 @@ importers:
       '@tanstack/ai-openrouter':
         specifier: 0.21.2
         version: 0.21.2(@tanstack/ai@0.66.0(zod@4.6.5))
+      '@tanstack/ai-react':
+        specifier: 0.30.1
+        version: 0.30.1(@tanstack/ai@0.66.0(zod@4.6.5))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
       '@tanstack/ai-vercel-gateway':
         specifier: 0.3.7
         version: 0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+      '@tanstack/react-query':
+        specifier: ^5.102.8
+        version: 5.104.1(react@19.3.0)
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5)
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.52.0(@types/react@19.3.0)(react@19.3.0)
+      pg:
+        specifier: ^8.23.0
+        version: 8.23.1
+      react:
+        specifier: 'catalog:'
+        version: 19.3.0
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.3.0(react@19.3.0)
+      sonner:
+        specifier: 'catalog:'
+        version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -467,114 +519,27 @@ importers:
       '@cloudflare/workers-types':
         specifier: 4.20260702.1
         version: 4.20260702.1
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-      vitest:
-        specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
-
-  packages/auth:
-    dependencies:
-      '@ai-chat/db':
-        specifier: workspace:*
-        version: link:../db
-      '@better-auth/core':
-        specifier: 1.7.7
-        version: 1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4)
-      '@better-auth/drizzle-adapter':
-        specifier: 1.7.7
-        version: 1.7.7(@better-auth/core@1.7.7(@better-auth/utils@0.4.2)(@better-fetch/fetch@1.3.2)(better-call@1.4.0(zod@4.6.5))(jose@6.2.12)(kysely@0.29.6)(nanostores@1.5.4))(@better-auth/utils@0.4.2)(drizzle-orm@1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5))
-      better-auth:
-        specifier: 'catalog:'
-        version: 1.7.7(@tanstack/react-start@1.168.60(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))(drizzle-kit@1.0.0-rc.4)(drizzle-orm@1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5))(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@1.9.15)(vitest@5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5)
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
-    devDependencies:
-      '@ai-chat/config':
-        specifier: workspace:*
-        version: link:../config
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
-  packages/chat-core:
-    dependencies:
-      '@ai-chat/api':
-        specifier: workspace:*
-        version: link:../api
-      '@ai-chat/db':
-        specifier: workspace:*
-        version: link:../db
-      '@tanstack/ai-client':
-        specifier: 0.39.0
-        version: 0.39.0(zod@4.6.5)
-    devDependencies:
-      '@ai-chat/config':
-        specifier: workspace:*
-        version: link:../config
-      typescript:
-        specifier: 'catalog:'
-        version: 6.0.3
-
-  packages/chat-react:
-    dependencies:
-      '@ai-chat/api':
-        specifier: workspace:*
-        version: link:../api
-      '@ai-chat/chat-core':
-        specifier: workspace:*
-        version: link:../chat-core
-      '@ai-chat/db':
-        specifier: workspace:*
-        version: link:../db
-      '@ai-chat/ui':
-        specifier: workspace:*
-        version: link:../ui
-      '@orpc/tanstack-query':
-        specifier: ^1.15.0
-        version: 1.15.4(@orpc/client@1.15.4)(@tanstack/query-core@5.104.1)
-      '@tanstack/ai':
-        specifier: 0.66.0
-        version: 0.66.0(zod@4.6.5)
-      '@tanstack/ai-client':
-        specifier: 0.39.0
-        version: 0.39.0(zod@4.6.5)
-      '@tanstack/ai-react':
-        specifier: 0.30.1
-        version: 0.30.1(@tanstack/ai@0.66.0(zod@4.6.5))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
-      '@tanstack/react-query':
-        specifier: ^5.102.8
-        version: 5.104.1(react@19.3.0)
-      lucide-react:
-        specifier: 'catalog:'
-        version: 1.52.0(@types/react@19.3.0)(react@19.3.0)
-      react:
-        specifier: 'catalog:'
-        version: 19.3.0
-      react-dom:
-        specifier: 'catalog:'
-        version: 19.3.0(react@19.3.0)
-      sonner:
-        specifier: 'catalog:'
-        version: 2.0.8(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-    devDependencies:
-      '@ai-chat/config':
-        specifier: workspace:*
-        version: link:../config
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
+      drizzle-kit:
+        specifier: 1.0.0-rc.4
+        version: 1.0.0-rc.4
       typescript:
         specifier: 'catalog:'
         version: 6.0.3
+      varlock:
+        specifier: 'catalog:'
+        version: 1.18.0
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/config: {}
 
@@ -586,9 +551,6 @@ importers:
       pg:
         specifier: ^8.23.0
         version: 8.23.1
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
     devDependencies:
       '@ai-chat/config':
         specifier: workspace:*
@@ -605,9 +567,6 @@ importers:
       varlock:
         specifier: 'catalog:'
         version: 1.18.0
-      vitest:
-        specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
 
   packages/ui:
     dependencies:
@@ -6850,12 +6809,12 @@ snapshots:
       postcss-selector-parser: 6.0.10
       tailwindcss: 4.3.3
 
-  '@tailwindcss/vite@4.3.3(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@tailwindcss/vite@4.3.3(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
       '@tailwindcss/node': 4.3.3
       '@tailwindcss/oxide': 4.3.3
       tailwindcss: 4.3.3
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
 
   '@tanstack/ai-anthropic@0.20.0(@tanstack/ai@0.66.0(zod@4.6.5))(zod@4.6.5)':
     dependencies:
@@ -7123,13 +7082,13 @@ snapshots:
     transitivePeerDependencies:
       - csstype
 
-  '@tanstack/react-form@1.33.5(@tanstack/react-start@1.168.60(crossws@0.4.12(srvx@1.0.5))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
+  '@tanstack/react-form@1.33.5(@tanstack/react-start@1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
     dependencies:
       '@tanstack/form-core': 1.33.5
       '@tanstack/react-store': 0.11.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
     optionalDependencies:
-      '@tanstack/react-start': 1.168.60(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      '@tanstack/react-start': 1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
     transitivePeerDependencies:
       - react-dom
 
@@ -7186,14 +7145,14 @@ snapshots:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
 
-  '@tanstack/react-start-rsc@0.1.59(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@tanstack/react-start-rsc@0.1.59(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-utils': 1.162.3
       '@tanstack/start-client-core': 1.170.34
       '@tanstack/start-fn-stubs': 1.162.0
-      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(crossws@0.4.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       '@tanstack/start-storage-context': 1.167.36
       pathe: 2.0.3
       react: 19.3.0
@@ -7222,21 +7181,21 @@ snapshots:
     transitivePeerDependencies:
       - crossws
 
-  '@tanstack/react-start@1.168.60(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@tanstack/react-start@1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/react-start-client': 1.168.39(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@tanstack/react-start-rsc': 0.1.59(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      '@tanstack/react-start-rsc': 0.1.59(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       '@tanstack/react-start-server': 1.167.46(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       '@tanstack/router-utils': 1.162.3
       '@tanstack/start-client-core': 1.170.34
-      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(crossws@0.4.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      '@tanstack/start-plugin-core': 1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.12)
       pathe: 2.0.3
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
     optionalDependencies:
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
     transitivePeerDependencies:
       - '@farmfe/core'
       - '@rspack/core'
@@ -7286,7 +7245,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tanstack/router-plugin@1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@tanstack/router-plugin@1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.25.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/template': 7.29.7
@@ -7295,11 +7254,11 @@ snapshots:
       '@tanstack/router-generator': 1.167.40
       '@tanstack/router-utils': 1.162.3
       chokidar: 5.0.0
-      unplugin: 3.4.0(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      unplugin: 3.4.0(esbuild@0.25.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       zod: 4.6.5
     optionalDependencies:
       '@tanstack/react-router': 1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
     transitivePeerDependencies:
       - '@farmfe/core'
       - '@rspack/core'
@@ -7337,7 +7296,7 @@ snapshots:
 
   '@tanstack/start-fn-stubs@1.162.0': {}
 
-  '@tanstack/start-plugin-core@1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(crossws@0.4.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@tanstack/start-plugin-core@1.171.49(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
       '@babel/code-frame': 7.29.7
       '@babel/core': 7.29.7
@@ -7345,7 +7304,7 @@ snapshots:
       '@jridgewell/remapping': 2.3.5
       '@tanstack/router-core': 1.171.34
       '@tanstack/router-generator': 1.167.40
-      '@tanstack/router-plugin': 1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      '@tanstack/router-plugin': 1.168.42(@tanstack/react-router@1.170.41(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(esbuild@0.25.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       '@tanstack/router-utils': 1.162.3
       '@tanstack/start-server-core': 1.169.39(crossws@0.4.12)
       exsolve: 1.1.3
@@ -7361,7 +7320,7 @@ snapshots:
       xmlbuilder2: 4.0.3
       zod: 4.6.5
     optionalDependencies:
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
     transitivePeerDependencies:
       - '@farmfe/core'
       - '@rspack/core'
@@ -7510,15 +7469,15 @@ snapshots:
   '@varlock/native-helper-win32-x64@1.18.0':
     optional: true
 
-  '@varlock/vite-integration@1.5.1(varlock@1.18.0)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@varlock/vite-integration@1.5.1(varlock@1.18.0)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
       varlock: 1.18.0
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
 
-  '@vitejs/plugin-react@6.1.2(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
+  '@vitejs/plugin-react@6.1.2(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
       '@rolldown/pluginutils': 1.0.1
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
 
   '@vitest/mocker@5.0.3(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))':
     dependencies:
@@ -7527,7 +7486,7 @@ snapshots:
       estree-walker: 3.0.3
       magic-string: 1.4.3
     optionalDependencies:
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
 
   '@vitest/spy@5.0.3': {}
 
@@ -7614,7 +7573,7 @@ snapshots:
       nanostores: 1.5.4
       zod: 4.6.5
     optionalDependencies:
-      '@tanstack/react-start': 1.168.60(crossws@0.4.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+      '@tanstack/react-start': 1.168.60(crossws@0.4.12(srvx@1.0.5))(esbuild@0.25.12)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1))
       drizzle-kit: 1.0.0-rc.4
       drizzle-orm: 1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5)
       pg: 8.23.1
@@ -7981,7 +7940,7 @@ snapshots:
     dependencies:
       eventsource-parser: 3.1.1
 
-  evlog@2.30.0(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(@tanstack/start-client-core@1.170.34)(express@5.2.1)(hono@4.13.13)(nitro@3.0.260903-beta)(react@19.3.0)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)):
+  evlog@2.30.0(@orpc/server@1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0))(@tanstack/start-client-core@1.170.34)(express@5.2.1)(hono@4.13.13)(nitro@3.0.260903-beta)(react@19.3.0)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)):
     optionalDependencies:
       '@orpc/server': 1.15.4(crossws@0.4.12(srvx@1.0.5))(ws@8.22.0)
       '@tanstack/start-client-core': 1.170.34
@@ -7989,7 +7948,7 @@ snapshots:
       hono: 4.13.13
       nitro: 3.0.260903-beta
       react: 19.3.0
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
 
   execa@5.1.1:
     dependencies:
@@ -9973,14 +9932,15 @@ snapshots:
 
   unpipe@1.0.0: {}
 
-  unplugin@3.4.0(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)):
+  unplugin@3.4.0(esbuild@0.25.12)(rolldown@1.2.12)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
       '@jridgewell/remapping': 2.3.5
       picomatch: 4.0.7
       webpack-virtual-modules: 0.6.2
     optionalDependencies:
+      esbuild: 0.25.12
       rolldown: 1.2.12
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
 
   unstorage@2.0.0-alpha.10: {}
 
@@ -10021,7 +9981,7 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.3
 
-  vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1):
+  vite@8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -10030,13 +9990,14 @@ snapshots:
       tinyglobby: 0.2.17
     optionalDependencies:
       '@types/node': 26.6.4
+      esbuild: 0.25.12
       fsevents: 2.3.3
       jiti: 2.7.0
       yaml: 2.9.1
 
   vitefu@1.1.3(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)):
     optionalDependencies:
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
 
   vitest@5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)):
     dependencies:
@@ -10052,7 +10013,7 @@ snapshots:
       tinybench: 6.2.0
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@26.6.4)(esbuild@0.25.12)(jiti@2.7.0)(yaml@2.9.1)
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 26.6.4

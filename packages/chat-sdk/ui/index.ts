@@ -1,12 +1,3 @@
-export {
-  type ChatAdapter,
-  type ChatLinkProps,
-  type ChatLocation,
-  type ChatOrpc,
-  type ChatPage,
-  ChatProvider,
-  useChatAdapter,
-} from "./provider";
 export { ChatView, type ConversationData } from "./chat/chat-view";
 export { MessageRow } from "./chat/message-row";
 export { AppShell } from "./shell/app-shell";

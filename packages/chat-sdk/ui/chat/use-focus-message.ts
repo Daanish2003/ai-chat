@@ -1,6 +1,6 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { focusStep } from "@ai-chat/chat-core/search";
+import { focusStep } from "../../core/client/search";
 
 /** How long an opened search hit stays highlighted. */
 const highlightMs = 2_500;

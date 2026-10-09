@@ -2,23 +2,23 @@ import {
   type CredentialService,
   credentialForms,
   type SaveCredentialsInput,
-} from "@ai-chat/api/shared/credentials/services";
+} from "../../core/shared/credentials/services";
 import {
   type ProviderRow,
   type ProviderRowStatus,
   providerRows,
   type ToolRow,
   toolRows,
-} from "@ai-chat/chat-core/key-settings";
-import { Button } from "@ai-chat/ui/components/button";
-import { Input } from "@ai-chat/ui/components/input";
-import { Label } from "@ai-chat/ui/components/label";
-import { cn } from "@ai-chat/ui/lib/utils";
+} from "../../core/client/key-settings";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { type ChatOrpc, useOrpc } from "../provider";
+import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
 import { TitleModelSelect } from "../settings/title-model-select";
 
 /** Keys & settings: the user's Provider and Tool credentials, and the Title Model. */

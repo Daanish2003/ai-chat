@@ -1,5 +1,5 @@
-import type { SharedConversation } from "@ai-chat/api/shared/share/conversation";
-import { sharedToUIMessages } from "@ai-chat/chat-core/chat";
+import type { SharedConversation } from "../../core/shared/share/conversation";
+import { sharedToUIMessages } from "../../core/client/chat";
 
 import { MessageRow } from "../chat/message-row";
 

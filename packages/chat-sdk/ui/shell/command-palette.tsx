@@ -1,8 +1,8 @@
-import { minSearchLength } from "@ai-chat/api/shared/search/text";
-import { relativeTime } from "@ai-chat/chat-core/relative-time";
-import { recentConversations, type SearchHit, splitSnippet } from "@ai-chat/chat-core/search";
-import { Dialog, DialogContent, DialogTitle } from "@ai-chat/ui/components/dialog";
-import { cn } from "@ai-chat/ui/lib/utils";
+import { minSearchLength } from "../../core/shared/search/text";
+import { relativeTime } from "../../core/client/relative-time";
+import { recentConversations, type SearchHit, splitSnippet } from "../../core/client/search";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRoundIcon,
@@ -16,9 +16,9 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import { invalidateConversationList } from "../conversation-list";
-import { useDeleteConversation } from "../delete-conversation";
-import { useChatAdapter, useChatLocation, useOrpc } from "../provider";
+import { invalidateConversationList } from "../../core/client/react/conversation-list";
+import { useDeleteConversation } from "../../core/client/react/delete-conversation";
+import { useChatAdapter, useChatLocation, useOrpc } from "../../core/client/react/provider";
 import { ShareDialog } from "../share/share-dialog";
 
 /** How long typing must pause before Messages are searched. */
