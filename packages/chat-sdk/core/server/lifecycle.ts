@@ -1,0 +1,49 @@
+import { reapStaleRuns, shutdownAbort } from "./chat/run";
+import type { AppDeps } from "./deps";
+
+/** How often `stop()` checks whether the local Runs have ended. */
+const DRAIN_POLL_MS = 50;
+
+export type Lifecycle = {
+  /** Reaps now, then every `reapIntervalMs` (ADR 0006). Resolves after the first reap. */
+  start: () => Promise<void>;
+  /**
+   * Refuses new Runs, lets local Runs finish for up to `drainMs`, then ends the rest as
+   * `error` "interrupted" (each Run saves itself and closes its log) and clears the reaper.
+   */
+  stop: () => Promise<void>;
+};
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** The SDK's background work: the reaper, and the drain that `stop()` runs. Nothing runs before `start()`. */
+export function createLifecycle(
+  deps: AppDeps,
+  logger: Pick<Console, "error"> = console,
+): Lifecycle {
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const reap = () =>
+    reapStaleRuns(deps).catch((error: unknown) =>
+      logger.error("Reaping interrupted runs failed", error),
+    );
+
+  return {
+    async start() {
+      clearInterval(timer);
+      timer = setInterval(() => void reap(), deps.limits.reapIntervalMs);
+      await reap();
+    },
+
+    async stop() {
+      deps.lifecycle.stopping = true;
+      clearInterval(timer);
+      timer = undefined;
+
+      const deadline = Date.now() + deps.limits.drainMs;
+      while (deps.runs.size > 0 && Date.now() < deadline) await sleep(DRAIN_POLL_MS);
+      for (const run of deps.runs.values()) run.abort(shutdownAbort);
+      // An aborted Run leaves the registry only once it has saved itself and closed its log.
+      while (deps.runs.size > 0) await sleep(DRAIN_POLL_MS);
+    },
+  };
+}

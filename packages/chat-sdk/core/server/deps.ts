@@ -36,6 +36,12 @@ export type Limits = {
   snapshotIntervalMs: number;
   /** Longest a run may take before it is saved as timed out. */
   runCapMs: number;
+  /** A streaming Message whose heartbeat is older than this is reaped (ADR 0006). */
+  leaseMs: number;
+  /** How often the reaper runs once `start()` has been called. */
+  reapIntervalMs: number;
+  /** How long `stop()` lets local Runs finish before it ends them. */
+  drainMs: number;
 };
 
 /** Everything the server entry points need from the outside world, built once at server start. */
@@ -49,6 +55,8 @@ export type AppDeps = {
   /** Every Run's chunk log, which its POST response and any joiner read (ADR 0006). */
   runStreams: RunStreams;
   limits: Limits;
+  /** Set by `stop()`: once `stopping`, a new Run is refused with 503. */
+  lifecycle: { stopping: boolean };
   fetch: typeof fetch;
   /** `KEY_ENCRYPTION_SECRET`: encrypts Provider credentials and Tool credentials at rest (ADR 0003). */
   keyEncryptionSecret: string;
@@ -57,6 +65,9 @@ export type AppDeps = {
 export const defaultLimits: Limits = {
   snapshotIntervalMs: 1_000,
   runCapMs: 5 * 60_000,
+  leaseMs: 30_000,
+  reapIntervalMs: 30_000,
+  drainMs: 250_000,
 };
 
 /** The production `AppDeps`. */
@@ -76,6 +87,7 @@ export function createAppDeps({
     runs: new Map(),
     runStreams: runtime.runStreams,
     limits: defaultLimits,
+    lifecycle: { stopping: false },
     fetch: globalThis.fetch,
     keyEncryptionSecret,
   };

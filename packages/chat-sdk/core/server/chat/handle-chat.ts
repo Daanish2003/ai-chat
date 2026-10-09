@@ -132,6 +132,8 @@ export async function handleChat(
         model: model.id,
         status: "streaming",
         createdAt: new Date(now.getTime() + 1),
+        // The Run's lease starts now (ADR 0006); the Run's snapshot timer keeps it fresh.
+        heartbeatAt: now,
       },
     ]);
     if (userParts) await linkAttachments(tx, userMessageId, attachmentIds);

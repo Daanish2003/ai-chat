@@ -1,7 +1,7 @@
 import { getTestDb } from "./test-database";
 
 import { createMemoryRunStreams } from "../../core/server/chat/run-streams";
-import type { AppDeps } from "../../core/server/deps";
+import type { AppDeps, Limits } from "../../core/server/deps";
 import { createFakeSearchClient } from "./fake-search-client";
 
 /** The `test` value of `KEY_ENCRYPTION_SECRET` in `apps/web/.env.schema`. */
@@ -11,7 +11,10 @@ export const testKeyEncryptionSecret = "test-key-encryption-secret-not-for-produ
  * `AppDeps` for tests: the test database and fakes, with nothing that reaches the network.
  * Pass overrides for the parts a test scripts (for example `adapterFor` returning a fake adapter).
  */
-export function createTestDeps(overrides: Partial<AppDeps> = {}): AppDeps {
+export function createTestDeps({
+  limits,
+  ...overrides
+}: Partial<Omit<AppDeps, "limits">> & { limits?: Partial<Limits> } = {}): AppDeps {
   return {
     db: getTestDb(),
     adapterFor: (model) => {
@@ -20,11 +23,23 @@ export function createTestDeps(overrides: Partial<AppDeps> = {}): AppDeps {
     searchClient: createFakeSearchClient(),
     runs: new Map(),
     runStreams: createMemoryRunStreams(),
-    limits: { snapshotIntervalMs: 20, runCapMs: 2_000 },
+    // Overrides merge, so a test that sets one limit keeps the rest.
+    limits: {
+      snapshotIntervalMs: 20,
+      runCapMs: 2_000,
+      leaseMs: 30_000,
+      reapIntervalMs: 30_000,
+      drainMs: 250_000,
+      ...limits,
+    },
     fetch: async (input) => {
       throw new Error(`Unexpected network call in a test: ${String(input)}`);
     },
     keyEncryptionSecret: testKeyEncryptionSecret,
+    lifecycle: { stopping: false },
     ...overrides,
   };
 }
+
+/** What a test may override in `createTestDeps`: any part of `AppDeps`, and any part of its limits. */
+export type TestDepsOverrides = Parameters<typeof createTestDeps>[0];
