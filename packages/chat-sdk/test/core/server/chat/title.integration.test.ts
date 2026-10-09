@@ -120,6 +120,25 @@ describe("automatic titles", () => {
     });
   });
 
+  it("titles with a live-listed Title Model (OpenRouter)", async () => {
+    const { user, deps, send, titleOf, adapterCalls } = await setup();
+    await saveCredentials(deps, user.id, {
+      service: "openrouter",
+      fields: { apiKey: "sk-or-test-key" },
+      hint: "…-key",
+      verified: true,
+    });
+    await saveTitleModel(deps, user.id, "openrouter:mistralai/mistral-large");
+
+    await send();
+
+    await vi.waitFor(async () => expect(await titleOf()).toBe("Capital of France"));
+    expect(adapterCalls[1]).toEqual({
+      model: "openrouter:mistralai/mistral-large",
+      credentials: { apiKey: "sk-or-test-key" },
+    });
+  });
+
   it("falls back to the start of the first Message without credentials for the Title Model", async () => {
     const { user, deps, send, titleOf, adapterCalls } = await setup();
     await saveTitleModel(deps, user.id, cheapModel);

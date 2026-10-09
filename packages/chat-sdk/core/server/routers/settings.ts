@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { findModel } from "../../shared/chat/models";
+import { isKnownModel } from "../../shared/chat/models";
 import { protectedProcedure } from "../procedures";
 import { loadSettings, saveTitleModel } from "../settings/store";
 
@@ -15,7 +15,7 @@ export const settingsRouter = {
   setTitleModel: protectedProcedure
     .input(z.object({ titleModel: z.string().nullable() }))
     .handler(async ({ context, input }) => {
-      if (input.titleModel !== null && !findModel(input.titleModel)) {
+      if (input.titleModel !== null && !isKnownModel(input.titleModel)) {
         throw new ORPCError("BAD_REQUEST", {
           message: `"${input.titleModel}" is not an available Model`,
         });
