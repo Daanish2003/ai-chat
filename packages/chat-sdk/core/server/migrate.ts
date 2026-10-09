@@ -1,6 +1,5 @@
 import { fileURLToPath } from "node:url";
 
-import { readMigrationFiles } from "drizzle-orm/migrator";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate as applyMigrations } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
@@ -13,8 +12,21 @@ import pg from "pg";
 /** Any fixed number: every `chat.migrate()` and `start()` on one database uses it. */
 const MIGRATION_LOCK_ID = 727_770_001;
 
+/**
+ * The newest folder in `core/server/migrations`. A bundler can't read that folder at run time, so
+ * `start()` compares against this name. A test keeps it equal to the folder listing.
+ */
+export const LATEST_MIGRATION = "20261009085944_chat_baseline";
+
 function migrationsFolder() {
-  return fileURLToPath(new URL("./migrations", import.meta.url));
+  // Only `migrate()` reads the folder, from a migrate script that runs the file unbundled.
+  return fileURLToPath(new URL("./migrations", /* turbopackIgnore: true */ import.meta.url));
+}
+
+/** Milliseconds for a migration folder's `yyyymmddhhmmss` prefix, as drizzle records them. */
+function folderMillis(name: string) {
+  const at = (start: number, length = 2) => Number(name.slice(start, start + length));
+  return Date.UTC(at(0, 4), at(4) - 1, at(6), at(8), at(10), at(12));
 }
 
 /**
@@ -61,7 +73,7 @@ async function createTrigramExtension(client: pg.Client) {
  * lock: a run in progress is reported as behind until it finishes.
  */
 export async function assertMigrated(databaseUrl: string): Promise<void> {
-  const latest = readMigrationFiles({ migrationsFolder: migrationsFolder() }).at(-1);
+  const latest = folderMillis(LATEST_MIGRATION);
   const client = new pg.Client({ connectionString: databaseUrl });
   await client.connect();
   try {
@@ -74,7 +86,7 @@ export async function assertMigrated(databaseUrl: string): Promise<void> {
         )
       : undefined;
     const appliedUpTo = Number(applied?.rows[0]?.created_at ?? 0);
-    if (latest && appliedUpTo < latest.folderMillis) {
+    if (appliedUpTo < latest) {
       throw new Error(
         "The chat schema is behind the bundled migrations: run chat.migrate() before start().",
       );
