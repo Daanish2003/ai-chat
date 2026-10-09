@@ -3,9 +3,9 @@ import {
   acceptedKinds,
   attachmentKind,
   maxAttachmentBytes,
-} from "@ai-chat/api/attachments/kinds";
-import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
-import { findModel } from "@ai-chat/api/chat/models";
+} from "@ai-chat/api/shared/attachments/kinds";
+import type { AttachmentInfo } from "@ai-chat/api/shared/attachments/kinds";
+import { findModel } from "@ai-chat/api/shared/chat/models";
 import type { AttachmentChip } from "@ai-chat/chat-core/chat";
 import {
   Attachment,

@@ -1,5 +1,5 @@
-import { type CuratedModel, findModel } from "@ai-chat/api/chat/models";
-import { providerLabel } from "@ai-chat/api/credentials/services";
+import { type CuratedModel, findModel } from "@ai-chat/api/shared/chat/models";
+import { providerLabel } from "@ai-chat/api/shared/credentials/services";
 import { buttonVariants } from "@ai-chat/ui/components/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@ai-chat/ui/components/popover";
 import { cn } from "@ai-chat/ui/lib/utils";

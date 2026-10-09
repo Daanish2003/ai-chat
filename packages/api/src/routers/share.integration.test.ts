@@ -4,8 +4,8 @@ import { getTestDb } from "@ai-chat/db/testing/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
-import { citationFor } from "../chat/citations";
-import { replySegments, sourcesOf } from "../chat/sources";
+import { citationFor } from "../shared/chat/citations";
+import { replySegments, sourcesOf } from "../shared/chat/sources";
 import { insertAttachment, linkTestAttachments } from "../testing/attachments";
 import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestClient, insertUser } from "../testing/router-client";

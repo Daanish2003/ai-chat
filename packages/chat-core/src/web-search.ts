@@ -1,4 +1,4 @@
-import { numberSources } from "@ai-chat/api/chat/sources";
+import { numberSources } from "@ai-chat/api/shared/chat/sources";
 import type { WebSearchPart } from "@ai-chat/db/message-parts";
 
 /** The composer's Search toggle: whether search can be offered, is offered, and why. */

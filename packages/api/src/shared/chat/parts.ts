@@ -15,9 +15,14 @@ import {
 } from "@tanstack/ai";
 
 import { attachmentKind, kindLabel, kindLabelPlural } from "../attachments/kinds";
-import type { SearchErrorReason, SearchResult } from "../deps";
 import { providerOf } from "./models";
-import { searchErrorMessages, type WebSearchOutput, webSearchToolName } from "./web-search";
+import {
+  searchErrorMessages,
+  type SearchErrorReason,
+  type SearchResult,
+  type WebSearchOutput,
+  webSearchToolName,
+} from "./web-search";
 
 /**
  * The one boundary between stored Message parts (our versioned zod shape, ADR 0001) and

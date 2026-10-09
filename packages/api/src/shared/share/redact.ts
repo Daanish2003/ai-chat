@@ -1,6 +1,6 @@
 import type { MessagePart } from "@tanstack/ai";
 
-import type { AttachmentInfo } from "../attachments/store";
+import type { AttachmentInfo } from "../attachments/kinds";
 
 /** The parts a Shared link viewer may see. Anything else (thinking, file contents) is left out. */
 const sharedPartTypes = new Set<MessagePart["type"]>(["text", "tool-call", "tool-result"]);

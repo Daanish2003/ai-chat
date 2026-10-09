@@ -10,8 +10,8 @@ import {
 import { and, eq, lt } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
-import { citationPrompt } from "./citations";
-import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "./parts";
+import { citationPrompt } from "../shared/chat/citations";
+import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../shared/chat/parts";
 import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
 

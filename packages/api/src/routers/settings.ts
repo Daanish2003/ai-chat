@@ -1,7 +1,7 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { findModel } from "../chat/models";
+import { findModel } from "../shared/chat/models";
 import { protectedProcedure } from "../index";
 import { loadSettings, saveTitleModel } from "../settings/store";
 

@@ -3,41 +3,18 @@ import { storedParts } from "@ai-chat/db/message-parts";
 import { conversation, message } from "@ai-chat/db/schema/chat";
 import { toServerSentEventsResponse } from "@tanstack/ai";
 import { and, eq } from "drizzle-orm";
-import { z } from "zod";
 
 import { attachmentsForSend } from "../attachments/send";
 import { linkAttachments, lockAttachments } from "../attachments/store";
-import { addKeyMessage, tavilyService } from "../credentials/services";
+import { addKeyMessage, tavilyService } from "../shared/credentials/services";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { uuidv7 } from "../lib/uuidv7";
 import { resolveModel } from "./available-models";
-import { parseStoredParts, searchTextOf, toModelMessages } from "./parts";
+import { parseStoredParts, searchTextOf, toModelMessages } from "../shared/chat/parts";
+import { chatCommandSchema } from "../shared/chat/command";
 import { startRun } from "./run";
 import { findConversation, loadPath } from "./store";
-
-/**
- * What the client asks for: a command, never history (ADR 0001). History is rebuilt from the
- * database by walking up from `parentId`. `useChat` sends it as the AG-UI `forwardedProps`.
- */
-export const chatCommandSchema = z.object({
-  conversationId: z.uuid(),
-  /** The Message the new one continues; `null` starts at the root. */
-  parentId: z.uuid().nullable(),
-  /** The user's text. Without it the command is a regenerate. */
-  text: z.string().trim().min(1).optional(),
-  /**
-   * The new Message's attachments, uploaded first through `attachment.upload`. On an edit this
-   * is the whole list: the client carries the edited Message's attachments over. A regenerate
-   * takes none; it leaves its user Message's attachments alone.
-   */
-  attachmentIds: z.array(z.uuid()).default([]),
-  /** `"provider:model"` */
-  model: z.string(),
-  webSearch: z.boolean().default(false),
-});
-
-export type ChatCommand = z.input<typeof chatCommandSchema>;
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 

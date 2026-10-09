@@ -1,5 +1,5 @@
-import { citationFor } from "@ai-chat/api/chat/citations";
-import type { Source as NumberedSource } from "@ai-chat/api/chat/sources";
+import { citationFor } from "@ai-chat/api/shared/chat/citations";
+import type { Source as NumberedSource } from "@ai-chat/api/shared/chat/sources";
 import { Source, SourceContent, SourceTrigger } from "@ai-chat/ui/components/prompt-kit/source";
 import { type ComponentProps, createContext, useContext } from "react";
 

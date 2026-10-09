@@ -1,7 +1,11 @@
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { attachmentKind, maxAttachmentBytes, normalizedMediaType } from "../attachments/kinds";
+import {
+  attachmentKind,
+  maxAttachmentBytes,
+  normalizedMediaType,
+} from "../shared/attachments/kinds";
 import { saveAttachment } from "../attachments/store";
 import { protectedProcedure } from "../index";
 

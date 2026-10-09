@@ -2,7 +2,11 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { checkCredentials } from "../credentials/check";
-import { credentialHint, credentialServices, saveCredentialsInput } from "../credentials/services";
+import {
+  credentialHint,
+  credentialServices,
+  saveCredentialsInput,
+} from "../shared/credentials/services";
 import { deleteCredentials, listCredentials, saveCredentials } from "../credentials/store";
 import { protectedProcedure } from "../index";
 

@@ -1,4 +1,4 @@
-import { findModel } from "@ai-chat/api/chat/models";
+import { findModel } from "@ai-chat/api/shared/chat/models";
 import { describe, expect, it } from "vitest";
 
 import { missingCredentialsMessage, modelGroups, modelLabel } from "./models";

@@ -10,7 +10,8 @@ import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestDeps } from "../testing/deps";
 import { createFakeAdapter, round, runError, text } from "../testing/fake-adapter";
 import { createTestClient, insertUser, sessionFor } from "../testing/router-client";
-import { type ChatCommand, handleChat } from "./handle-chat";
+import type { ChatCommand } from "../shared/chat/command";
+import { handleChat } from "./handle-chat";
 import { titleConversation } from "./title";
 
 const replyModel = "anthropic:claude-sonnet-5-5";

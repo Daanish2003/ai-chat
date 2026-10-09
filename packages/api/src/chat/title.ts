@@ -5,7 +5,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { loadCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { loadSettings } from "../settings/store";
-import { findModel } from "./models";
+import { findModel } from "../shared/chat/models";
 import { loadPath } from "./store";
 
 const titlePrompt =

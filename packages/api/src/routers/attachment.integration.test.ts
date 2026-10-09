@@ -3,7 +3,7 @@ import { getTestDb } from "@ai-chat/db/testing/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
-import { maxAttachmentBytes } from "../attachments/kinds";
+import { maxAttachmentBytes } from "../shared/attachments/kinds";
 import { deleteOrphanAttachments, lockAttachments } from "../attachments/store";
 import { insertAttachment, linkTestAttachments } from "../testing/attachments";
 import { insertConversation, insertMessage } from "../testing/conversations";

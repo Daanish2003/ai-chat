@@ -8,6 +8,9 @@ import type { CuratedModel } from "../chat/models";
 
 export type AttachmentKind = "text" | "image" | "pdf";
 
+/** What the client and the Shared link see of an attachment: never its bytes. */
+export type AttachmentInfo = { id: string; filename: string; mediaType: string; size: number };
+
 /** The largest file that can be attached. */
 export const maxAttachmentBytes = 5 * 1024 * 1024;
 /** The most attachment bytes one Active Branch may carry; history is resent on every turn. */

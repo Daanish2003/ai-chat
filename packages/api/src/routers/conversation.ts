@@ -12,7 +12,7 @@ import {
   setConversationModel,
   switchBranch,
 } from "../chat/store";
-import { addKeyMessage } from "../credentials/services";
+import { addKeyMessage } from "../shared/credentials/services";
 import { loadCredentials } from "../credentials/store";
 import { protectedProcedure } from "../index";
 import { uuidv7 } from "../lib/uuidv7";

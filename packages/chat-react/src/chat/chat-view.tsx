@@ -1,11 +1,11 @@
-import type { AttachmentInfo } from "@ai-chat/api/attachments/store";
+import type { AttachmentInfo } from "@ai-chat/api/shared/attachments/kinds";
 import type { AppRouterClient } from "@ai-chat/api/routers/index";
 import {
   ChatContainerContent,
   ChatContainerRoot,
 } from "@ai-chat/ui/components/prompt-kit/chat-container";
 import { ScrollButton } from "@ai-chat/ui/components/prompt-kit/scroll-button";
-import type { ChatCommand } from "@ai-chat/api/chat/handle-chat";
+import type { ChatCommand } from "@ai-chat/api/shared/chat/command";
 import { branchFrom, takePendingFirstMessage, toUIMessages } from "@ai-chat/chat-core/chat";
 import { missingCredentialsMessage } from "@ai-chat/chat-core/models";
 import { fetchServerSentEvents, type UIMessage, useChat } from "@tanstack/ai-react";

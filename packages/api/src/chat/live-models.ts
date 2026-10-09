@@ -1,7 +1,7 @@
 import { OPENROUTER_CHAT_MODELS } from "@tanstack/ai-openrouter/model-meta";
 import { z } from "zod";
 
-import type { CuratedModel } from "./models";
+import type { CuratedModel } from "../shared/chat/models";
 
 /**
  * The live Model lists of OpenRouter and Ollama, fetched through `deps.fetch`. A list that

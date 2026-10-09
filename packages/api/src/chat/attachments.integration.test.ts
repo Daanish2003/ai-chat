@@ -3,7 +3,7 @@ import { message } from "@ai-chat/db/schema/chat";
 import { asc, eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
-import { maxAttachmentBytes } from "../attachments/kinds";
+import { maxAttachmentBytes } from "../shared/attachments/kinds";
 import { saveCredentials } from "../credentials/store";
 import type { AppDeps } from "../deps";
 import { insertAttachment, linkTestAttachments } from "../testing/attachments";
@@ -11,7 +11,8 @@ import { insertConversation, insertMessage } from "../testing/conversations";
 import { createTestDeps } from "../testing/deps";
 import { createFakeAdapter, round, text } from "../testing/fake-adapter";
 import { createTestClient, insertUser, sessionFor, type TestUser } from "../testing/router-client";
-import { type ChatCommand, handleChat } from "./handle-chat";
+import type { ChatCommand } from "../shared/chat/command";
+import { handleChat } from "./handle-chat";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
 const openaiModel = "openai:gpt-5.6";

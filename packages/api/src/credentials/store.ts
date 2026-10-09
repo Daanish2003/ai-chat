@@ -2,11 +2,10 @@ import { userCredentials } from "@ai-chat/db/schema/credentials";
 import { and, eq } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
+import type { CredentialSummary } from "../shared/credentials/services";
 import { decryptCredentials, encryptCredentials } from "./encryption";
 
 type Deps = Pick<AppDeps, "db" | "keyEncryptionSecret">;
-
-export type CredentialSummary = { service: string; hint: string; verified: boolean };
 
 const encryptionOptions = (deps: Deps, userId: string, service: string) => ({
   secret: deps.keyEncryptionSecret,
