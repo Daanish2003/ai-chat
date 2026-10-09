@@ -7,6 +7,7 @@ import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
 import { createAppDeps, type AppDeps } from "./deps";
 import { createLifecycle } from "./lifecycle";
+import { deleteUserData } from "./delete-user";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
@@ -93,6 +94,8 @@ export function createChat(options: CreateChatOptions): {
    * rest as interrupted and stops the reaper. Call it on SIGTERM.
    */
   stop: () => Promise<void>;
+  /** Deletes everything the SDK holds for a user, in one transaction. Idempotent. */
+  deleteUser: (userId: string) => Promise<void>;
 } {
   let deps: AppDeps | undefined;
   const getDeps = () => {
@@ -119,6 +122,7 @@ export function createChat(options: CreateChatOptions): {
       await getLifecycle().start();
     },
     stop: () => getLifecycle().stop(),
+    deleteUser: (userId) => deleteUserData(getDeps(), userId),
   };
 }
 

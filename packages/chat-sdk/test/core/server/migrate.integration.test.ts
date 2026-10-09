@@ -193,6 +193,8 @@ describe("chat.start()", () => {
     await chat.migrate();
 
     await expect(chat.start()).resolves.toBeUndefined();
+    // start() set the reaper going; stop it so it doesn't outlive the test.
+    await chat.stop();
 
     // A journal with nothing applied is behind the bundled migrations.
     await rows(url, "delete from chat.__migrations");
