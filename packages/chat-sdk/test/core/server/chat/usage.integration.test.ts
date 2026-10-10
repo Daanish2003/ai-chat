@@ -150,6 +150,31 @@ describe("chat.usage for a Run", () => {
     expect(await usageOf(owner.id)).toMatchObject([{ costMicros: 2000, estimated: false }]);
   });
 
+  it("prices the tokens, not a reported cost, when only some iterations report one", async () => {
+    const { owner, send } = await setup({
+      rounds: [
+        [
+          ...withUsage(round(text("First")), {
+            promptTokens: 100,
+            completionTokens: 50,
+            totalTokens: 150,
+            cost: 0.002,
+          }),
+          ...withUsage(round(text("Second")), {
+            promptTokens: 10,
+            completionTokens: 5,
+            totalTokens: 15,
+          }),
+        ],
+      ],
+    });
+
+    await (await send()).text();
+
+    // 110 × $3/M + 55 × $15/M = 1155 micros; the 2000 reported for the first iteration alone would undercount.
+    expect(await usageOf(owner.id)).toMatchObject([{ costMicros: 1155, estimated: false }]);
+  });
+
   it("sums the usage of every RUN_FINISHED in one Run", async () => {
     const { owner, send } = await setup({
       rounds: [

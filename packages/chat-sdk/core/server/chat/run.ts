@@ -63,6 +63,7 @@ export async function startRun(
   let total: RunUsage | undefined;
   /** The Provider-reported cost in USD, summed over the Run's iterations, when it reports one. */
   let reportedCost: number | undefined;
+  let costComplete = true;
   const promptCharacters = promptCharactersOf(messages);
 
   let writes = Promise.resolve();
@@ -129,8 +130,10 @@ export async function startRun(
           // The AG-UI array form is converted back to TanStack's shape first.
           const tokens = Array.isArray(chunk.usage) ? fromSpecTokenUsage(chunk.usage) : chunk.usage;
           if (tokens) total = addUsage(total, normalizeUsage(provider, tokens));
-          // A Provider that reports a cost (OpenRouter) prices a Host Run exactly (ADR 0007).
-          if (tokens?.cost !== undefined) reportedCost = (reportedCost ?? 0) + tokens.cost;
+          // A Provider that reports a cost (OpenRouter) prices a Host Run exactly (ADR 0007). A cost
+          // reported for only some iterations would undercount, so it is used only when all report one.
+          if (tokens?.cost === undefined) costComplete = false;
+          else reportedCost = (reportedCost ?? 0) + tokens.cost;
         }
         if (chunk.type === EventType.RUN_ERROR) {
           error = { message: chunk.message, code: chunk.code ?? chunk.error?.code };
@@ -171,8 +174,8 @@ export async function startRun(
       await write(withParts({ ...ending, usage }));
       // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
       if (meter) {
-        await recordRunUsage(deps, meter, usage, reportedCost).catch((caught: unknown) =>
-          console.error(`Recording usage of ${messageId} failed`, caught),
+        await recordRunUsage(deps, meter, usage, costComplete ? reportedCost : undefined).catch(
+          (caught: unknown) => console.error(`Recording usage of ${messageId} failed`, caught),
         );
       }
       void unsubscribeStop().catch((error: unknown) =>
