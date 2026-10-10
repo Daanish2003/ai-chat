@@ -6,6 +6,7 @@ import {
   ChatView,
   KeySettingsPage,
   NewConversationPage,
+  ProjectPage,
   SharedConversationPage,
   type SharedViewer,
   SharedLinkNotFound as SdkSharedLinkNotFound,
@@ -15,6 +16,10 @@ import { useRouter } from "next/navigation";
 
 export function NewConversation() {
   return <NewConversationPage />;
+}
+
+export function ProjectRoute({ id }: { id: string }) {
+  return <ProjectPage key={id} projectId={id} />;
 }
 
 export function KeySettings() {

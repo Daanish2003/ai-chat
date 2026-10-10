@@ -5,6 +5,7 @@ export { KeySettingsPage } from "./pages/key-settings";
 export { DeleteAllConversationsSection } from "./settings/delete-all-conversations";
 export { ExportDataButton } from "./settings/export-data-button";
 export { NewConversationPage } from "./pages/new-conversation";
+export { ProjectPage } from "./pages/project";
 export {
   SharedConversationPage,
   SharedLinkNotFound,
