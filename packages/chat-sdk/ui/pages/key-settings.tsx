@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
 import { InstructionsField } from "../settings/instructions-field";
+import { SharedLinksSection } from "../settings/shared-links";
 import { TitleModelSelect } from "../settings/title-model-select";
 
 /** Keys & settings: the user's Provider and Tool credentials, the Title Model and the Instructions. */
@@ -73,6 +74,8 @@ export function KeySettingsPage() {
           ))}
         </ul>
       </section>
+
+      <SharedLinksSection />
 
       <InstructionsField />
 

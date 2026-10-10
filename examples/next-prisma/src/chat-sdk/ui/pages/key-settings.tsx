@@ -19,6 +19,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
+import { SharedLinksSection } from "../settings/shared-links";
 import { TitleModelSelect } from "../settings/title-model-select";
 
 /** Keys & settings: the user's Provider and Tool credentials, and the Title Model. */
@@ -72,6 +73,8 @@ export function KeySettingsPage() {
           ))}
         </ul>
       </section>
+
+      <SharedLinksSection />
 
       <TitleModelSelect />
     </main>
