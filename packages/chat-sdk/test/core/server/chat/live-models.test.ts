@@ -107,6 +107,26 @@ describe("openRouterModels", () => {
     expect(model?.reasoning).toEqual({ efforts: [], off: false, defaultEffort: null });
   });
 
+  it("doesn't call the default off when the Model doesn't allow reasoning to be turned off", async () => {
+    const { fetch } = stubFetch(() =>
+      json({
+        data: [
+          {
+            id: "deepseek/deepseek-v4-pro",
+            name: "DeepSeek V4 Pro",
+            architecture: { input_modalities: ["text"] },
+            supported_parameters: ["tools"],
+            reasoning: { supported_efforts: ["high", "none"], default_effort: "none" },
+          },
+        ],
+      }),
+    );
+
+    const [model] = await openRouterModels(fetch);
+
+    expect(model?.reasoning).toEqual({ efforts: [], off: false, defaultEffort: null });
+  });
+
   it("keeps the list instead of asking again within the hour", async () => {
     const { fetch, urls } = stubFetch(() => json(openRouterList));
 

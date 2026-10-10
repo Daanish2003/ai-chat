@@ -82,10 +82,11 @@ function openRouterReasoning(entry: OpenRouterEntry): ReasoningSupport {
     ? (entry.reasoning?.supported_efforts ?? [])
     : [];
   const efforts = effortLevels.filter((level) => listed.includes(level));
+  const off = listed.includes("none");
   const declared = entry.reasoning?.default_effort;
   const defaultEffort =
-    declared === "none" ? "off" : (efforts.find((level) => level === declared) ?? null);
-  return { efforts, off: listed.includes("none"), defaultEffort };
+    declared === "none" && off ? "off" : (efforts.find((level) => level === declared) ?? null);
+  return { efforts, off, defaultEffort };
 }
 
 /**

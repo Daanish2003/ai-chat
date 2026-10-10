@@ -5,7 +5,7 @@ import { modelsDevSnapshot } from "./models-snapshot";
  * The curated Model list: plain data, safe to import into the browser. Every `modelId` must be
  * in its adapter package's `*_MODELS` export (checked in `models.test.ts`). Capability flags
  * follow each package's model metadata. The limits and reasoning efforts come from the reviewed
- * models.dev snapshot (`models-snapshot.ts`, `pnpm -F @ai-chat/chat-sdk snapshot:models`).
+ * models.dev snapshot (`models-snapshot.ts`, `pnpm snapshot:models`).
  */
 
 /** A reasoning effort the chat offers. `off` is separate: see `ReasoningSupport`. */

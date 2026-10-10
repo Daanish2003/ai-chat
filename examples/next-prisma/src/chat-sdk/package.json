@@ -9,7 +9,6 @@
   "scripts": {
     "check-types": "tsc --noEmit",
     "copy": "node scripts/copy.ts",
-    "snapshot:models": "node scripts/models-snapshot.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
