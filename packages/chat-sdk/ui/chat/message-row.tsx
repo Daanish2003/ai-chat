@@ -45,6 +45,7 @@ import { SearchRow } from "./search-row";
 import { replyComponents, ReplySources } from "./source-chips";
 import { UsageInfo } from "./usage-info";
 
+import { useByok } from "../../core/client/react/byok";
 import { useChatAdapter } from "../../core/client/react/provider";
 
 function plainText(message: UIMessage) {
@@ -392,11 +393,12 @@ function waitingForText(parts: UIMessage["parts"]) {
 /** Why the reply ended in `error`, with a way to fix a rejected key. */
 function ErrorMessage({ info }: { info: MessageInfo }) {
   const { Link } = useChatAdapter();
+  const byok = useByok();
   const { text, keySettings } = describeError(info);
   return (
     <SystemMessage variant="error" fill role="alert" className="max-w-[80ch]">
       {text}
-      {keySettings && (
+      {keySettings && byok && (
         <>
           {" "}
           <Link page={{ to: "keys" }} className="font-medium underline underline-offset-2">

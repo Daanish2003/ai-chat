@@ -113,3 +113,11 @@ describe("modelLabel", () => {
     expect(modelLabel("mystery")).toBe("mystery");
   });
 });
+
+describe("missingCredentialsMessage with byok off", () => {
+  it("asks for another Model, never for a key, when the Provider has none", () => {
+    expect(missingCredentialsMessage("openai:gpt-6-luna", available.slice(1, 3), false)).toBe(
+      "Pick another Model",
+    );
+  });
+});

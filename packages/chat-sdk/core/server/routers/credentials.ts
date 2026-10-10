@@ -14,7 +14,13 @@ import { protectedProcedure } from "../procedures";
 export const credentialsRouter = {
   list: protectedProcedure.handler(({ context }) => listCredentials(context.deps, context.user.id)),
 
+  /** Whether the user may bring their own Provider credentials (`byok`, ADR 0007). */
+  mode: protectedProcedure.handler(({ context }) => ({ byok: context.deps.byok })),
+
   save: protectedProcedure.input(saveCredentialsInput).handler(async ({ context, input }) => {
+    if (!context.deps.byok) {
+      throw new ORPCError("FORBIDDEN", { message: "Your own keys are turned off on this app" });
+    }
     const result = await checkCredentials(input.service, input.fields, context.deps.fetch);
     if (result.status === "rejected") {
       throw new ORPCError("BAD_REQUEST", {

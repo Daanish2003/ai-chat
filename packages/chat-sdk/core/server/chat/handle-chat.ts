@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 
 import { attachmentsForSend } from "../attachments/send";
 import { linkAttachments, lockAttachments } from "../attachments/store";
-import { addKeyMessage, tavilyService } from "../../shared/credentials/services";
+import { tavilyService, unusableModelMessage } from "../../shared/credentials/services";
 import { resolveCredentials, resolveModelCall } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import type { ChatUser } from "../context";
@@ -59,7 +59,7 @@ export async function handleChat(
   const model = await resolveModel(deps, userId, command.model);
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const call = await resolveModelCall(deps, userId, model.id);
-  if (!call) return refuse(400, addKeyMessage(model.provider));
+  if (!call) return refuse(400, unusableModelMessage(model.provider, deps.byok));
   // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
   const searchCredentials =
     command.webSearch && model.tools ? await resolveCredentials(deps, userId, tavilyService) : null;

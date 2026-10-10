@@ -138,6 +138,12 @@ Redis holds each Run's chunk log while the Run is live and for an hour after it 
 - A user's own key for a Provider always wins over the Host's. The Model list marks the Models that run on Host credentials.
 - `start()` throws with neither `hostProviders` nor `byok`.
 
+Three modes, chosen by those two options:
+
+- **Host only** (`hostProviders`, `byok: false`): a company Host. Users chat on the Models you offer and never see the keys page or an "add your key" prompt. Saving a credential is rejected with `FORBIDDEN`; listing and deleting the credentials a user already has still work.
+- **User keys only** (no `hostProviders`, `byok: true`): every reply runs on the user's own keys, as before.
+- **Both** (`hostProviders` and `byok: true`, the default): a user's own key wins for its Provider; otherwise the Host's Models answer.
+
 ```ts
 const chat = createChat({
   databaseUrl,
