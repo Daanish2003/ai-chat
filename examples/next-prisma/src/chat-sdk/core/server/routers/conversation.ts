@@ -21,6 +21,7 @@ import {
 } from "../chat/store";
 import { unusableModelMessage } from "../../shared/credentials/services";
 import { resolveModelCall } from "../credentials/resolve";
+import { findProject } from "../project/store";
 import { protectedProcedure } from "../procedures";
 import { uuidv7 } from "../lib/uuidv7";
 
@@ -31,6 +32,8 @@ export const conversationRouter = {
       z.object({
         model: z.string(),
         reasoningEffort: z.enum(reasoningEffort.enumValues).nullish(),
+        /** The Project to create the Conversation in; it must be the caller's. */
+        projectId: z.uuid().nullish(),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -39,29 +42,37 @@ export const conversationRouter = {
           message: `"${input.model}" is not an available Model`,
         });
       }
+      if (input.projectId && !(await findProject(context.deps, context.user.id, input.projectId))) {
+        throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      }
       const id = uuidv7();
       await context.deps.db.insert(conversation).values({
         id,
         userId: context.user.id,
         model: input.model,
         reasoningEffort: input.reasoningEffort ?? null,
+        projectId: input.projectId ?? null,
       });
       return { id };
     }),
 
   /**
-   * One page of the caller's Conversations outside any Project and not pinned, for the Conversation
-   * panel, newest Message first, 50 at a time. Pass the previous page's `nextCursor` for the next one.
+   * One page of the caller's Conversations for the Conversation panel, newest Message first, 50 at
+   * a time: those outside any Project and not pinned, or those in `projectId` (the caller's own
+   * Project). Pass the previous page's `nextCursor` for the next one.
    */
   list: protectedProcedure
-    .input(z.object({ cursor: z.string().optional() }))
-    .handler(({ context, input }) => {
+    .input(z.object({ cursor: z.string().optional(), projectId: z.uuid().optional() }))
+    .handler(async ({ context, input }) => {
       const cursor =
         input.cursor === undefined ? undefined : decodeConversationCursor(input.cursor);
       if (input.cursor !== undefined && !cursor) {
         throw new ORPCError("BAD_REQUEST", { message: "Invalid cursor" });
       }
-      return listConversations(context.deps, context.user.id, cursor);
+      if (input.projectId && !(await findProject(context.deps, context.user.id, input.projectId))) {
+        throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      }
+      return listConversations(context.deps, context.user.id, cursor, input.projectId);
     }),
 
   /** The Conversation with its Active Branch, oldest Message first. */

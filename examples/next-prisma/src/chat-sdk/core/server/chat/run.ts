@@ -2,6 +2,7 @@ import { type StoredPart, storedPartsSchema } from "../../shared/message-parts";
 import { conversation, message } from "../db/schema/chat";
 import {
   type AnyTextAdapter,
+  type ChatMiddleware,
   chat,
   EventType,
   fromSpecTokenUsage,
@@ -15,6 +16,7 @@ import { cancelRunningCalls, createPartsBuilder, searchTextOf } from "../../shar
 import { titleConversation } from "./title";
 import { createHostTools, type HostServerTool, type HostToolContext } from "./host-tools";
 import { createWebSearchTool } from "./web-search-tool";
+import { createFetchUrlTool } from "./fetch-url-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
 import { addUsage, messageUsage, normalizeUsage, promptCharactersOf, type RunUsage } from "./usage";
 import {
@@ -48,10 +50,12 @@ export async function startRun(
     adapter,
     messages,
     webSearch,
+    fetchUrl = false,
     hostTools = [],
     context,
     systemPrompts,
     modelOptions,
+    compaction,
     meter,
     searchMeter,
   }: {
@@ -71,6 +75,8 @@ export async function startRun(
     messages: ModelMessage[];
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
     webSearch?: Credentials;
+    /** Whether this reply offers the `fetch_url` tool, which needs no credential. */
+    fetchUrl?: boolean;
     /** The Host tools this reply offers (none when its Model has no tools). */
     hostTools?: HostServerTool[];
     /** The user and Conversation the Host tools are called for, passed to them as their context. */
@@ -79,6 +85,11 @@ export async function startRun(
     systemPrompts: string[];
     /** The Provider's options for the Run, from `generationOptionsFor` (max output, reasoning). */
     modelOptions?: Record<string, unknown>;
+    /**
+     * Drops the oldest Messages a model call would send past the window (`compactionFor`). Its
+     * context start is saved on the Message when the Run ends.
+     */
+    compaction?: { middleware: ChatMiddleware; contextStartId: () => string | null };
     /** Set on a Run on Host credentials: the Run is recorded in `chat.usage` (ADR 0007). */
     meter?: UsageMeter;
     /** Set when the search runs on the Host's Tavily key: each search is recorded (ADR 0007). */
@@ -160,6 +171,16 @@ export async function startRun(
               }),
             ]
           : []),
+        ...(fetchUrl
+          ? [
+              createFetchUrlTool({
+                fetch: deps.fetch,
+                timeoutMs: deps.limits.fetchTimeoutMs,
+                parts,
+                onChange: () => (changed = true),
+              }),
+            ]
+          : []),
         ...createHostTools(hostTools, { parts, onChange: () => (changed = true) }),
       ];
       const stream = chat({
@@ -170,6 +191,7 @@ export async function startRun(
         ...(tools.length > 0 && { tools }),
         ...(systemPrompts.length > 0 && { systemPrompts }),
         modelOptions,
+        ...(compaction && { middleware: [compaction.middleware] }),
         // A resumed Run continues the thread and the Run that ended waiting (ADR 0008, spike #154).
         ...(resume && {
           threadId: resume.threadId,
@@ -247,7 +269,13 @@ export async function startRun(
           parts: parts.parts().parts,
         },
       );
-      await write(withParts({ ...ending, usage }));
+      await write(
+        withParts({
+          ...ending,
+          usage,
+          ...(compaction && { contextStartId: compaction.contextStartId() }),
+        }),
+      );
       // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
       if (meter) {
         await recordHostUsage(

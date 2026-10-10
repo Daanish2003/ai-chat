@@ -71,7 +71,7 @@ export async function decideApproval(
   if (attachments.error) return "unavailable";
   const hostTools = model.tools ? deps.tools : [];
   const { instructions } = await loadSettings(deps, userId);
-  const systemPrompts = systemPromptsFor({ webSearch: false, instructions });
+  const systemPrompts = systemPromptsFor({ web: false, instructions });
   const messages = toModelMessages(
     history.map((row) => ({
       role: row.role,
