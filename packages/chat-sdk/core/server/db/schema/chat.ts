@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { type AnyPgColumn, index, jsonb, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 import type { StoredParts } from "../../../shared/message-parts";
@@ -21,6 +22,28 @@ export type MessageUsage = {
   estimated: boolean;
 };
 
+/** A Project: a named group of one user's Conversations, with Instructions and a default Model. */
+export const project = chatSchema.table(
+  "project",
+  {
+    /** uuidv7, generated in app code. */
+    id: uuid("id").primaryKey(),
+    /** The Host's user id. Like a Conversation's, it has no foreign key to the user. */
+    userId: text("user_id").notNull(),
+    name: text("name").notNull(),
+    /** The Project's Instructions; null when it has none. */
+    instructions: text("instructions"),
+    /** The default Model, `"provider:model"`; null when it has none. */
+    defaultModel: text("default_model"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => /* @__PURE__ */ new Date())
+      .notNull(),
+  },
+  (table) => [index("project_user_id_idx").on(table.userId)],
+);
+
 /** A Conversation, owned by one user. Its Messages form a tree (ADR 0001). */
 export const conversation = chatSchema.table(
   "conversation",
@@ -38,6 +61,10 @@ export const conversation = chatSchema.table(
     activeLeafId: uuid("active_leaf_id").references((): AnyPgColumn => message.id, {
       onDelete: "set null",
     }),
+    /** The Project this Conversation is in; null when it is in none. Deleting it deletes this. */
+    projectId: uuid("project_id").references(() => project.id, { onDelete: "cascade" }),
+    /** When the Conversation was pinned; null when it is not pinned. */
+    pinnedAt: timestamp("pinned_at"),
     /** Bumped only by new Messages, never by renames or Branch switches. */
     lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -48,6 +75,19 @@ export const conversation = chatSchema.table(
   },
   (table) => [
     index("conversation_user_id_last_message_at_idx").on(table.userId, table.lastMessageAt.desc()),
+    // The main list: a user's Conversations that are in no Project, newest first.
+    index("conversation_unprojected_user_id_last_message_at_idx")
+      .on(table.userId, table.lastMessageAt.desc())
+      .where(sql`project_id is null`),
+    // A Project's list, newest first.
+    index("conversation_project_id_last_message_at_idx").on(
+      table.projectId,
+      table.lastMessageAt.desc(),
+    ),
+    // The Pinned section: a user's pinned Conversations, most recently pinned first.
+    index("conversation_pinned_user_id_pinned_at_idx")
+      .on(table.userId, table.pinnedAt.desc())
+      .where(sql`pinned_at is not null`),
     index("conversation_title_trgm_idx").using("gin", table.title.op("public.gin_trgm_ops")),
   ],
 );

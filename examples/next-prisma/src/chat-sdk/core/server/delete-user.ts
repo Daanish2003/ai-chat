@@ -2,7 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { stopRun } from "./chat/run";
 import { attachment, attachmentBlob } from "./db/schema/attachment";
-import { conversation, message } from "./db/schema/chat";
+import { conversation, message, project } from "./db/schema/chat";
 import { userCredentials } from "./db/schema/credentials";
 import { userSettings } from "./db/schema/settings";
 import type { AppDeps } from "./deps";
@@ -27,6 +27,11 @@ export async function deleteUserData(deps: AppDeps, userId: string): Promise<voi
 
     // 2. Conversations, which cascade to their Messages, Shared links and Message–Attachment links.
     await tx.delete(conversation).where(eq(conversation.userId, userId));
+
+    // 2b. Projects, after their Conversations; a Project's own Conversations are already gone.
+    await tx.delete(project).where(eq(project.userId, userId));
+
+    // 2b. Projects, after their Conversations; a Project's own Conversations are already gone.
 
     // 3. Attachments and their bytes. The bytes live in Postgres, so they go with their rows. There
     // is no external blob store yet: an external one would delete its objects here, best-effort,
