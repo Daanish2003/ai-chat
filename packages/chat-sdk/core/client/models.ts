@@ -53,3 +53,25 @@ export function missingCredentialsMessage(
 export function modelLabel(id: string) {
   return findModel(id)?.label ?? parseModelId(id)?.modelId ?? id;
 }
+
+/**
+ * The Model a new Conversation starts on: the one the user picked, else the Project's default when
+ * `models.list` still offers it, else `models.list`'s default.
+ */
+export function newConversationModel({
+  picked,
+  projectModel,
+  available,
+  listDefault,
+}: {
+  picked?: string;
+  /** The Project's default Model, or null when it has none. */
+  projectModel: string | null;
+  /** The ids `models.list` offers. */
+  available: string[];
+  listDefault: string | null;
+}): string | undefined {
+  if (picked) return picked;
+  if (projectModel && available.includes(projectModel)) return projectModel;
+  return listDefault ?? undefined;
+}

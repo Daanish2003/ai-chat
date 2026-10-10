@@ -8,6 +8,8 @@ import { uuidv7 } from "../../../../core/server/lib/uuidv7";
 import { insertConversation } from "../../../support/conversations";
 import { insertUser } from "../../../support/users";
 import { chatRpc } from "../../../support/sdk";
+import { createTestDeps } from "../../../support/deps";
+import { saveCredentials } from "../../../../core/server/credentials/store";
 
 async function signedIn() {
   const user = await insertUser();
@@ -20,7 +22,11 @@ describe("project.create", () => {
 
     const { id } = await client.project.create({ name: "  Thesis  " });
 
-    await expect(client.project.get({ id })).resolves.toEqual({ id, name: "Thesis" });
+    await expect(client.project.get({ id })).resolves.toEqual({
+      id,
+      name: "Thesis",
+      defaultModel: null,
+    });
   });
 
   it("refuses a blank name and a name longer than 100 characters", async () => {
@@ -65,6 +71,114 @@ describe("project.create", () => {
 
   it("rejects signed-out callers", async () => {
     await expect(chatRpc({}).project.create({ name: "Nope" })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+  });
+});
+
+describe("project.update", () => {
+  async function withOpenAiCredentials() {
+    const { user, client } = await signedIn();
+    await saveCredentials(createTestDeps(), user.id, {
+      service: "openai",
+      fields: { apiKey: "openai-test-key" },
+      hint: "…-key",
+      verified: true,
+    });
+    return { user, client };
+  }
+
+  it("renames the Project, sets its default Model, and clears the Model with null", async () => {
+    const { client } = await withOpenAiCredentials();
+    const { id } = await client.project.create({ name: "Thesis" });
+
+    await client.project.update({ id, name: "Thesis v2", defaultModel: "openai:gpt-5.6" });
+    await expect(client.project.get({ id })).resolves.toEqual({
+      id,
+      name: "Thesis v2",
+      defaultModel: "openai:gpt-5.6",
+    });
+
+    await client.project.update({ id, name: "Thesis v2", defaultModel: null });
+    await expect(client.project.get({ id })).resolves.toMatchObject({ defaultModel: null });
+  });
+
+  it("keeps the default Model when the input leaves it out", async () => {
+    const { client } = await withOpenAiCredentials();
+    const { id } = await client.project.create({ name: "Thesis" });
+    await client.project.update({ id, name: "Thesis", defaultModel: "openai:gpt-5.6" });
+
+    await client.project.update({ id, name: "Renamed" });
+
+    await expect(client.project.get({ id })).resolves.toEqual({
+      id,
+      name: "Renamed",
+      defaultModel: "openai:gpt-5.6",
+    });
+  });
+
+  it("refuses a default Model that isn't available", async () => {
+    const { client } = await withOpenAiCredentials();
+    const { id } = await client.project.create({ name: "Thesis" });
+
+    await expect(
+      client.project.update({ id, name: "Thesis", defaultModel: "openai:gpt-2" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(client.project.get({ id })).resolves.toMatchObject({ defaultModel: null });
+  });
+
+  it("refuses a default Model whose Provider the user has no credentials for", async () => {
+    const { client } = await signedIn();
+    const { id } = await client.project.create({ name: "Thesis" });
+
+    await expect(
+      client.project.update({ id, name: "Thesis", defaultModel: "openai:gpt-5.6" }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("refuses a blank name", async () => {
+    const { client } = await signedIn();
+    const { id } = await client.project.create({ name: "Thesis" });
+
+    await expect(client.project.update({ id, name: "   " })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("answers NOT_FOUND for another user's Project", async () => {
+    const other = await insertUser();
+    const { id } = await chatRpc({ user: other }).project.create({ name: "Theirs" });
+    const { client } = await signedIn();
+
+    await expect(client.project.update({ id, name: "Mine now" })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    await expect(chatRpc({ user: other }).project.get({ id })).resolves.toMatchObject({
+      name: "Theirs",
+    });
+  });
+
+  it("still renames a Project whose stored default Model is no longer available", async () => {
+    const { user, client } = await signedIn();
+    const id = uuidv7();
+    await getTestDb()
+      .insert(project)
+      .values({ id, userId: user.id, name: "Old", defaultModel: "openai:gpt-2" });
+
+    await client.project.update({ id, name: "New name" });
+
+    await expect(client.project.get({ id })).resolves.toEqual({
+      id,
+      name: "New name",
+      defaultModel: "openai:gpt-2",
+    });
+  });
+
+  it("rejects signed-out callers", async () => {
+    const other = await insertUser();
+    const { id } = await chatRpc({ user: other }).project.create({ name: "Theirs" });
+
+    await expect(chatRpc({}).project.update({ id, name: "Nope" })).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
   });
