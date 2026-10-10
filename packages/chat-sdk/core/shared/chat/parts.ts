@@ -3,6 +3,7 @@ import {
   type StoredParts,
   storedParts,
   storedPartsSchema,
+  type ToolCallPart,
   type WebSearchPart,
 } from "../message-parts";
 import {
@@ -83,6 +84,11 @@ export function createPartsBuilder() {
       (part): part is WebSearchPart =>
         part.type === "web_search" && part.toolCallId === toolCallId && part.state === "running",
     );
+  const runningCall = (toolCallId: string) =>
+    parts.find(
+      (part): part is ToolCallPart =>
+        part.type === "tool_call" && part.toolCallId === toolCallId && part.state === "running",
+    );
 
   return {
     add(chunk: StreamChunk) {
@@ -122,9 +128,22 @@ export function createPartsBuilder() {
         part.errorReason = outcome.errorReason;
       }
     },
-    cancelRunningSearches() {
+    /** Starts a tool call other than `web_search`, as the tool is about to run. */
+    startToolCall({ toolCallId, name, source, args }: StartToolCall) {
+      parts.push({ type: "tool_call", toolCallId, name, source, args, state: "running" });
+    },
+    /** Ends a running tool call with its result. A call cancelled meanwhile stays cancelled. */
+    finishToolCall(toolCallId: string, { state, result }: FinishToolCall) {
+      const part = runningCall(toolCallId);
+      if (!part) return;
+      part.state = state;
+      part.result = result;
+    },
+    cancelRunningCalls() {
       for (const part of parts) {
-        if (part.type === "web_search" && part.state === "running") part.state = "cancelled";
+        if ((part.type === "web_search" || part.type === "tool_call") && part.state === "running") {
+          part.state = "cancelled";
+        }
       }
     },
     /** A copy of the parts so far. */
@@ -134,11 +153,16 @@ export function createPartsBuilder() {
   };
 }
 
-/** The parts with every `running` search closed as `cancelled`, for a run that ended. */
-export function cancelRunningSearches(parts: StoredParts): StoredParts {
+/** A tool call as it starts: what the Model asked for, before the tool has run. */
+export type StartToolCall = Pick<ToolCallPart, "name" | "source" | "args"> & { toolCallId: string };
+/** How a tool call ended: `done` with its result, or `error` with `{ error }`. */
+export type FinishToolCall = { state: "done" | "error"; result: unknown };
+
+/** The parts with every `running` search and tool call closed as `cancelled`, for a run that ended. */
+export function cancelRunningCalls(parts: StoredParts): StoredParts {
   return storedParts(
     parts.parts.map((part) =>
-      part.type === "web_search" && part.state === "running"
+      (part.type === "web_search" || part.type === "tool_call") && part.state === "running"
         ? { ...part, state: "cancelled" }
         : part,
     ),
@@ -152,7 +176,8 @@ function textOf(parts: StoredParts, separator: string) {
     .join(separator);
 }
 
-const finished = (part: WebSearchPart) => part.state === "done" || part.state === "error";
+const finished = (part: WebSearchPart | ToolCallPart) =>
+  part.state === "done" || part.state === "error";
 
 /** What the Model read as the result of a finished search. */
 function searchOutput(part: WebSearchPart): WebSearchOutput {
@@ -172,47 +197,84 @@ function searchPlaceholder(part: WebSearchPart) {
   return `[Searched the web for "${part.query}": ${found}]`;
 }
 
-/** A Message as the Model sees it when the `web_search` tool is offered: searches as tool calls. */
-function withToolCalls({ role, parts }: StoredMessage): ModelMessage[] {
+/** A finished tool call as text, for a request that doesn't offer its tool. */
+function toolCallPlaceholder(part: ToolCallPart) {
+  return `[Called "${part.name}" with ${JSON.stringify(part.args)}: ${JSON.stringify(part.result ?? null)}]`;
+}
+
+/** A finished search or tool call as text, for a request that doesn't offer its tool. */
+function placeholderOf(part: WebSearchPart | ToolCallPart) {
+  return part.type === "web_search" ? searchPlaceholder(part) : toolCallPlaceholder(part);
+}
+
+/** The tools a request offers: a finished search or tool call of a kind not offered is text. */
+type OfferedTools = { webSearch: boolean; hostTools: boolean };
+
+/** A finished call a request offers its tool for, as the Model replays it. */
+const offeredCall = (part: WebSearchPart | ToolCallPart, offered: OfferedTools) =>
+  part.type === "web_search" ? offered.webSearch : offered.hostTools;
+
+/**
+ * A Message as the Model sees it when some tools are offered: finished searches and tool calls
+ * of an offered tool as tool calls, the rest as text placeholders. A call without a result
+ * (running, cancelled) is an unmatched tool call, and is left out.
+ */
+function withToolCalls({ role, parts }: StoredMessage, offered: OfferedTools): ModelMessage[] {
   const messages: ModelMessage[] = [];
   let content = "";
-  let searches: WebSearchPart[] = [];
+  // A placeholder is followed by a paragraph break before any text that comes after it.
+  let breakBeforeText = false;
+  let calls: (WebSearchPart | ToolCallPart)[] = [];
   const flush = () => {
-    if (searches.length > 0) {
-      const toolCalls: ToolCall[] = searches.map((search) => ({
-        id: search.toolCallId,
+    if (calls.length > 0) {
+      const toolCalls: ToolCall[] = calls.map((call) => ({
+        id: call.toolCallId,
         type: "function",
-        function: { name: webSearchToolName, arguments: JSON.stringify({ query: search.query }) },
+        function:
+          call.type === "web_search"
+            ? { name: webSearchToolName, arguments: JSON.stringify({ query: call.query }) }
+            : { name: call.name, arguments: JSON.stringify(call.args) },
       }));
       messages.push({ role, content: content || null, toolCalls });
-      for (const search of searches) {
+      for (const call of calls) {
         messages.push({
           role: "tool",
-          toolCallId: search.toolCallId,
-          content: JSON.stringify(searchOutput(search)),
+          toolCallId: call.toolCallId,
+          content: JSON.stringify(
+            call.type === "web_search" ? searchOutput(call) : (call.result ?? null),
+          ),
         });
       }
     } else if (content) {
       messages.push({ role, content });
     }
     content = "";
-    searches = [];
+    breakBeforeText = false;
+    calls = [];
   };
 
   for (const part of parts.parts) {
     if (part.type === "text") {
-      if (searches.length > 0) flush();
+      if (calls.length > 0) flush();
+      if (breakBeforeText) content += "\n\n";
+      breakBeforeText = false;
       content += part.text;
-    } else if (part.type === "web_search" && finished(part)) {
-      // A search without a result (running, cancelled) is an unmatched tool call: left out.
-      searches.push(part);
+    } else if ((part.type === "web_search" || part.type === "tool_call") && finished(part)) {
+      if (offeredCall(part, offered)) {
+        calls.push(part);
+      } else {
+        if (calls.length > 0) flush();
+        if (content) content += "\n\n";
+        content += placeholderOf(part);
+        breakBeforeText = true;
+      }
     }
   }
   flush();
   return messages;
 }
 
-/** A Message as the Model sees it without the `web_search` tool: searches as text placeholders. */
+/** A Message as the Model sees it when no tool is offered: searches and tool calls as text placeholders. */
 function withPlaceholders({ role, parts }: StoredMessage): ModelMessage[] {
   const pieces: string[] = [];
   let lastWasText = false;
@@ -221,8 +283,8 @@ function withPlaceholders({ role, parts }: StoredMessage): ModelMessage[] {
       if (lastWasText) pieces[pieces.length - 1] += part.text;
       else pieces.push(part.text);
       lastWasText = true;
-    } else if (part.type === "web_search" && finished(part)) {
-      pieces.push(searchPlaceholder(part));
+    } else if ((part.type === "web_search" || part.type === "tool_call") && finished(part)) {
+      pieces.push(placeholderOf(part));
       lastWasText = false;
     }
   }
@@ -233,25 +295,31 @@ function withPlaceholders({ role, parts }: StoredMessage): ModelMessage[] {
 /**
  * Provider history for `provider`, oldest first. Messages without any text are left out.
  * Thinking goes back only to the Provider that wrote it (on the Message's first turn); another
- * Provider can't read it. Stored searches replay as `web_search` tool calls when this request
- * offers the tool (`webSearch`), else as short text placeholders (a Model without tools, or
- * Search off). Stored history is never rewritten.
+ * Provider can't read it. Stored searches and tool calls replay as tool calls when this request
+ * offers their tool (`webSearch`, `hostTools`), else as short text placeholders. Stored history is
+ * never rewritten.
  */
 export function toModelMessages(
   history: StoredMessage[],
   {
     provider,
     webSearch = false,
+    hostTools = false,
     reads = { images: false, pdfs: false },
   }: {
     provider?: string;
     webSearch?: boolean;
+    /** Whether this request offers the Host's tools. */
+    hostTools?: boolean;
     /** Attachments the Model can't read become text placeholders. */
     reads?: ModelReads;
   } = {},
 ): ModelMessage[] {
   return history.flatMap((stored) => {
-    const messages = webSearch ? withToolCalls(stored) : withPlaceholders(stored);
+    const messages =
+      webSearch || hostTools
+        ? withToolCalls(stored, { webSearch, hostTools })
+        : withPlaceholders(stored);
     const [first] = messages;
     if (!first) return [];
     const { parts, model, attachments = [] } = stored;
@@ -311,6 +379,7 @@ export function toUIParts(parts: StoredParts): MessagePart[] {
     if (part.type === "text") return { type: "text", content: part.text };
     // The signature is only for the Provider; the client never needs it.
     if (part.type === "thinking") return { type: "thinking", content: part.text };
+    if (part.type === "tool_call") return toolCallUIPart(part);
     const input = { query: part.query };
     return {
       type: "tool-call",
@@ -328,6 +397,24 @@ export function toUIParts(parts: StoredParts): MessagePart[] {
       ...(finished(part) && { output: searchOutput(part) }),
     };
   });
+}
+
+/**
+ * A stored tool call other than `web_search`, as `useChat` shows it. Its source and stored status
+ * ride in `metadata`, so a Shared link can tell which calls to redact and the row can show a cancel.
+ */
+function toolCallUIPart(part: ToolCallPart): MessagePart {
+  return {
+    type: "tool-call",
+    id: part.toolCallId,
+    name: part.name,
+    arguments: JSON.stringify(part.args),
+    input: part.args,
+    state:
+      part.state === "running" ? "input-complete" : part.state === "done" ? "complete" : "error",
+    ...(finished(part) && { output: part.result }),
+    metadata: { source: part.source, status: part.state },
+  };
 }
 
 /** The plain text `message.searchText` holds: the text parts only. */

@@ -11,8 +11,9 @@ import {
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
-import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
+import { cancelRunningCalls, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
 import { titleConversation } from "./title";
+import { createHostTools, type HostServerTool, type HostToolContext } from "./host-tools";
 import { createWebSearchTool } from "./web-search-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
 import { addUsage, messageUsage, normalizeUsage, promptCharactersOf, type RunUsage } from "./usage";
@@ -44,6 +45,8 @@ export async function startRun(
     adapter,
     messages,
     webSearch,
+    hostTools = [],
+    context,
     systemPrompts,
     modelOptions,
     meter,
@@ -56,6 +59,10 @@ export async function startRun(
     messages: ModelMessage[];
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
     webSearch?: Credentials;
+    /** The Host tools this reply offers (none when its Model has no tools). */
+    hostTools?: HostServerTool[];
+    /** The user and Conversation the Host tools are called for, passed to them as their context. */
+    context: HostToolContext;
     /** The reply's system prompts, from `systemPromptsFor` when the Run starts. */
     systemPrompts: string[];
     /** The Provider's options for the Run, from `generationOptionsFor` (max output, reasoning). */
@@ -121,25 +128,31 @@ export async function startRun(
   void (async () => {
     let error: ProviderError | undefined;
     try {
-      const tools = webSearch && [
-        createWebSearchTool({
-          searchClient: deps.searchClient,
-          credentials: webSearch,
-          parts,
-          onChange: () => (changed = true),
-          recordSearch: searchMeter
-            ? () =>
-                recordSearchUsage(deps, searchMeter).catch((caught: unknown) =>
-                  console.error(`Recording a search of ${messageId} failed`, caught),
-                )
-            : undefined,
-        }),
+      const tools = [
+        ...(webSearch
+          ? [
+              createWebSearchTool({
+                searchClient: deps.searchClient,
+                credentials: webSearch,
+                parts,
+                onChange: () => (changed = true),
+                recordSearch: searchMeter
+                  ? () =>
+                      recordSearchUsage(deps, searchMeter).catch((caught: unknown) =>
+                        console.error(`Recording a search of ${messageId} failed`, caught),
+                      )
+                  : undefined,
+              }),
+            ]
+          : []),
+        ...createHostTools(hostTools, { parts, onChange: () => (changed = true) }),
       ];
       const stream = chat({
         adapter,
         messages,
         abortController,
-        ...(tools && { tools }),
+        context,
+        ...(tools.length > 0 && { tools }),
         ...(systemPrompts.length > 0 && { systemPrompts }),
         modelOptions,
       });
@@ -171,7 +184,7 @@ export async function startRun(
     } finally {
       clearInterval(snapshotTimer);
       clearTimeout(capTimer);
-      parts.cancelRunningSearches();
+      parts.cancelRunningCalls();
       const interrupted = abortController.signal.reason === shutdownAbort;
       const ending: MessageUpdate = timedOut
         ? { status: "error", error: "timed out" }
@@ -353,7 +366,7 @@ async function endOrphanedRun(deps: AppDeps, messageId: string, db: Executor) {
     .update(message)
     .set({
       status: "stopped",
-      ...(parsed.success && { parts: cancelRunningSearches(parsed.data) }),
+      ...(parsed.success && { parts: cancelRunningCalls(parsed.data) }),
     })
     .where(and(eq(message.id, messageId), eq(message.status, "streaming")))
     .returning({ id: message.id });
@@ -391,15 +404,18 @@ export async function reapStaleRuns(deps: AppDeps, now = new Date()) {
     )
     .returning({ id: message.id, parts: message.parts });
   for (const row of reaped) {
-    // A row that doesn't parse holds no running search, and mustn't stop the reaper.
+    // A row that doesn't parse holds no running call, and mustn't stop the reaper.
     const parsed = storedPartsSchema.safeParse(row.parts);
     if (
       parsed.success &&
-      parsed.data.parts.some((part) => part.type === "web_search" && part.state === "running")
+      parsed.data.parts.some(
+        (part) =>
+          (part.type === "web_search" || part.type === "tool_call") && part.state === "running",
+      )
     ) {
       await deps.db
         .update(message)
-        .set({ parts: cancelRunningSearches(parsed.data) })
+        .set({ parts: cancelRunningCalls(parsed.data) })
         .where(eq(message.id, row.id));
     }
     const ids = { threadId: row.id, runId: row.id };

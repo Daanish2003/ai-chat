@@ -4,6 +4,7 @@ import type { AnyTextAdapter } from "@tanstack/ai";
 import { adapterFor } from "./chat/adapters";
 import type { CounterStore } from "./chat/counters";
 import type { PubSub } from "./chat/pubsub";
+import type { HostServerTool } from "./chat/host-tools";
 import type { RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
 import { createGuardedFetch } from "./lib/guarded-fetch";
@@ -112,6 +113,8 @@ export type AppDeps = {
   /** A user's Quota on Host credentials, `null` when unlimited (ADR 0007). */
   getQuota: (userId: string) => Promise<Quota | null>;
   searchClient: SearchClient;
+  /** The Host's own tools, offered to every reply whose Model has tools (`createChat({ tools })`). */
+  tools: HostServerTool[];
   /** Every Run's chunk log, which its POST response and any joiner read (ADR 0006). */
   runStreams: RunStreams;
   /** Control signals such as Stop, which a Run's owner subscribes to (ADR 0006). */
@@ -149,6 +152,7 @@ export function createAppDeps({
   byok,
   getQuota,
   rateLimits,
+  tools,
 }: {
   db: Database;
   keyEncryptionSecrets: string[];
@@ -158,6 +162,7 @@ export function createAppDeps({
   byok: boolean;
   getQuota: AppDeps["getQuota"];
   rateLimits: ResolvedRateLimits;
+  tools: HostServerTool[];
 }): AppDeps {
   return {
     db,
@@ -167,6 +172,7 @@ export function createAppDeps({
     byok,
     getQuota,
     searchClient: createTavilyClient(globalThis.fetch),
+    tools,
     runStreams: runtime.runStreams,
     pubsub: runtime.pubsub,
     counters: runtime.counters,

@@ -2,6 +2,8 @@ import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 
 import { handleChat } from "./chat/handle-chat";
+import type { HostServerTool } from "./chat/host-tools";
+import { webSearchToolName } from "../shared/chat/web-search";
 import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
@@ -58,6 +60,12 @@ export type CreateChatOptions = {
    * unlimited (ADR 0007).
    */
   getQuota?: QuotaSetting;
+  /**
+   * The Host's own tools, written with TanStack AI's `toolDefinition(...).server(fn)`. The Model
+   * can call them in any reply whose Model has tools; each call runs on this server. Their names
+   * must not be `web_search`, the SDK's own search tool.
+   */
+  tools?: HostServerTool[];
 };
 
 /**
@@ -139,6 +147,11 @@ export function createChat(options: CreateChatOptions): {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
   }
+  if (options.tools?.some((tool) => tool.name === webSearchToolName)) {
+    throw new Error(
+      `A Host tool can't be named "${webSearchToolName}": the SDK's search tool has it`,
+    );
+  }
   let deps: AppDeps | undefined;
   const getDeps = () => {
     deps ??= createAppDeps({
@@ -150,6 +163,7 @@ export function createChat(options: CreateChatOptions): {
       byok: options.byok ?? true,
       getQuota: quotaLookup(options.getQuota),
       rateLimits: resolveRateLimits(options.rateLimits),
+      tools: options.tools ?? [],
     });
     return deps;
   };

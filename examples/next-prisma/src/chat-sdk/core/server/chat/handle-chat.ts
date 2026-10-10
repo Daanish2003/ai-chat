@@ -82,6 +82,8 @@ export async function handleChat(
   // user's own, else the Host's (ADR 0007).
   const searchCall =
     command.webSearch && model.tools ? await resolveToolCall(deps, userId, tavilyService) : null;
+  // The Host's tools are offered to a Model that has tools (`createChat({ tools })`).
+  const hostTools = model.tools ? deps.tools : [];
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({
@@ -126,6 +128,7 @@ export async function handleChat(
     {
       provider: model.provider,
       webSearch: searchCall !== null,
+      hostTools: hostTools.length > 0,
       reads: { images: model.images, pdfs: model.pdfs },
     },
   );
@@ -196,6 +199,8 @@ export async function handleChat(
     adapter,
     messages,
     webSearch: searchCall?.credentials,
+    hostTools,
+    context: { userId, conversationId: owned.id },
     systemPrompts,
     modelOptions: generationOptionsFor(model.id, { maxOutputTokens: model.maxOutputTokens }),
     // A Run on Host credentials is recorded against the user's Quota (ADR 0007).

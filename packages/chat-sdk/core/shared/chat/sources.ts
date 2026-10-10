@@ -1,6 +1,7 @@
 import type { WebSearchPart } from "../message-parts";
 import type { MessagePart } from "@tanstack/ai";
 
+import { toolCallOf, type ToolCallView } from "./tool-call";
 import { webSearchOf } from "./web-search";
 
 /**
@@ -11,10 +12,14 @@ import { webSearchOf } from "./web-search";
 /** One web page a reply's searches returned, numbered per Message. */
 export type Source = { number: number; url: string; title: string; snippet: string };
 
-/** A reply's parts as shown, in stream order: text, or a row of back-to-back searches. */
+/**
+ * A reply's parts as shown, in stream order: text, a row of back-to-back searches, or one tool call
+ * other than a search, with its own row.
+ */
 export type ReplySegment =
   | { type: "text"; key: string; content: string }
-  | { type: "searches"; key: string; searches: WebSearchPart[] };
+  | { type: "searches"; key: string; searches: WebSearchPart[] }
+  | { type: "tool"; key: string; call: ToolCallView };
 
 /**
  * The key two URLs share when they are the same Source: the URL without its fragment or a
@@ -66,7 +71,12 @@ export function replySegments(parts: MessagePart[]): ReplySegment[] {
       return;
     }
     const search = webSearchOf(part);
-    if (!search) return;
+    if (!search) {
+      // A search that never ran (over the limit) shows nothing; any other tool call gets a row.
+      const call = toolCallOf(part);
+      if (call) segments.push({ type: "tool", key: `tool-${index}`, call });
+      return;
+    }
     const last = segments.at(-1);
     if (last?.type === "searches") last.searches.push(search);
     else segments.push({ type: "searches", key: search.toolCallId, searches: [search] });
