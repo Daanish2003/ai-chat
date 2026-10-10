@@ -147,6 +147,8 @@ function ChatThread({
     messages.length > 0 &&
     messageInfo(messages[messages.length - 1]!).status === "awaiting_approval";
   const decide = async (messageId: string, approved: boolean) => {
+    // A second click while the first decision is in flight would be refused as stale.
+    if (decideCall.isPending) return;
     try {
       await decideCall.mutateAsync({ messageId, approved });
     } catch (caught) {

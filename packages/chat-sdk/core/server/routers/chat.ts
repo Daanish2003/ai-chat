@@ -13,11 +13,18 @@ const refusals: Record<Exclude<DecideResult, "started" | "not_found">, string> =
   quota: "You've used this window's Quota",
 };
 
+/** Throws the error a decision that didn't start a Run is refused with. */
+function refuseDecision(result: DecideResult): void {
+  if (result === "started") return;
+  if (result === "not_found") throw new ORPCError("NOT_FOUND", { message: "Message not found" });
+  throw new ORPCError("CONFLICT", { message: refusals[result] });
+}
+
 export const chatRouter = {
   /**
    * Stops the run writing a streaming assistant Message (ADR 0002). The run saves it `stopped`
    * and the client just sees its stream close. A Message that already ended is left alone. Stop on
-   * a Message waiting for Approval counts as a denial (ADR 0008).
+   * a Message waiting for Approval counts as a denial (ADR 0008), and a refused denial is an error.
    */
   stop: protectedProcedure
     .input(z.object({ messageId: z.uuid() }))
@@ -25,7 +32,7 @@ export const chatRouter = {
       const owned = await findMessage(context.deps, context.user.id, input.messageId);
       if (!owned) throw new ORPCError("NOT_FOUND", { message: "Message not found" });
       if (owned.status === "awaiting_approval") {
-        await decideApproval(context.deps, context.user.id, owned.id, false);
+        refuseDecision(await decideApproval(context.deps, context.user.id, owned.id, false));
         return;
       }
       await stopRun(context.deps, owned.id);
@@ -37,14 +44,8 @@ export const chatRouter = {
   decide: protectedProcedure
     .input(z.object({ messageId: z.uuid(), approved: z.boolean() }))
     .handler(async ({ context, input }) => {
-      const result = await decideApproval(
-        context.deps,
-        context.user.id,
-        input.messageId,
-        input.approved,
+      refuseDecision(
+        await decideApproval(context.deps, context.user.id, input.messageId, input.approved),
       );
-      if (result === "not_found")
-        throw new ORPCError("NOT_FOUND", { message: "Message not found" });
-      if (result !== "started") throw new ORPCError("CONFLICT", { message: refusals[result] });
     }),
 };

@@ -293,6 +293,33 @@ describe("a Host tool that needs Approval", () => {
     expect(response.status).toBe(409);
   });
 
+  it("Stop on a waiting reply counts as a denial: the tool never runs and the reply completes", async () => {
+    const runs: Runs = [];
+    const { user, deps, conv, fake, send } = await setup({
+      rounds: [round(mailCall("call-1")), round(text("Stopped."))],
+      runs,
+    });
+    await (await send()).text();
+    const reply = await replyOf(deps, conv.id);
+
+    await chatRpc({ user, deps }).chat.stop({ messageId: reply.id });
+    await join(reply.id, user, deps);
+
+    expect(runs).toEqual([]);
+    expect(fake.calls[1]!.messages.at(-1)).toMatchObject({
+      role: "tool",
+      toolCallId: "call-1",
+      content: expect.stringContaining("declined"),
+    });
+    expect(await replyOf(deps, conv.id)).toMatchObject({
+      status: "complete",
+      parts: storedParts([
+        expect.objectContaining({ toolCallId: "call-1", state: "denied" }),
+        { type: "text", text: "Stopped." },
+      ]),
+    });
+  });
+
   it("a resumed Run can be stopped, and a stop ends it as stopped", async () => {
     const { user, deps, conv, fake, send, decide } = await setup({
       rounds: [round(mailCall("call-1")), round(text("Sent."))],
