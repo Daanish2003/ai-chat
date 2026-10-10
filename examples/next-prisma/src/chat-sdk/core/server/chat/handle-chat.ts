@@ -19,6 +19,7 @@ import { startRun } from "./run";
 import { allowTools } from "./host-tools";
 import { mcpToolsFor } from "../mcp/tools";
 import { findConversation, loadPath } from "./store";
+import { projectInstructionsOf } from "../project/store";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 import { quotaExceededCode, quotaRefusal } from "./quota";
@@ -95,9 +96,11 @@ export async function handleChat(
   const hostTools = model.tools ? allowTools(deps.tools, toolSettings.allowedTools) : [];
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
+  // The Project's Instructions are read from the Conversation's Project at the same moment (spec 5).
   const systemPrompts = systemPromptsFor({
     web,
     instructions,
+    projectInstructions: await projectInstructionsOf(deps, owned.projectId),
   });
 
   const history = await loadPath(deps, owned.id, command.parentId);

@@ -18,6 +18,16 @@ export async function findProject(deps: Deps, userId: string, id: string) {
   return row;
 }
 
+/** The Project's Instructions, or `null` when it has none or `projectId` is `null` (no Project). */
+export async function projectInstructionsOf(deps: Deps, projectId: string | null) {
+  if (!projectId) return null;
+  const [row] = await deps.db
+    .select({ instructions: project.instructions })
+    .from(project)
+    .where(eq(project.id, projectId));
+  return row?.instructions ?? null;
+}
+
 /** How many Projects the user has. */
 export async function countProjects(deps: Deps, userId: string) {
   const [row] = await deps.db

@@ -1,4 +1,5 @@
 import { modelGroups, modelLabel } from "../../core/client/models";
+import { instructionsMaxChars } from "../../core/shared/chat/instructions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -21,19 +24,23 @@ import { useOrpc } from "../../core/client/react/provider";
 const noModel = "none";
 
 /**
- * Edits a Project's name and default Model. The default Model is sent only when the user changes
- * it, so a stored Model that is no longer available doesn't block a rename.
+ * Edits a Project's name, Instructions and default Model. The default Model and the Instructions
+ * are sent only when the user changes them, so a stored Model that is no longer available doesn't
+ * block a rename.
  */
 export function EditProjectForm({
   projectId,
   name,
   defaultModel,
+  instructions,
   onDone,
 }: {
   projectId: string;
   name: string;
   /** The stored default Model; null when it has none. */
   defaultModel: string | null;
+  /** The stored Instructions; null when the Project has none. */
+  instructions: string | null;
   onDone: () => void;
 }) {
   const orpc = useOrpc();
@@ -41,6 +48,7 @@ export function EditProjectForm({
   const models = useQuery(orpc.models.list.queryOptions());
   const [draftName, setDraftName] = useState(name);
   const [draftModel, setDraftModel] = useState(defaultModel ?? noModel);
+  const [draftInstructions, setDraftInstructions] = useState(instructions ?? "");
   const update = useMutation(
     orpc.project.update.mutationOptions({
       onSuccess: async () => {
@@ -53,6 +61,7 @@ export function EditProjectForm({
   );
 
   const trimmed = draftName.trim();
+  const tooLong = draftInstructions.length > instructionsMaxChars;
   const available = models.data?.models ?? [];
   // A stored Model that `models.list` no longer offers stays selectable, and says so.
   const unavailable =
@@ -71,12 +80,15 @@ export function EditProjectForm({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!trimmed) return;
+    if (!trimmed || tooLong) return;
     const changedModel = draftModel !== (defaultModel ?? noModel);
+    const changedInstructions = draftInstructions !== (instructions ?? "");
     update.mutate({
       id: projectId,
       name: trimmed,
       defaultModel: changedModel ? (draftModel === noModel ? null : draftModel) : undefined,
+      // Blank means none: the server stores it as null.
+      instructions: changedInstructions ? draftInstructions.trim() || null : undefined,
     });
   };
 
@@ -128,11 +140,36 @@ export function EditProjectForm({
           theirs.
         </p>
       </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="project-instructions">Instructions</Label>
+        <Textarea
+          id="project-instructions"
+          value={draftInstructions}
+          placeholder="For example: this is my thesis on coastal erosion; cite sources."
+          onChange={(event) => setDraftInstructions(event.target.value)}
+          aria-invalid={tooLong || undefined}
+        />
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Sent with every reply here, after your own Instructions. Where they conflict, this
+            Project's win. Shared links never show them.
+          </p>
+          <p
+            className={cn(
+              "shrink-0 text-xs tabular-nums text-muted-foreground",
+              tooLong && "text-destructive",
+            )}
+          >
+            {draftInstructions.length.toLocaleString("en-US")} /{" "}
+            {instructionsMaxChars.toLocaleString("en-US")} characters
+          </p>
+        </div>
+      </div>
       <div className="flex justify-end gap-2">
         <Button variant="outline" size="sm" type="button" onClick={onDone}>
           Cancel
         </Button>
-        <Button size="sm" type="submit" disabled={!trimmed || update.isPending}>
+        <Button size="sm" type="submit" disabled={!trimmed || tooLong || update.isPending}>
           {update.isPending ? "Saving…" : "Save"}
         </Button>
       </div>

@@ -65,6 +65,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
           projectId={projectId}
           name={project.data.name}
           defaultModel={project.data.defaultModel}
+          instructions={project.data.instructions}
           onDone={() => setEditing(false)}
         />
       )}

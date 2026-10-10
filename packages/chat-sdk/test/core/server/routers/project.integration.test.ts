@@ -29,6 +29,7 @@ describe("project.create", () => {
       id,
       name: "Thesis",
       defaultModel: null,
+      instructions: null,
     });
   });
 
@@ -100,6 +101,7 @@ describe("project.update", () => {
       id,
       name: "Thesis v2",
       defaultModel: "openai:gpt-5.6",
+      instructions: null,
     });
 
     await client.project.update({ id, name: "Thesis v2", defaultModel: null });
@@ -117,6 +119,7 @@ describe("project.update", () => {
       id,
       name: "Renamed",
       defaultModel: "openai:gpt-5.6",
+      instructions: null,
     });
   });
 
@@ -174,6 +177,7 @@ describe("project.update", () => {
       id,
       name: "New name",
       defaultModel: "openai:gpt-2",
+      instructions: null,
     });
   });
 
@@ -444,5 +448,65 @@ describe("project.delete", () => {
       expect(await getTestDb().select().from(message).where(eq(message.id, reply.id))).toEqual([]);
       expect(consoleError).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("project.update Instructions", () => {
+  async function withOpenAiCredentials() {
+    const { user, client } = await signedIn();
+    await saveCredentials(createTestDeps(), user.id, {
+      service: "openai",
+      fields: { apiKey: "openai-test-key" },
+      hint: "…-key",
+      verified: true,
+    });
+    return { user, client };
+  }
+
+  it("stores the Instructions, trimmed, and returns them from project.get", async () => {
+    const { client } = await withOpenAiCredentials();
+    const { id } = await client.project.create({ name: "Thesis" });
+
+    await client.project.update({ id, name: "Thesis", instructions: "  Cite sources.  " });
+
+    await expect(client.project.get({ id })).resolves.toMatchObject({
+      instructions: "Cite sources.",
+    });
+  });
+
+  it("treats blank Instructions as none, and keeps the stored ones when left out", async () => {
+    const { client } = await withOpenAiCredentials();
+    const { id } = await client.project.create({ name: "Thesis" });
+    await client.project.update({ id, name: "Thesis", instructions: "Cite sources." });
+
+    await client.project.update({ id, name: "Renamed" });
+    await expect(client.project.get({ id })).resolves.toMatchObject({
+      instructions: "Cite sources.",
+    });
+
+    await client.project.update({ id, name: "Renamed", instructions: "   \n " });
+    await expect(client.project.get({ id })).resolves.toMatchObject({ instructions: null });
+  });
+
+  it("refuses Instructions over 4,000 characters and keeps the stored ones", async () => {
+    const { client } = await withOpenAiCredentials();
+    const { id } = await client.project.create({ name: "Thesis" });
+    await client.project.update({ id, name: "Thesis", instructions: "Cite sources." });
+
+    await expect(
+      client.project.update({ id, name: "Thesis", instructions: "x".repeat(4_001) }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(client.project.get({ id })).resolves.toMatchObject({
+      instructions: "Cite sources.",
+    });
+  });
+
+  it("accepts exactly 4,000 characters", async () => {
+    const { client } = await withOpenAiCredentials();
+    const { id } = await client.project.create({ name: "Thesis" });
+
+    await expect(
+      client.project.update({ id, name: "Thesis", instructions: "x".repeat(4_000) }),
+    ).resolves.toBeUndefined();
   });
 });

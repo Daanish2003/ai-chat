@@ -14,6 +14,7 @@ import {
   listProjects,
   projectLimit,
 } from "../project/store";
+import { instructionsMaxChars } from "../../shared/chat/instructions";
 import { protectedProcedure } from "../procedures";
 import { uuidv7 } from "../lib/uuidv7";
 
@@ -23,17 +24,23 @@ export const projectRouter = {
     items: await listProjects(context.deps, context.user.id),
   })),
 
-  /** One of the caller's Projects; `defaultModel` is null when it has none. */
+  /** One of the caller's Projects; `defaultModel` and `instructions` are null when it has none. */
   get: protectedProcedure.input(z.object({ id: z.uuid() })).handler(async ({ context, input }) => {
     const row = await findProject(context.deps, context.user.id, input.id);
     if (!row) throw new ORPCError("NOT_FOUND", { message: "Project not found" });
-    return { id: row.id, name: row.name, defaultModel: row.defaultModel };
+    return {
+      id: row.id,
+      name: row.name,
+      defaultModel: row.defaultModel,
+      instructions: row.instructions,
+    };
   }),
 
   /**
-   * Renames the caller's Project and sets its default Model. A `defaultModel` left out keeps the
-   * stored one without checking it, so a Model that has since gone can't block a rename; a string
-   * must be a Model the user can use now, and `null` clears it.
+   * Renames the caller's Project, sets its default Model and its Instructions. A `defaultModel` left
+   * out keeps the stored one without checking it, so a Model that has since gone can't block a
+   * rename; a string must be a Model the user can use now, and `null` clears it. Instructions left
+   * out are kept; blank ones (or `null`) clear them, and they're capped like the user's.
    */
   update: protectedProcedure
     .input(
@@ -41,6 +48,7 @@ export const projectRouter = {
         id: z.uuid(),
         name: z.string().trim().min(1).max(100),
         defaultModel: z.string().nullish(),
+        instructions: z.string().nullish(),
       }),
     )
     .handler(async ({ context, input }) => {
@@ -48,7 +56,19 @@ export const projectRouter = {
       if (!(await findProject(context.deps, userId, input.id))) {
         throw new ORPCError("NOT_FOUND", { message: "Project not found" });
       }
-      const changes: { name: string; defaultModel?: string | null } = { name: input.name };
+      if (input.instructions && input.instructions.length > instructionsMaxChars) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: `Instructions are limited to ${instructionsMaxChars.toLocaleString("en-US")} characters`,
+        });
+      }
+      const changes: {
+        name: string;
+        defaultModel?: string | null;
+        instructions?: string | null;
+      } = { name: input.name };
+      if (input.instructions !== undefined) {
+        changes.instructions = input.instructions?.trim() || null;
+      }
       if (typeof input.defaultModel === "string") {
         const model = await resolveModel(context.deps, userId, input.defaultModel);
         if (!model) {
