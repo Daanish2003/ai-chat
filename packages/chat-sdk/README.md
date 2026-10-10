@@ -100,6 +100,9 @@ process.on("SIGTERM", () => void chat.stop().finally(() => process.exit(0)));
 // when your app deletes a user
 await chat.deleteUser(String(user.id));
 
+// when your app exports a user's data: one JSON-ready document (version 1), never credentials
+const copy = await chat.exportUser(String(user.id));
+
 // your own route for a Shared link page
 const data = await chat.getSharedConversation(token);
 ```

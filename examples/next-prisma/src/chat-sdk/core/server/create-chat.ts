@@ -9,6 +9,7 @@ import { quotaLookup } from "./chat/quota";
 import { createAppDeps, type AppDeps, type HostProvider, type QuotaSetting } from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
+import { exportUserData, type UserExport } from "./export-user";
 import { countUnreadableCredentials } from "./credentials/store";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { rateLimitedFor, resolveRateLimits, rpcRateLimits, type RateLimits } from "./rate-limits";
@@ -117,6 +118,8 @@ export function createChat(options: CreateChatOptions): {
   stop: () => Promise<void>;
   /** Deletes everything the SDK holds for a user, in one transaction. Idempotent. */
   deleteUser: (userId: string) => Promise<void>;
+  /** Everything the SDK keeps for a user, as one document (`version: 1`). Empty for an unknown id. */
+  exportUser: (userId: string) => Promise<UserExport>;
 } {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
@@ -162,6 +165,7 @@ export function createChat(options: CreateChatOptions): {
       await options.runtime?.close?.();
     },
     deleteUser: (userId) => deleteUserData(getDeps(), userId),
+    exportUser: (userId) => exportUserData(getDeps(), userId),
   };
 }
 
