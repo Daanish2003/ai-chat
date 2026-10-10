@@ -160,3 +160,53 @@ export async function exchangeCode({
     scope: typeof body.scope === "string" ? body.scope : "",
   };
 }
+
+/**
+ * Trades a refresh token for a new access token (RFC 6749 §6), with the same client as the
+ * sign-in. The server may omit a new refresh token, which keeps the old one (the caller's job).
+ * Throws `SignInError` when the server refuses, so the Connection can be marked for reconnection.
+ */
+export async function refreshAccess({
+  fetch,
+  server,
+  tokenEndpoint,
+  refreshToken,
+  scope,
+}: {
+  fetch: Fetch;
+  server: McpServerConfig;
+  tokenEndpoint: string;
+  refreshToken: string;
+  scope: string;
+}): Promise<TokenSet> {
+  const basic = Buffer.from(
+    `${encodeURIComponent(server.oauth.clientId)}:${encodeURIComponent(server.oauth.clientSecret)}`,
+  ).toString("base64");
+  const response = await fetch(tokenEndpoint, {
+    method: "POST",
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      accept: "application/json",
+      authorization: `Basic ${basic}`,
+    },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      resource: server.url,
+    }),
+  });
+  const body = response.ok ? await response.json().catch(() => null) : null;
+  if (typeof body?.access_token !== "string" || body.access_token === "") {
+    throw new SignInError("The server refused the refresh");
+  }
+  const expiresIn = Number(body.expires_in);
+  return {
+    accessToken: body.access_token,
+    tokenType: typeof body.token_type === "string" ? body.token_type : "Bearer",
+    refreshToken: typeof body.refresh_token === "string" ? body.refresh_token : refreshToken,
+    ...(Number.isFinite(expiresIn) && expiresIn > 0
+      ? { expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() }
+      : {}),
+    scope: typeof body.scope === "string" ? body.scope : scope,
+  };
+}
