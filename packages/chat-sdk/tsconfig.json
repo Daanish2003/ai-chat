@@ -17,5 +17,6 @@
     "test/**/*.ts",
     "test/**/*.tsx",
     "scripts/**/*.ts"
-  ]
+  ],
+  "exclude": ["node_modules", "test/e2e"]
 }

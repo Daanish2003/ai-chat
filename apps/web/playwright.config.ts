@@ -4,13 +4,14 @@ import { baseURL, serverEnv } from "./e2e/env";
 
 /**
  * End-to-end tests against the production build, its own database (`e2e/start-server.ts`) and
- * a fake Ollama host (`e2e/fake-ollama.ts`), so no Provider key is needed. `*.phone.spec.ts`
+ * a fake Ollama host (`packages/chat-sdk/test/e2e/fake-ollama.ts`), so no Provider key is needed. `*.phone.spec.ts`
  * runs on a phone, the rest on a desktop browser.
  */
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
-  // The form sign-up test may wait out Better Auth's rate limit (until it moves to a seeded user).
+  // The tests that sign up or sign in through the form may wait out Better Auth's rate limit.
+  // The shared scenarios seed their users instead.
   timeout: 90_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
