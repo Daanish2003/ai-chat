@@ -43,6 +43,7 @@ import {
 
 import { SearchRow } from "./search-row";
 import { replyComponents, ReplySources } from "./source-chips";
+import { UsageInfo } from "./usage-info";
 
 import { useChatAdapter } from "../../core/client/react/provider";
 
@@ -138,6 +139,7 @@ export function MessageRow({
                 })}
               </time>
             )}
+            {!isUser && info.usage && <UsageInfo usage={info.usage} />}
             {actions && (
               <BranchArrows
                 message={message}
