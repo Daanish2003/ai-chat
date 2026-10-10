@@ -4,7 +4,7 @@ import {
   isLiveListProvider,
   parseModelId,
 } from "../shared/chat/models";
-import { addKeyMessage, providers } from "../shared/credentials/services";
+import { providers, unusableModelMessage } from "../shared/credentials/services";
 
 export type ModelGroup<T extends CuratedModel = CuratedModel> = {
   provider: CuratedModel["provider"];
@@ -31,16 +31,21 @@ export function modelGroups<T extends CuratedModel>(models: T[], search: string)
 
 /**
  * Why the selected Model can't be sent to, or `null` when it can. `available` is what
- * `models.list` offers: the Models of Providers the user has credentials for.
+ * `models.list` offers: the Models of Providers the user has credentials for, and the Host's.
+ * With `byok` off the user can't add a key, so the only reason given is "pick another".
  */
-export function missingCredentialsMessage(selected: string, available: CuratedModel[]) {
+export function missingCredentialsMessage(
+  selected: string,
+  available: CuratedModel[],
+  byok: boolean,
+) {
   if (available.some((model) => model.id === selected)) return null;
   const prefix = parseModelId(selected)?.provider ?? "";
   const provider =
     findModel(selected)?.provider ?? (isLiveListProvider(prefix) ? prefix : undefined);
   // A live-listed Model can leave its list while the Provider still has credentials.
   return provider && !available.some((model) => model.provider === provider)
-    ? addKeyMessage(provider)
+    ? unusableModelMessage(provider, byok)
     : "Pick another Model";
 }
 

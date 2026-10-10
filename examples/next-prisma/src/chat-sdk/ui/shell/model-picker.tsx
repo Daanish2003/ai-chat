@@ -16,11 +16,13 @@ import { useState } from "react";
 
 import { modelGroups } from "../../core/client/models";
 
+import { useByok } from "../../core/client/react/byok";
 import { useChatAdapter } from "../../core/client/react/provider";
 
 /**
  * The top-bar Model picker: a popover with a search box, the available Models grouped by
- * Provider with capability icons, a check on the selected one, and "Add a Provider…".
+ * Provider with capability icons, a check on the selected one, and "Add a Provider…" (only when
+ * `byok` is on).
  */
 export function ModelPicker({
   value,
@@ -37,6 +39,7 @@ export function ModelPicker({
   invalid?: boolean;
 }) {
   const { Link } = useChatAdapter();
+  const byok = useByok();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const selected = value
@@ -125,17 +128,23 @@ export function ModelPicker({
           ))}
           {groups.length === 0 && (
             <p className="px-2.5 py-4 text-center text-xs text-muted-foreground">
-              {models.length === 0 ? "No Provider credentials yet" : "No matching Models"}
+              {models.length === 0
+                ? byok
+                  ? "No Provider credentials yet"
+                  : "No Models yet"
+                : "No matching Models"}
             </p>
           )}
         </div>
-        <Link
-          page={{ to: "keys" }}
-          onClick={() => setOpen(false)}
-          className="flex items-center gap-2 border-t px-2.5 py-2 text-xs text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted"
-        >
-          <PlusIcon className="size-3.5" /> Add a Provider…
-        </Link>
+        {byok && (
+          <Link
+            page={{ to: "keys" }}
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2 border-t px-2.5 py-2 text-xs text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:bg-muted"
+          >
+            <PlusIcon className="size-3.5" /> Add a Provider…
+          </Link>
+        )}
       </PopoverContent>
     </Popover>
   );

@@ -10,6 +10,7 @@ import { NoCredentials } from "../chat/no-credentials";
 import { SearchToggle, useWebSearch } from "../chat/search-toggle";
 import { Welcome } from "../chat/welcome";
 import { invalidateConversationList } from "../../core/client/react/conversation-list";
+import { useByok } from "../../core/client/react/byok";
 import { useNewConversationModel } from "../../core/client/react/new-conversation-model";
 import { useChatAdapter } from "../../core/client/react/provider";
 
@@ -21,10 +22,11 @@ export function NewConversationPage() {
   const { orpc, navigate } = useChatAdapter();
   const queryClient = useQueryClient();
   const models = useQuery(orpc.models.list.queryOptions());
+  const byok = useByok();
   const { model } = useNewConversationModel();
   const create = useMutation(orpc.conversation.create.mutationOptions());
   const blocked =
-    models.data && model ? missingCredentialsMessage(model, models.data.models) : null;
+    models.data && model ? missingCredentialsMessage(model, models.data.models, byok) : null;
   const disabled = !model || !!blocked || create.isPending;
   const draft = useAttachmentDraft(model);
   const search = useWebSearch(model);

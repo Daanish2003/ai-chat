@@ -7,6 +7,7 @@ import { type ReactNode, useEffect, useRef, useState, useSyncExternalStore } fro
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "../../core/client/react/conversation-list";
+import { useByok } from "../../core/client/react/byok";
 import { useNewConversationModel } from "../../core/client/react/new-conversation-model";
 import { useChatLocation, useOrpc } from "../../core/client/react/provider";
 import { ShareButton } from "../share/share-dialog";
@@ -113,6 +114,7 @@ function ConversationModelPicker({ id }: { id: string }) {
   const orpc = useOrpc();
   const conversation = useQuery(orpc.conversation.get.queryOptions({ input: { id } }));
   const models = useQuery(orpc.models.list.queryOptions());
+  const byok = useByok();
   const getKey = orpc.conversation.get.queryKey({ input: { id } });
   const setModel = useMutation(
     orpc.conversation.setModel.mutationOptions({
@@ -139,7 +141,7 @@ function ConversationModelPicker({ id }: { id: string }) {
     <ModelPicker
       value={value}
       models={models.data.models}
-      invalid={missingCredentialsMessage(value, models.data.models) !== null}
+      invalid={missingCredentialsMessage(value, models.data.models, byok) !== null}
       onSelect={(model) => setModel.mutate({ id, model })}
     />
   );
@@ -149,6 +151,7 @@ function ConversationModelPicker({ id }: { id: string }) {
 function NewConversationModelPicker() {
   const orpc = useOrpc();
   const models = useQuery(orpc.models.list.queryOptions());
+  const byok = useByok();
   const { model, setModel } = useNewConversationModel();
 
   if (!models.data) return null;
@@ -156,7 +159,9 @@ function NewConversationModelPicker() {
     <ModelPicker
       value={model}
       models={models.data.models}
-      invalid={model !== undefined && missingCredentialsMessage(model, models.data.models) !== null}
+      invalid={
+        model !== undefined && missingCredentialsMessage(model, models.data.models, byok) !== null
+      }
       onSelect={(next) => void setModel(next)}
     />
   );

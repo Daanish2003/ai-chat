@@ -13,7 +13,7 @@ import {
   setConversationModel,
   switchBranch,
 } from "../chat/store";
-import { addKeyMessage } from "../../shared/credentials/services";
+import { unusableModelMessage } from "../../shared/credentials/services";
 import { resolveModelCall } from "../credentials/resolve";
 import { protectedProcedure } from "../procedures";
 import { uuidv7 } from "../lib/uuidv7";
@@ -108,7 +108,9 @@ export const conversationRouter = {
         });
       }
       if (!(await resolveModelCall(context.deps, userId, model.id))) {
-        throw new ORPCError("BAD_REQUEST", { message: addKeyMessage(model.provider) });
+        throw new ORPCError("BAD_REQUEST", {
+          message: unusableModelMessage(model.provider, context.deps.byok),
+        });
       }
       const updated = await setConversationModel(context.deps, userId, input.id, model.id);
       if (!updated) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
