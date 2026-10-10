@@ -1,4 +1,4 @@
-import { and, eq, gte, sql } from "drizzle-orm";
+import { and, eq, gte, lt, sql } from "drizzle-orm";
 
 import { usage } from "../db/schema/usage";
 import type { AppDeps, Quota, QuotaSetting } from "../deps";
@@ -40,7 +40,9 @@ async function quotaState(deps: Pick<AppDeps, "db" | "getQuota">, userId: string
   const [row] = await deps.db
     .select({ spent: sql<string>`coalesce(sum(${usage.costMicros}), 0)` })
     .from(usage)
-    .where(and(eq(usage.userId, userId), gte(usage.createdAt, start)));
+    .where(
+      and(eq(usage.userId, userId), gte(usage.createdAt, start), lt(usage.createdAt, resetsAt)),
+    );
   return {
     window: quota.window,
     resetsAt,
