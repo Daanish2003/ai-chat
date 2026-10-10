@@ -1,14 +1,20 @@
 import { Button, buttonVariants } from "@/components/ui/button";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { useChatAdapter, useOrpc } from "../../core/client/react/provider";
 import { ConversationRow } from "../shell/conversation-panel";
+import { EditProjectForm } from "./edit-project-form";
 
-/** A Project: its name, its Conversations (newest Message first) and "New chat in this Project". */
+/**
+ * A Project: its name, its Conversations (newest Message first), "New chat in this Project", and an
+ * edit form for its name and default Model.
+ */
 export function ProjectPage({ projectId }: { projectId: string }) {
   const orpc = useOrpc();
   const { Link } = useChatAdapter();
   const project = useQuery(orpc.project.get.queryOptions({ input: { id: projectId } }));
+  const [editing, setEditing] = useState(false);
   const conversations = useInfiniteQuery(
     orpc.conversation.list.infiniteOptions({
       input: (cursor: string | undefined) => ({ cursor, projectId }),
@@ -26,10 +32,30 @@ export function ProjectPage({ projectId }: { projectId: string }) {
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-6">
       <header className="flex items-center justify-between gap-3">
         <h1 className="truncate text-lg font-semibold">{project.data?.name ?? "Project"}</h1>
-        <Link page={{ to: "new", projectId }} className={buttonVariants({ size: "sm" })}>
-          New chat in this Project
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          {project.data && (
+            <Button
+              variant="outline"
+              size="sm"
+              aria-expanded={editing}
+              onClick={() => setEditing((open) => !open)}
+            >
+              Edit
+            </Button>
+          )}
+          <Link page={{ to: "new", projectId }} className={buttonVariants({ size: "sm" })}>
+            New chat in this Project
+          </Link>
+        </div>
       </header>
+      {editing && project.data && (
+        <EditProjectForm
+          projectId={projectId}
+          name={project.data.name}
+          defaultModel={project.data.defaultModel}
+          onDone={() => setEditing(false)}
+        />
+      )}
       {conversations.isSuccess && rows.length === 0 && (
         <p className="text-sm text-muted-foreground">No Conversations in this Project yet</p>
       )}
