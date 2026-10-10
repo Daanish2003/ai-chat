@@ -91,7 +91,7 @@ export function createChat(options: CreateChatOptions): {
   start: () => Promise<void>;
   /**
    * Refuses new Runs with 503, lets local Runs finish for up to `drainMs` (250 s), then ends the
-   * rest as interrupted and stops the reaper. Call it on SIGTERM.
+   * rest as interrupted, stops the reaper and closes the runtime's connections. Call it on SIGTERM.
    */
   stop: () => Promise<void>;
   /** Deletes everything the SDK holds for a user, in one transaction. Idempotent. */
@@ -121,7 +121,10 @@ export function createChat(options: CreateChatOptions): {
       await assertMigrated(options.databaseUrl);
       await getLifecycle().start();
     },
-    stop: () => getLifecycle().stop(),
+    stop: async () => {
+      await getLifecycle().stop();
+      await options.runtime?.close?.();
+    },
     deleteUser: (userId) => deleteUserData(getDeps(), userId),
   };
 }

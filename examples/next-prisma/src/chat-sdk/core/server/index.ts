@@ -1,4 +1,4 @@
 export { createChat, type CreateChatOptions, type GetUser, type Logger } from "./create-chat";
-export { memoryRuntime, type ChatRuntime } from "./runtime";
+export { memoryRuntime, redisRuntime, type ChatRuntime, type RedisRuntimeOptions } from "./runtime";
 export type { PubSub } from "./chat/pubsub";
 export { createDb, type Database } from "./db";
