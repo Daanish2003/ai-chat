@@ -22,7 +22,8 @@ export type MessageRecord = {
   model: string | null;
   /** The reasoning effort the Run used; null when the Model's default was used, and on user Messages. */
   reasoningEffort: ReasoningChoice | null;
-  status: "streaming" | "complete" | "stopped" | "error";
+  /** `awaiting_approval`: the Run ended on a tool call that waits for the user's decision (ADR 0008). */
+  status: "streaming" | "complete" | "stopped" | "error" | "awaiting_approval";
   error: string | null;
   errorReason: "invalid_key" | "rate_limited" | "provider_error" | null;
   /** Tokens the Run used, for display only; null on user Messages and on older Runs. */

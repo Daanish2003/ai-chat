@@ -212,7 +212,18 @@ const serverTime = toolDefinition({
 createChat({ /* ... */ tools: [serverTime] });
 ```
 
-Host tools run without an approval step. To give a tool its own look in the chat, edit `ui/chat/tool-call-row.tsx` in your copy: the copy never overwrites `ui/`.
+A tool that sets `needsApproval: true` in its `toolDefinition` asks the user first. The reply ends at the call and shows the tool's name, its full arguments, and Approve and Deny. Approving runs the tool; denying never runs it, and the Model is told the user declined. The reply then continues in a new Run on the same Message, so the wait takes no server process and survives a restart. While a call waits, the composer waits too, and Stop counts as Deny. A Shared link shows a waiting call as waiting, without its arguments.
+
+```ts
+const sendMail = toolDefinition({
+  name: "send_mail",
+  description: "Sends an email for the user.",
+  inputSchema: z.object({ to: z.string(), body: z.string() }),
+  needsApproval: true,
+}).server<HostToolContext>(async (args) => sendEmail(args));
+```
+
+To give a tool its own look in the chat, edit `ui/chat/tool-call-row.tsx` in your copy: the copy never overwrites `ui/`.
 
 ## Rate limits
 

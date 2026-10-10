@@ -63,11 +63,14 @@ export type SearchOutcome = { results: SearchResult[] } | { errorReason: SearchE
 
 /**
  * Collects a run's stream chunks into stored parts. The `web_search` tool records its searches
- * here as it runs them, so they land between the text before and after them.
+ * here as it runs them, so they land between the text before and after them. A resumed Run starts
+ * from the parts its Message already holds (`initial`), so its reply continues them.
  */
-export function createPartsBuilder() {
-  const parts: StoredPart[] = [];
+export function createPartsBuilder(initial: StoredPart[] = []) {
+  const parts: StoredPart[] = initial.map((part) => ({ ...part }));
   let textMessageId: string | undefined;
+  // Tool calls as the model streams them, by id: a call that needs Approval is stored from these.
+  const streamedCalls = new Map<string, { name: string; json: string }>();
   // Thinking by reasoning message id: its signature arrives after its text.
   const thinking = new Map<string, ThinkingPart>();
   const thinkingPart = (messageId: string) => {
@@ -93,6 +96,15 @@ export function createPartsBuilder() {
 
   return {
     add(chunk: StreamChunk) {
+      if (chunk.type === EventType.TOOL_CALL_START) {
+        streamedCalls.set(chunk.toolCallId, { name: chunk.toolCallName, json: "" });
+        return;
+      }
+      if (chunk.type === EventType.TOOL_CALL_ARGS) {
+        const call = streamedCalls.get(chunk.toolCallId);
+        if (call) call.json += chunk.delta;
+        return;
+      }
       if (chunk.type === EventType.REASONING_MESSAGE_CONTENT && chunk.delta) {
         thinkingPart(chunk.messageId).text += chunk.delta;
         return;
@@ -129,9 +141,32 @@ export function createPartsBuilder() {
         part.errorReason = outcome.errorReason;
       }
     },
-    /** Starts a tool call other than `web_search`, as the tool is about to run. */
+    /**
+     * Starts a tool call other than `web_search`, as the tool is about to run. A call a resumed Run
+     * already holds (waiting for Approval, now approved) is updated in place.
+     */
     startToolCall({ toolCallId, name, source, args }: StartToolCall) {
-      parts.push({ type: "tool_call", toolCallId, name, source, args, state: "running" });
+      const held = parts.find(
+        (part): part is ToolCallPart => part.type === "tool_call" && part.toolCallId === toolCallId,
+      );
+      if (held) Object.assign(held, { name, source, args, state: "running", result: undefined });
+      else parts.push({ type: "tool_call", toolCallId, name, source, args, state: "running" });
+    },
+    /**
+     * Stores a call the model asked for that waits for Approval: its name and full arguments, as
+     * the model streamed them, with no result.
+     */
+    awaitApproval(toolCallId: string) {
+      const streamed = streamedCalls.get(toolCallId);
+      const args = parseArgs(streamed?.json ?? "");
+      parts.push({
+        type: "tool_call",
+        toolCallId,
+        name: streamed?.name ?? "",
+        source: "host",
+        args,
+        state: "awaiting_approval",
+      });
     },
     /** Ends a running tool call with its result. A call cancelled meanwhile stays cancelled. */
     finishToolCall(toolCallId: string, { state, result }: FinishToolCall) {
@@ -178,7 +213,16 @@ function textOf(parts: StoredParts, separator: string) {
 }
 
 const finished = (part: WebSearchPart | ToolCallPart) =>
-  part.state === "done" || part.state === "error";
+  part.state === "done" || part.state === "error" || part.state === "denied";
+
+/** A call's arguments as the model streamed them; an unreadable stream reads as no arguments. */
+function parseArgs(json: string): unknown {
+  try {
+    return json ? JSON.parse(json) : {};
+  } catch {
+    return {};
+  }
+}
 
 /** What the Model read as the result of a finished search. */
 function searchOutput(part: WebSearchPart): WebSearchOutput {
@@ -240,7 +284,8 @@ function withToolCalls({ role, parts }: StoredMessage, offered: OfferedTools): M
             : { name: call.name, arguments: JSON.stringify(call.args) },
       }));
       messages.push({ role, content: content || null, toolCalls });
-      for (const call of calls) {
+      // A call waiting for Approval has no result yet: the resumed Run supplies it (ADR 0008).
+      for (const call of calls.filter(finished)) {
         messages.push({
           role: "tool",
           toolCallId: call.toolCallId,
@@ -263,6 +308,9 @@ function withToolCalls({ role, parts }: StoredMessage, offered: OfferedTools): M
       if (breakBeforeText) content += "\n\n";
       breakBeforeText = false;
       content += part.text;
+    } else if (part.type === "tool_call" && part.state === "awaiting_approval") {
+      // Sent without a result, so the resumed Run can answer it (the Model's call is still open).
+      if (offered.hostTools) calls.push(part);
     } else if ((part.type === "web_search" || part.type === "tool_call") && finished(part)) {
       if (offeredCall(part, offered)) {
         calls.push(part);
@@ -418,7 +466,11 @@ function toolCallUIPart(part: ToolCallPart): MessagePart {
     arguments: JSON.stringify(part.args),
     input: part.args,
     state:
-      part.state === "running" ? "input-complete" : part.state === "done" ? "complete" : "error",
+      part.state === "running" || part.state === "awaiting_approval"
+        ? "input-complete"
+        : part.state === "done"
+          ? "complete"
+          : "error",
     ...(finished(part) && { output: part.result }),
     metadata: { source: part.source, status: part.state },
   };

@@ -336,7 +336,7 @@ describe("chat.migrate()", () => {
     await expect(Promise.all([chat.migrate(), chat.migrate()])).resolves.toBeDefined();
 
     const applied = await rows<{ count: string }>(url, "select count(*) from chat.__migrations");
-    expect(applied).toEqual([{ count: "4" }]);
+    expect(applied).toEqual([{ count: "5" }]);
   });
 
   it("throws an error naming pg_trgm when the role may not create it", async () => {

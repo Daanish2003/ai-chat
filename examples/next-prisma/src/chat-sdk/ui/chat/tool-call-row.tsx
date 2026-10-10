@@ -1,6 +1,15 @@
 import type { ToolCallStatus, ToolCallView } from "../../core/shared/chat/tool-call";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { BanIcon, CheckIcon, ChevronRightIcon, LoaderIcon, WrenchIcon, XIcon } from "lucide-react";
+import {
+  BanIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  LoaderIcon,
+  WrenchIcon,
+  XIcon,
+} from "lucide-react";
 import { useId, useState } from "react";
 
 const statusLabels: Record<ToolCallStatus, string> = {
@@ -8,23 +17,34 @@ const statusLabels: Record<ToolCallStatus, string> = {
   done: "Done",
   error: "Failed",
   cancelled: "Cancelled",
+  awaiting_approval: "Waiting for approval",
+  denied: "Denied",
 };
 
 /**
  * One tool call of a reply other than a search (a Host tool, later an MCP tool): a slim line with
- * its name and state, which expands to the arguments and result. A call redacted for a Shared link
- * shows only that it was used. To give one tool its own look, edit this file in the Host's `ui/`;
- * the SDK copy never overwrites it.
+ * its name and state, which expands to the arguments and result. A call waiting for Approval shows
+ * its full arguments and, when `onDecide` is given, Approve and Deny. A call redacted for a Shared
+ * link shows only that it was used (or that it waits). To give one tool its own look, edit this
+ * file in the Host's `ui/`; the SDK copy never overwrites it.
  */
-export function ToolCallRow({ call }: { call: ToolCallView }) {
-  const [open, setOpen] = useState(false);
+export function ToolCallRow({
+  call,
+  onDecide,
+}: {
+  call: ToolCallView;
+  /** Answers a call waiting for Approval: `true` approves it, `false` denies it (ADR 0008). */
+  onDecide?: (approved: boolean) => void;
+}) {
+  const waiting = call.status === "awaiting_approval";
+  const [open, setOpen] = useState(waiting);
   const detailsId = useId();
 
   if (call.redacted) {
     return (
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <WrenchIcon className="size-3.5 shrink-0" aria-hidden />
-        <span>{`Used ${call.name}`}</span>
+        <span>{waiting ? `Waiting for approval to use ${call.name}` : `Used ${call.name}`}</span>
       </div>
     );
   }
@@ -53,6 +73,16 @@ export function ToolCallRow({ call }: { call: ToolCallView }) {
       {open && (
         <div id={detailsId} className="border-l pl-3">
           <ToolCallDetails call={call} />
+        </div>
+      )}
+      {waiting && onDecide && (
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => onDecide(true)}>
+            Approve
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onDecide(false)}>
+            Deny
+          </Button>
         </div>
       )}
     </div>
@@ -90,6 +120,10 @@ function StatusIcon({ status }: { status: ToolCallStatus }) {
     case "error":
       return <XIcon className={className} aria-hidden />;
     case "cancelled":
+      return <BanIcon className={className} aria-hidden />;
+    case "awaiting_approval":
+      return <ClockIcon className={className} aria-hidden />;
+    case "denied":
       return <BanIcon className={className} aria-hidden />;
   }
 }

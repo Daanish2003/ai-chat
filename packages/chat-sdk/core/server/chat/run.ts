@@ -1,4 +1,4 @@
-import { storedPartsSchema } from "../../shared/message-parts";
+import { type StoredPart, storedPartsSchema } from "../../shared/message-parts";
 import { conversation, message } from "../db/schema/chat";
 import {
   type AnyTextAdapter,
@@ -43,6 +43,9 @@ export async function startRun(
   deps: AppDeps,
   {
     messageId,
+    runNumber = 1,
+    initialParts = [],
+    resume,
     provider,
     adapter,
     messages,
@@ -57,6 +60,15 @@ export async function startRun(
     searchMeter,
   }: {
     messageId: string;
+    /** The Run's number on its Message: a decision on a waiting call starts the next one (ADR 0008). */
+    runNumber?: number;
+    /** The parts the Message holds before this Run, which a resumed Run's reply continues. */
+    initialParts?: StoredPart[];
+    /**
+     * Set on a Run that answers a call waiting for Approval: the thread and the Run that ended
+     * waiting, and the user's decision (ADR 0008).
+     */
+    resume?: ResumeOf;
     /** The Provider of the Model, which decides how its usage is normalised. */
     provider: string;
     adapter: AnyTextAdapter;
@@ -85,11 +97,14 @@ export async function startRun(
   },
 ): Promise<void> {
   const abortController = new AbortController();
-  await deps.runStreams.open(messageId);
+  const logId = runLogId(messageId, runNumber);
+  await deps.runStreams.open(logId);
   const unsubscribeStop = await listenForStop(deps, messageId, () => abortController.abort());
   // Registered once nothing before the Run's own `finally` can throw, so it always leaves again.
   deps.lifecycle.runs.set(messageId, abortController);
-  const parts = createPartsBuilder();
+  const parts = createPartsBuilder(initialParts);
+  /** The call a reply stops on, waiting for Approval, and the Run that stopped (ADR 0008). */
+  let awaiting: { toolCallId: string; threadId: string; runId: string } | undefined;
   // The Run's usage, summed over its model iterations as the stream is read (issue #117).
   let total: RunUsage | undefined;
   /** The Provider-reported cost in USD, summed over the Run's iterations, when it reports one. */
@@ -177,10 +192,29 @@ export async function startRun(
         ...(systemPrompts.length > 0 && { systemPrompts }),
         modelOptions,
         ...(compaction && { middleware: [compaction.middleware] }),
+        // A resumed Run continues the thread and the Run that ended waiting (ADR 0008, spike #154).
+        ...(resume && {
+          threadId: resume.threadId,
+          parentRunId: resume.parentRunId,
+          resume: [
+            {
+              interruptId: resume.interruptId,
+              status: "resolved",
+              payload: { approved: resume.approved },
+            },
+          ],
+        }),
       });
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
         changed = true;
+        const approval = approvalOf(chunk);
+        const chunkIds = runIdsOf(chunk);
+        if (approval && chunkIds) {
+          // The Run ends here, with the call stored as waiting (ADR 0008): nothing waits in a process.
+          awaiting = { toolCallId: approval, ...chunkIds };
+          parts.awaitApproval(approval);
+        }
         if (chunk.type === EventType.RUN_FINISHED && chunk.usage) {
           // The AG-UI array form is converted back to TanStack's shape first.
           const tokens = Array.isArray(chunk.usage) ? fromSpecTokenUsage(chunk.usage) : chunk.usage;
@@ -198,7 +232,7 @@ export async function startRun(
         }
         ids ??= runIdsOf(chunk);
         void deps.runStreams
-          .append(messageId, chunk)
+          .append(logId, chunk)
           .catch((error: unknown) => console.error(`Logging Message ${messageId} failed`, error));
       }
     } catch (caught) {
@@ -220,12 +254,21 @@ export async function startRun(
                   error: error.message,
                   errorReason: errorReasonOf(error.code),
                 }
-              : { status: "complete" };
-      // Stored whatever the ending: the Provider's usage for a complete Run, else an estimate.
-      const usage = messageUsage(ending.status === "complete" ? total : undefined, {
-        promptCharacters,
-        parts: parts.parts().parts,
-      });
+              : awaiting
+                ? {
+                    status: "awaiting_approval",
+                    threadId: awaiting.threadId,
+                    interruptedRunId: awaiting.runId,
+                  }
+                : { status: "complete" };
+      // Stored whatever the ending: the Provider's usage for a finished model call, else an estimate.
+      const usage = messageUsage(
+        ending.status === "complete" || ending.status === "awaiting_approval" ? total : undefined,
+        {
+          promptCharacters,
+          parts: parts.parts().parts,
+        },
+      );
       await write(
         withParts({
           ...ending,
@@ -254,7 +297,7 @@ export async function startRun(
       if (!logEnded) {
         void deps.runStreams
           .append(
-            messageId,
+            logId,
             endingChunk(
               ids ?? { threadId: messageId, runId: messageId },
               timedOut ? "timed out" : interrupted ? "interrupted" : error?.message,
@@ -262,15 +305,55 @@ export async function startRun(
           )
           .catch((caught: unknown) => console.error(`Logging Message ${messageId} failed`, caught));
       }
-      await deps.runStreams.close(messageId);
+      await deps.runStreams.close(logId);
       deps.lifecycle.runs.delete(messageId);
-      // The run ended `complete`: title its Conversation, fire-and-forget.
-      if (!timedOut && !abortController.signal.aborted && error === undefined) {
+      // The run ended `complete`: title its Conversation, fire-and-forget. A reply waiting for
+      // Approval is titled once its resumed Run completes.
+      if (
+        !timedOut &&
+        !abortController.signal.aborted &&
+        error === undefined &&
+        awaiting === undefined
+      ) {
         void titleConversation(deps, messageId);
       }
     }
   })();
 }
+
+/**
+ * The id a Message's Run log is keyed by: the Message's id for its first Run (ADR 0006), and
+ * `<messageId>:<n>` for the Run that answers a decision on a waiting call (ADR 0008).
+ */
+export function runLogId(messageId: string, runNumber: number) {
+  return runNumber <= 1 ? messageId : `${messageId}:${runNumber}`;
+}
+
+/** What a decision on a waiting call resumes: the thread, the Run that ended waiting, and the answer. */
+export type ResumeOf = {
+  threadId: string;
+  parentRunId: string;
+  interruptId: string;
+  approved: boolean;
+};
+
+/**
+ * The tool call id of a RUN_FINISHED that ends waiting for Approval (the interrupt's id is
+ * `approval_<toolCallId>`), or `undefined` for any other chunk.
+ */
+function approvalOf(chunk: StreamChunk): string | undefined {
+  if (chunk.type !== EventType.RUN_FINISHED) return undefined;
+  const outcome = (chunk as { outcome?: { type?: unknown; interrupts?: Array<{ id?: unknown }> } })
+    .outcome;
+  if (outcome?.type !== "interrupt") return undefined;
+  const id = outcome.interrupts?.[0]?.id;
+  return typeof id === "string" && id.startsWith(approvalPrefix)
+    ? id.slice(approvalPrefix.length)
+    : undefined;
+}
+
+/** The interrupt id prefix TanStack AI gives a tool call that needs Approval. */
+export const approvalPrefix = "approval_";
 
 /** The thread and run ids a chat() chunk carries, so the ending chunk belongs to the same run. */
 function runIdsOf(chunk: StreamChunk) {
@@ -385,7 +468,7 @@ export async function stopUserRuns(deps: AppDeps, userId: string, db: Executor =
  */
 async function endOrphanedRun(deps: AppDeps, messageId: string, db: Executor) {
   const [row] = await db
-    .select({ parts: message.parts })
+    .select({ parts: message.parts, runNumber: message.runNumber })
     .from(message)
     .where(and(eq(message.id, messageId), eq(message.status, "streaming")));
   if (!row) return;
@@ -399,12 +482,13 @@ async function endOrphanedRun(deps: AppDeps, messageId: string, db: Executor) {
     .where(and(eq(message.id, messageId), eq(message.status, "streaming")))
     .returning({ id: message.id });
   if (ended.length === 0) return;
-  await deps.runStreams.open(messageId);
+  const logId = runLogId(messageId, row.runNumber);
+  await deps.runStreams.open(logId);
   await deps.runStreams.append(
-    messageId,
+    logId,
     endingChunk({ threadId: messageId, runId: messageId }, undefined),
   );
-  await deps.runStreams.close(messageId);
+  await deps.runStreams.close(logId);
 }
 
 /**
@@ -430,7 +514,7 @@ export async function reapStaleRuns(deps: AppDeps, now = new Date()) {
         or(isNull(message.heartbeatAt), lt(message.heartbeatAt, cutoff)),
       ),
     )
-    .returning({ id: message.id, parts: message.parts });
+    .returning({ id: message.id, parts: message.parts, runNumber: message.runNumber });
   for (const row of reaped) {
     // A row that doesn't parse holds no running call, and mustn't stop the reaper.
     const parsed = storedPartsSchema.safeParse(row.parts);
@@ -447,8 +531,9 @@ export async function reapStaleRuns(deps: AppDeps, now = new Date()) {
         .where(eq(message.id, row.id));
     }
     const ids = { threadId: row.id, runId: row.id };
-    await deps.runStreams.open(row.id);
-    await deps.runStreams.append(row.id, endingChunk(ids, "interrupted"));
-    await deps.runStreams.close(row.id);
+    const logId = runLogId(row.id, row.runNumber);
+    await deps.runStreams.open(logId);
+    await deps.runStreams.append(logId, endingChunk(ids, "interrupted"));
+    await deps.runStreams.close(logId);
   }
 }

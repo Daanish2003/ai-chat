@@ -3,7 +3,12 @@ import type { AppRouterClient } from "../../core/server/routers/index";
 import { ChatContainerContent, ChatContainerRoot } from "@/components/ui/prompt-kit/chat-container";
 import { ScrollButton } from "@/components/ui/prompt-kit/scroll-button";
 import type { ChatCommand } from "../../core/shared/chat/command";
-import { branchFrom, takePendingFirstMessage, toUIMessages } from "../../core/client/chat";
+import {
+  branchFrom,
+  messageInfo,
+  takePendingFirstMessage,
+  toUIMessages,
+} from "../../core/client/chat";
 import { missingCredentialsMessage } from "../../core/client/models";
 import { rateLimitedErrorOf, runFetch } from "../../core/client/rate-limit";
 import { fetchServerSentEvents, type UIMessage, useChat } from "@tanstack/ai-react";
@@ -29,22 +34,50 @@ import { useFocusMessage } from "./use-focus-message";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
 
+type ChatViewProps = {
+  conversation: ConversationData;
+  /** A search hit to land on: its Branch is shown, then it's scrolled to and highlighted. */
+  focusMessageId?: string;
+  /** Called once `focusMessageId` has been landed on (or couldn't be). */
+  onFocused?: () => void;
+};
+
+/**
+ * One Conversation's Active Branch and composer. A decision on a call that waits for Approval starts
+ * the reply's next Run (ADR 0008): the page restarts on the refetched Conversation, which joins that
+ * Run's log as a reload does, so the restart is a fresh `ChatThread`.
+ */
+export function ChatView(props: ChatViewProps) {
+  const [restarted, setRestarted] = useState<{
+    conversation: ConversationData;
+    generation: number;
+  }>();
+  return (
+    <ChatThread
+      key={restarted?.generation ?? 0}
+      {...props}
+      conversation={restarted?.conversation ?? props.conversation}
+      onDecided={(conversation) =>
+        setRestarted({ conversation, generation: (restarted?.generation ?? 0) + 1 })
+      }
+    />
+  );
+}
+
 /**
  * One Conversation's Active Branch and composer. `useChat` is the truth while a run streams;
  * when it ends, the Active Branch is refetched and replaces `useChat`'s messages (ADR 0002).
  * A reply still streaming when the page opens (a reload, or a second tab) is joined from its
  * Run's log, so it continues live (ADR 0006).
  */
-export function ChatView({
+function ChatThread({
   conversation,
   focusMessageId,
   onFocused = () => {},
-}: {
-  conversation: ConversationData;
-  /** A search hit to land on: its Branch is shown, then it's scrolled to and highlighted. */
-  focusMessageId?: string;
-  /** Called once `focusMessageId` has been landed on (or couldn't be). */
-  onFocused?: () => void;
+  onDecided,
+}: ChatViewProps & {
+  /** Called with the refetched Conversation once a decision has started its Run. */
+  onDecided: (conversation: ConversationData) => void;
 }) {
   const queryClient = useQueryClient();
   const { orpc, chatUrl } = useChatAdapter();
@@ -106,6 +139,23 @@ export function ChatView({
     const fresh = await fetchConversation();
     const running = fresh.messages.find((m) => m.status === "streaming");
     if (running) await stopRun.mutateAsync({ messageId: running.id });
+  };
+
+  // The newest reply waits for its call's Approval: the composer waits too (ADR 0008).
+  const decideCall = useMutation(orpc.chat.decide.mutationOptions());
+  const waiting =
+    messages.length > 0 &&
+    messageInfo(messages[messages.length - 1]!).status === "awaiting_approval";
+  const decide = async (messageId: string, approved: boolean) => {
+    // A second click while the first decision is in flight would be refused as stale.
+    if (decideCall.isPending) return;
+    try {
+      await decideCall.mutateAsync({ messageId, approved });
+    } catch (caught) {
+      toast.error(`Deciding failed: ${(caught as Error).message}`);
+      return;
+    }
+    onDecided(await fetchConversation());
   };
 
   // The selected Model's Provider may have lost its credentials; the server re-checks on send.
@@ -218,6 +268,7 @@ export function ChatView({
                 onEdit: (text, attachments) => startBranch(message.id, text, attachments),
                 onRegenerate: () => startBranch(message.id),
                 onSwitchBranch: (messageId) => switchBranch.mutate({ messageId }),
+                onDecide: (approved) => void decide(message.id, approved),
               }}
             />
           ))}
@@ -256,7 +307,8 @@ export function ChatView({
             }
             streaming={streaming}
             // The next Message continues the Branch being switched to, so wait for it.
-            disabled={!!blocked || quotaBlocked || switchBranch.isPending}
+            disabled={!!blocked || quotaBlocked || switchBranch.isPending || waiting}
+            placeholder={waiting ? "Approve or deny the tool call first" : undefined}
           >
             <AttachButton draft={draft} disabled={!!blocked || quotaBlocked} />
             <SearchToggle search={search} />
