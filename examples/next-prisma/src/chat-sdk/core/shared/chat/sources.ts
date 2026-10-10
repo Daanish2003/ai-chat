@@ -64,7 +64,10 @@ export function pageSourcesOf(call: ToolCallView, sources: Source[]): Source[] {
 /** Every Source of a Message's parts, numbered in stream order across its searches and fetched pages. */
 export function sourcesOf(parts: MessagePart[]): Source[] {
   return numberSources(
-    parts.flatMap((part) => webSearchOf(part)?.results ?? fetchedSourceOf(part) ?? []),
+    parts.flatMap((part): SearchResult[] => {
+      const page = fetchedSourceOf(part);
+      return page ? [page] : (webSearchOf(part)?.results ?? []);
+    }),
   );
 }
 
