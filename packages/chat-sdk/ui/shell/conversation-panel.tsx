@@ -10,8 +10,9 @@ import { useEffect, useRef } from "react";
 
 import { useDeleteConversation } from "../../core/client/react/delete-conversation";
 import { useChatAdapter, useOrpc } from "../../core/client/react/provider";
+import { ProjectsSection } from "./projects-section";
 
-type ConversationSummary = Awaited<
+export type ConversationSummary = Awaited<
   ReturnType<AppRouterClient["conversation"]["list"]>
 >["items"][number];
 
@@ -60,6 +61,7 @@ export function ConversationPanel({ className }: { className?: string }) {
         <p className="px-3 py-6 text-center text-xs text-muted-foreground">No Conversations yet</p>
       )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <ProjectsSection />
         {groups.map((group) => (
           <section key={group.label} aria-label={group.label}>
             <h3 className="sticky top-0 z-10 bg-sidebar/95 px-3 py-1.5 text-[10px] font-medium text-muted-foreground">
@@ -81,7 +83,8 @@ export function ConversationPanel({ className }: { className?: string }) {
   );
 }
 
-function ConversationRow({ conversation }: { conversation: ConversationSummary }) {
+/** One Conversation in a list: its title, preview and Model, with a delete button. */
+export function ConversationRow({ conversation }: { conversation: ConversationSummary }) {
   const title = conversation.title ?? "Untitled";
   const remove = useDeleteConversation();
   const { Link } = useChatAdapter();

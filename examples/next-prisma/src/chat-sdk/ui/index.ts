@@ -4,6 +4,7 @@ export { AppShell } from "./shell/app-shell";
 export { KeySettingsPage } from "./pages/key-settings";
 export { DeleteAllConversationsSection } from "./settings/delete-all-conversations";
 export { NewConversationPage } from "./pages/new-conversation";
+export { ProjectPage } from "./pages/project";
 export {
   SharedConversationPage,
   SharedLinkNotFound,
