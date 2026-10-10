@@ -14,12 +14,16 @@ import { toast } from "sonner";
 import { invalidateConversationList } from "../../core/client/react/conversation-list";
 import { useByok } from "../../core/client/react/byok";
 import { useChatAdapter } from "../../core/client/react/provider";
+import { useQuota } from "../../core/client/react/quota";
 import { readSearchPreference } from "../../core/client/react/search-preference";
+import { quotaBlocksModel } from "../../core/client/quota";
 
 import { AttachButton, DraftAttachmentChips, useAttachmentDraft } from "./attachments";
 import { Composer } from "./composer";
 import { MessageRow } from "./message-row";
 import { MissingCredentialsBanner } from "./missing-credentials-banner";
+import { QuotaBanner } from "./quota-banner";
+import { QuotaMeter } from "./quota-meter";
 import { SearchToggle, useWebSearch } from "./search-toggle";
 import { useFocusMessage } from "./use-focus-message";
 
@@ -110,6 +114,12 @@ export function ChatView({
   const blocked = models.data
     ? missingCredentialsMessage(conversation.model, models.data.models, byok)
     : null;
+  // A spent Quota blocks the selected Model only when it's a Host Model; the user's own still runs.
+  const quota = useQuota().data;
+  const quotaBlocked = quotaBlocksModel(
+    models.data?.models.find((model) => model.id === conversation.model),
+    quota,
+  );
   const search = useWebSearch(conversation.model);
 
   const draft = useAttachmentDraft(conversation.model);
@@ -149,6 +159,8 @@ export function ChatView({
       } finally {
         setSending(false);
         void invalidateConversationList(queryClient, orpc);
+        // The Run's spend changes the meter (and a refused Run means the Quota is spent).
+        void queryClient.invalidateQueries({ queryKey: orpc.quota.read.queryKey() });
       }
     }
   };
@@ -216,14 +228,17 @@ export function ChatView({
       </ChatContainerRoot>
       <div className="border-t bg-background px-3 py-3 sm:px-6">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
-          {error && !sending && (
+          {/* A refused Run is explained by the Quota banner below, not by its error. */}
+          {error && !sending && !quotaBlocked && (
             <p role="alert" className="text-xs text-destructive">
               {rateLimitedErrorOf(error)
                 ? "Too many messages. Try again in a moment."
                 : error.message}
             </p>
           )}
+          <QuotaMeter />
           {blocked && <MissingCredentialsBanner message={blocked} />}
+          {quotaBlocked && quota && <QuotaBanner resetsAt={quota.resetsAt} />}
           <Composer
             onSend={(text) => {
               void send(text, draft.uploaded);
@@ -241,9 +256,9 @@ export function ChatView({
             }
             streaming={streaming}
             // The next Message continues the Branch being switched to, so wait for it.
-            disabled={!!blocked || switchBranch.isPending}
+            disabled={!!blocked || quotaBlocked || switchBranch.isPending}
           >
-            <AttachButton draft={draft} disabled={!!blocked} />
+            <AttachButton draft={draft} disabled={!!blocked || quotaBlocked} />
             <SearchToggle search={search} />
           </Composer>
         </div>
