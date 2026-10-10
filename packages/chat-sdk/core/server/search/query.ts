@@ -45,6 +45,8 @@ export type SearchFilters = {
   provider?: string;
   from?: Date;
   to?: Date;
+  /** A Project id: only Messages in its Conversations. */
+  projectId?: string;
 };
 
 /**
@@ -93,6 +95,7 @@ export async function searchMessages(
         filters.to === undefined
           ? undefined
           : sql`${message.createdAt} < ${filters.to.toISOString()}::timestamp`,
+        filters.projectId === undefined ? undefined : eq(conversation.projectId, filters.projectId),
       ),
     )
     .orderBy(desc(message.createdAt), desc(message.id))

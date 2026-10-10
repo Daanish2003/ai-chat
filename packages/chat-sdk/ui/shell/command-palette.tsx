@@ -132,6 +132,7 @@ function PaletteBody({
   const searched = useDebounced(q.trim(), searchDebounceMs);
   const [filters, setFilters] = useState<SearchFilterValue>({});
   const models = useQuery(orpc.models.list.queryOptions());
+  const projects = useQuery(orpc.project.list.queryOptions());
   const search = useInfiniteQuery(
     orpc.search.query.infiniteOptions({
       input: (cursor: string | undefined) => ({
@@ -139,6 +140,7 @@ function PaletteBody({
         cursor,
         model: filters.model,
         provider: filters.provider,
+        projectId: filters.projectId,
         ...localDayRange(filters.fromDay, filters.toDay),
       }),
       initialPageParam: undefined,
@@ -277,7 +279,12 @@ function PaletteBody({
         placeholder="Jump to a Conversation, search Messages, or run a command…"
         className="h-12 w-full shrink-0 border-b bg-transparent px-4 text-sm outline-none"
       />
-      <SearchFilterRow value={filters} onChange={setFilters} models={models.data?.models ?? []} />
+      <SearchFilterRow
+        value={filters}
+        onChange={setFilters}
+        models={models.data?.models ?? []}
+        projects={projects.data?.items ?? []}
+      />
       <div
         ref={listRef}
         id="palette-list"
@@ -336,10 +343,11 @@ function PaletteBody({
   );
 }
 
-/** The Message search's filters: a Model, a Provider, and a day range (`YYYY-MM-DD`, local). */
+/** The Message search's filters: a Model, a Provider, a Project, and a day range (`YYYY-MM-DD`, local). */
 type SearchFilterValue = {
   model?: string;
   provider?: string;
+  projectId?: string;
   fromDay?: string;
   toDay?: string;
 };
@@ -349,10 +357,12 @@ function SearchFilterRow({
   value,
   onChange,
   models,
+  projects,
 }: {
   value: SearchFilterValue;
   onChange: (value: SearchFilterValue) => void;
   models: { id: string; label: string; provider: string }[];
+  projects: { id: string; name: string }[];
 }) {
   const modelItems = [
     { value: null, label: "Any Model" },
@@ -364,6 +374,10 @@ function SearchFilterRow({
     ...providers
       .filter((provider) => models.some((model) => model.provider === provider.id))
       .map((provider) => ({ value: provider.id, label: provider.label })),
+  ];
+  const projectItems = [
+    { value: null, label: "Any Project" },
+    ...projects.map((project) => ({ value: project.id, label: project.name })),
   ];
   return (
     <div
@@ -397,6 +411,22 @@ function SearchFilterRow({
         </SelectTrigger>
         <SelectContent>
           {providerItems.map((item) => (
+            <SelectItem key={item.value ?? ""} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        items={projectItems}
+        value={value.projectId ?? null}
+        onValueChange={(projectId) => onChange({ ...value, projectId: projectId ?? undefined })}
+      >
+        <SelectTrigger aria-label="Project" size="sm" className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {projectItems.map((item) => (
             <SelectItem key={item.value ?? ""} value={item.value}>
               {item.label}
             </SelectItem>
