@@ -1,3 +1,5 @@
+import type { ReasoningChoice } from "./models";
+
 /** Tokens a Run used, summed over its model iterations (input includes cached tokens). */
 export type MessageUsage = {
   input: number;
@@ -18,6 +20,8 @@ export type MessageRecord = {
   role: "user" | "assistant";
   parts: unknown;
   model: string | null;
+  /** The reasoning effort the Run used; null when the Model's default was used, and on user Messages. */
+  reasoningEffort: ReasoningChoice | null;
   status: "streaming" | "complete" | "stopped" | "error";
   error: string | null;
   errorReason: "invalid_key" | "rate_limited" | "provider_error" | null;

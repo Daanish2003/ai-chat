@@ -8,6 +8,7 @@ import { attachmentsOfMessages } from "../attachments/store";
 import type { AppDeps } from "../deps";
 import { newestLeaf, pathTo, siblingPosition } from "../../shared/chat/branches";
 import { type ActiveBranchMessage, toClientMessage } from "../../shared/chat/client-message";
+import type { ReasoningChoice } from "../../shared/chat/models";
 
 type Deps = Pick<AppDeps, "db">;
 
@@ -37,6 +38,21 @@ export async function setConversationModel(deps: Deps, userId: string, id: strin
   const rows = await deps.db
     .update(conversation)
     .set({ model })
+    .where(ownConversation(userId, id))
+    .returning({ id: conversation.id });
+  return rows.length > 0;
+}
+
+/** Sets the user's Conversation's reasoning effort (`null` for the Model's default); `false` when it isn't theirs. */
+export async function setConversationReasoningEffort(
+  deps: Deps,
+  userId: string,
+  id: string,
+  reasoningEffort: ReasoningChoice | null,
+) {
+  const rows = await deps.db
+    .update(conversation)
+    .set({ reasoningEffort })
     .where(ownConversation(userId, id))
     .returning({ id: conversation.id });
   return rows.length > 0;

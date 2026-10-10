@@ -21,6 +21,7 @@ import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 import { quotaExceededCode, quotaRefusal } from "./quota";
 import { generationOptionsFor } from "./generation";
+import { effortFor } from "../../shared/chat/models";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 
@@ -132,6 +133,8 @@ export async function handleChat(
       reads: { images: model.images, pdfs: model.pdfs },
     },
   );
+  // The Conversation's choice, when the Model offers it: the Run sends it and the reply records it.
+  const effort = effortFor(model, owned.reasoningEffort);
   const userMessageId = uuidv7();
   const assistantMessageId = uuidv7();
   const now = new Date();
@@ -175,6 +178,7 @@ export async function handleChat(
         role: "assistant",
         parts: storedParts([]),
         model: model.id,
+        reasoningEffort: effort ?? null,
         status: "streaming",
         createdAt: new Date(now.getTime() + 1),
         // The Run's lease starts now (ADR 0006); the Run's snapshot timer keeps it fresh.
@@ -202,7 +206,10 @@ export async function handleChat(
     hostTools,
     context: { userId, conversationId: owned.id },
     systemPrompts,
-    modelOptions: generationOptionsFor(model.id, { maxOutputTokens: model.maxOutputTokens }),
+    modelOptions: generationOptionsFor(model.id, {
+      maxOutputTokens: model.maxOutputTokens,
+      effort,
+    }),
     // A Run on Host credentials is recorded against the user's Quota (ADR 0007).
     meter: call.hostModel ? { userId, model: model.id, price: call.hostModel } : undefined,
     // Each search on the Host's Tavily key is recorded at its price (ADR 0007).

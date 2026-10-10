@@ -74,6 +74,7 @@ describe("conversation.get", () => {
         parts: [{ type: "text", content: "Hi" }],
         attachments: [],
         model: null,
+        reasoningEffort: null,
         status: "complete",
         error: null,
         errorReason: null,
@@ -88,6 +89,7 @@ describe("conversation.get", () => {
         parts: [{ type: "text", content: "Hello!" }],
         attachments: [],
         model: "anthropic:claude-sonnet-5-5",
+        reasoningEffort: null,
         status: "complete",
         error: null,
         errorReason: null,
@@ -715,5 +717,55 @@ describe("live-listed Models", () => {
     await expect(
       client.conversation.setModel({ id: conv.id, model: "ollama:llama3.2:latest" }),
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+describe("conversation reasoning effort", () => {
+  it("creates a Conversation with the chosen effort, and get returns it", async () => {
+    const { client } = await signedIn();
+    const { id } = await client.conversation.create({
+      model: "anthropic:claude-sonnet-5-5",
+      reasoningEffort: "high",
+    });
+
+    await expect(client.conversation.get({ id })).resolves.toMatchObject({
+      reasoningEffort: "high",
+    });
+  });
+
+  it("sets the effort on an existing Conversation, and clears it back to the Model's default", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user, { model: "anthropic:claude-sonnet-5-5" });
+
+    await client.conversation.setReasoningEffort({ id: conv.id, reasoningEffort: "low" });
+    await expect(client.conversation.get({ id: conv.id })).resolves.toMatchObject({
+      reasoningEffort: "low",
+    });
+
+    await client.conversation.setReasoningEffort({ id: conv.id, reasoningEffort: null });
+    await expect(client.conversation.get({ id: conv.id })).resolves.toMatchObject({
+      reasoningEffort: null,
+    });
+  });
+
+  it("refuses an effort that isn't one the chat knows", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user);
+
+    await expect(
+      client.conversation.setReasoningEffort({
+        id: conv.id,
+        reasoningEffort: "extreme" as "low",
+      }),
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("can't change another user's Conversation's effort", async () => {
+    const { client } = await signedIn();
+    const conv = await insertConversation(await insertUser());
+
+    await expect(
+      client.conversation.setReasoningEffort({ id: conv.id, reasoningEffort: "high" }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });

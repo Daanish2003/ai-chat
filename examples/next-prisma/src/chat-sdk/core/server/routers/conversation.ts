@@ -1,4 +1,4 @@
-import { conversation } from "../db/schema/chat";
+import { conversation, reasoningEffort } from "../db/schema/chat";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
@@ -12,6 +12,7 @@ import {
   loadActiveBranch,
   renameConversation,
   setConversationModel,
+  setConversationReasoningEffort,
   switchBranch,
 } from "../chat/store";
 import { unusableModelMessage } from "../../shared/credentials/services";
@@ -20,9 +21,14 @@ import { protectedProcedure } from "../procedures";
 import { uuidv7 } from "../lib/uuidv7";
 
 export const conversationRouter = {
-  /** Starts an empty Conversation; the first Message is sent through `/api/chat`. */
+  /** Starts an empty Conversation, with its reasoning effort if one is chosen; the first Message is sent through `/api/chat`. */
   create: protectedProcedure
-    .input(z.object({ model: z.string() }))
+    .input(
+      z.object({
+        model: z.string(),
+        reasoningEffort: z.enum(reasoningEffort.enumValues).nullish(),
+      }),
+    )
     .handler(async ({ context, input }) => {
       if (!(await resolveModel(context.deps, context.user.id, input.model))) {
         throw new ORPCError("BAD_REQUEST", {
@@ -30,9 +36,12 @@ export const conversationRouter = {
         });
       }
       const id = uuidv7();
-      await context.deps.db
-        .insert(conversation)
-        .values({ id, userId: context.user.id, model: input.model });
+      await context.deps.db.insert(conversation).values({
+        id,
+        userId: context.user.id,
+        model: input.model,
+        reasoningEffort: input.reasoningEffort ?? null,
+      });
       return { id };
     }),
 
@@ -60,6 +69,7 @@ export const conversationRouter = {
       id: row.id,
       title: row.title,
       model: row.model,
+      reasoningEffort: row.reasoningEffort,
       messages,
     };
   }),
@@ -114,6 +124,24 @@ export const conversationRouter = {
         });
       }
       const updated = await setConversationModel(context.deps, userId, input.id, model.id);
+      if (!updated) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }),
+
+  /** Selects the reasoning effort the next Message and regenerate use; `null` is the Model's default. */
+  setReasoningEffort: protectedProcedure
+    .input(
+      z.object({
+        id: z.uuid(),
+        reasoningEffort: z.enum(reasoningEffort.enumValues).nullable(),
+      }),
+    )
+    .handler(async ({ context, input }) => {
+      const updated = await setConversationReasoningEffort(
+        context.deps,
+        context.user.id,
+        input.id,
+        input.reasoningEffort,
+      );
       if (!updated) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
     }),
 

@@ -24,6 +24,7 @@ describe("toUIMessages", () => {
         parts: [{ type: "text", content: "Hi" }],
         attachments: [{ id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 }],
         model: null,
+        reasoningEffort: null,
         status: "complete",
         error: null,
         errorReason: null,
@@ -38,6 +39,7 @@ describe("toUIMessages", () => {
         parts: [{ type: "text", content: "Hello" }],
         attachments: [],
         model: "openai:gpt-5.6",
+        reasoningEffort: null,
         status: "streaming",
         error: null,
         errorReason: null,
@@ -55,6 +57,7 @@ describe("toUIMessages", () => {
         createdAt,
         metadata: {
           model: null,
+          reasoningEffort: null,
           status: "complete",
           error: null,
           errorReason: null,
@@ -70,6 +73,7 @@ describe("toUIMessages", () => {
         createdAt,
         metadata: {
           model: "openai:gpt-5.6",
+          reasoningEffort: null,
           status: "streaming",
           error: null,
           errorReason: null,
@@ -81,6 +85,7 @@ describe("toUIMessages", () => {
     ]);
     expect(messageInfo(messages[1]!)).toEqual({
       model: "openai:gpt-5.6",
+      reasoningEffort: null,
       status: "streaming",
       error: null,
       errorReason: null,
@@ -91,6 +96,7 @@ describe("toUIMessages", () => {
   it("treats a message useChat is streaming, which has no server metadata, as streaming", () => {
     expect(messageInfo({ id: "x", role: "assistant", parts: [] })).toEqual({
       model: null,
+      reasoningEffort: null,
       status: "streaming",
       error: null,
       errorReason: null,
@@ -109,6 +115,7 @@ describe("messageAttachments", () => {
         parts: [],
         attachments: [{ id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 }],
         model: null,
+        reasoningEffort: null,
         status: "complete",
         error: null,
         errorReason: null,
@@ -137,6 +144,7 @@ describe("messageSiblings", () => {
         parts: [],
         attachments: [],
         model: null,
+        reasoningEffort: null,
         status: "complete",
         error: null,
         errorReason: null,
@@ -151,6 +159,7 @@ describe("messageSiblings", () => {
         parts: [],
         attachments: [],
         model: null,
+        reasoningEffort: null,
         status: "complete",
         error: null,
         errorReason: null,
@@ -196,6 +205,7 @@ describe("branchFrom", () => {
 describe("describeError", () => {
   const info = (fields: Partial<MessageInfo>): MessageInfo => ({
     model: null,
+    reasoningEffort: null,
     status: "error",
     error: null,
     errorReason: null,

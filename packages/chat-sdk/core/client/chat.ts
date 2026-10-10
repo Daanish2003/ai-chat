@@ -7,7 +7,7 @@ import type { UIMessage } from "@tanstack/ai-client";
 /** What the server knows about a Message beyond its parts, kept in `UIMessage.metadata`. */
 export type MessageInfo = Pick<
   ClientMessage,
-  "model" | "status" | "error" | "errorReason" | "usage"
+  "model" | "reasoningEffort" | "status" | "error" | "errorReason" | "usage"
 >;
 
 /**
@@ -26,6 +26,7 @@ export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
       parts,
       createdAt,
       model,
+      reasoningEffort,
       status,
       error,
       errorReason,
@@ -39,6 +40,7 @@ export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
       createdAt,
       metadata: {
         model,
+        reasoningEffort,
         status,
         error,
         errorReason,
@@ -62,6 +64,8 @@ export function sharedToUIMessages(messages: SharedConversation["messages"]): UI
     createdAt,
     metadata: {
       model,
+      // A Shared link carries no reasoning effort.
+      reasoningEffort: null,
       status,
       error: null,
       errorReason: null,
@@ -105,6 +109,7 @@ export function messageInfo(message: UIMessage): MessageInfo {
   const info = message.metadata as Partial<MessageInfo> | undefined;
   return {
     model: info?.model ?? null,
+    reasoningEffort: info?.reasoningEffort ?? null,
     status: info?.status ?? "streaming",
     error: info?.error ?? null,
     errorReason: info?.errorReason ?? null,

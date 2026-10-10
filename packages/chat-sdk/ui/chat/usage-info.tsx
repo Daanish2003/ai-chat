@@ -1,3 +1,4 @@
+import { reasoningChoiceLabel, type ReasoningChoice } from "../../core/shared/chat/models";
 import type { MessageUsage } from "../../core/shared/chat/message-record";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -5,8 +6,17 @@ import { cn } from "@/lib/utils";
 import { InfoIcon } from "lucide-react";
 import { Fragment } from "react";
 
-/** An assistant Message's tokens behind an info control. Tokens only, never cost. */
-export function UsageInfo({ usage }: { usage: MessageUsage }) {
+/**
+ * An assistant Message's reasoning effort and tokens behind an info control. Tokens only, never
+ * cost. `reasoningEffort` is the effort the reply ran with; `null` is the Model's default.
+ */
+export function UsageInfo({
+  usage,
+  reasoningEffort,
+}: {
+  usage: MessageUsage | null;
+  reasoningEffort: ReasoningChoice | null;
+}) {
   return (
     <Popover>
       <PopoverTrigger
@@ -20,9 +30,22 @@ export function UsageInfo({ usage }: { usage: MessageUsage }) {
         <InfoIcon />
       </PopoverTrigger>
       <PopoverContent className="w-52 p-3">
-        <UsageBreakdown usage={usage} />
+        <div className="flex flex-col gap-3 text-xs">
+          <EffortLine reasoningEffort={reasoningEffort} />
+          {usage && <UsageBreakdown usage={usage} />}
+        </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** The reasoning effort a reply ran with; `null` reads as the Model's default. */
+export function EffortLine({ reasoningEffort }: { reasoningEffort: ReasoningChoice | null }) {
+  return (
+    <p>
+      <span className="text-muted-foreground">Reasoning effort: </span>
+      {reasoningChoiceLabel(reasoningEffort)}
+    </p>
   );
 }
 

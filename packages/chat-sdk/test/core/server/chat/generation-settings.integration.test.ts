@@ -1,3 +1,6 @@
+import { conversation, message } from "../../../../core/server/db/schema/chat";
+import { and, eq } from "drizzle-orm";
+import { getTestDb } from "../../../support/test-database";
 import { describe, expect, it } from "vitest";
 
 import { saveCredentials } from "../../../../core/server/credentials/store";
@@ -5,6 +8,7 @@ import { insertConversation } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
 import { insertUser } from "../../../support/users";
+import { liveModelsFetch } from "../../../support/live-models";
 import { sendAs } from "../../../support/sdk";
 import { findModel } from "../../../../core/shared/chat/models";
 
@@ -93,3 +97,110 @@ function maxOutputOf(id: string): number {
   if (limit == null) throw new Error(`${id} has no known max output`);
   return limit;
 }
+
+describe("reasoning effort on a Run", () => {
+  /** Runs one reply in a Conversation that stores `reasoningEffort`, returning its options and rows. */
+  async function runWithEffort(
+    model: string,
+    service: string,
+    reasoningEffort: "off" | "high",
+    fetch?: typeof globalThis.fetch,
+  ) {
+    const user = await insertUser();
+    const fake = createFakeAdapter({ rounds: [round(text("Hi."))] });
+    const deps = createTestDeps({ adapterFor: () => fake.adapter, ...(fetch && { fetch }) });
+    await saveCredentials(deps, user.id, {
+      service,
+      fields: { apiKey: "test-key" },
+      hint: "…-key",
+      verified: true,
+    });
+    const conv = await insertConversation(user, {
+      model,
+      title: "Test Conversation",
+      reasoningEffort,
+    });
+    const response = await sendAs(
+      new Request("http://localhost/api/chat/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [],
+          forwardedProps: {
+            conversationId: conv.id,
+            parentId: null,
+            text: "Hello",
+            attachmentIds: [],
+            model,
+            webSearch: false,
+          },
+        }),
+      }),
+      user,
+      deps,
+    );
+    await response.text();
+    const [reply] = await getTestDb()
+      .select()
+      .from(message)
+      .where(and(eq(message.conversationId, conv.id), eq(message.role, "assistant")));
+    const [stored] = await getTestDb()
+      .select({ reasoningEffort: conversation.reasoningEffort })
+      .from(conversation)
+      .where(eq(conversation.id, conv.id));
+    return {
+      options: fake.calls[0]?.modelOptions as Record<string, unknown> | undefined,
+      recorded: reply?.reasoningEffort,
+      stored: stored?.reasoningEffort,
+    };
+  }
+
+  it("sends the Conversation's effort and records it on the reply", async () => {
+    const { options, recorded, stored } = await runWithEffort(
+      "anthropic:claude-sonnet-5-5",
+      "anthropic",
+      "high",
+    );
+
+    expect(options).toMatchObject({ effort: "high", thinking: { type: "adaptive" } });
+    expect(recorded).toBe("high");
+    expect(stored).toBe("high");
+  });
+
+  it("sends the Model's default and records null when the Model doesn't offer the choice", async () => {
+    // Haiku 4.5 has no reasoning control, so `high` doesn't apply and the Model's default runs.
+    const { options, recorded, stored } = await runWithEffort(
+      "anthropic:claude-haiku-4-5",
+      "anthropic",
+      "high",
+    );
+
+    expect(options).not.toHaveProperty("effort");
+    expect(options).not.toHaveProperty("thinking");
+    expect(recorded).toBeNull();
+    expect(stored).toBe("high");
+  });
+
+  it("sends the effort on an OpenRouter live Model that lists efforts", async () => {
+    const live = liveModelsFetch({
+      openRouterReasoning: { "anthropic/claude-sonnet-5.5": ["low", "high"] },
+    });
+
+    const { options, recorded } = await runWithEffort(
+      "openrouter:anthropic/claude-sonnet-5.5",
+      "openrouter",
+      "high",
+      live.fetch,
+    );
+
+    expect(options).toMatchObject({ reasoning: { effort: "high" } });
+    expect(recorded).toBe("high");
+  });
+
+  it("maps `off` to the Provider's off setting where the Model allows it", async () => {
+    const { options, recorded } = await runWithEffort("openai:gpt-5.6", "openai", "off");
+
+    expect(options).toMatchObject({ reasoning: { effort: "none" } });
+    expect(recorded).toBe("off");
+  });
+});

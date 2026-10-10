@@ -1,6 +1,7 @@
 import { setPendingFirstMessage } from "../../core/client/chat";
 import { missingCredentialsMessage } from "../../core/client/models";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { toast } from "sonner";
 
 import { AttachButton, DraftAttachmentChips, useAttachmentDraft } from "../chat/attachments";
@@ -11,6 +12,10 @@ import { SearchToggle, useWebSearch } from "../chat/search-toggle";
 import { Welcome } from "../chat/welcome";
 import { invalidateConversationList } from "../../core/client/react/conversation-list";
 import { useByok } from "../../core/client/react/byok";
+import {
+  setNewConversationEffort,
+  useNewConversationEffort,
+} from "../../core/client/react/new-conversation-effort";
 import { useNewConversationModel } from "../../core/client/react/new-conversation-model";
 import { useChatAdapter } from "../../core/client/react/provider";
 
@@ -24,6 +29,9 @@ export function NewConversationPage() {
   const models = useQuery(orpc.models.list.queryOptions());
   const byok = useByok();
   const { model } = useNewConversationModel();
+  const { effort } = useNewConversationEffort();
+  // A pick belongs to this new Conversation: leaving the page without sending drops it.
+  useEffect(() => () => setNewConversationEffort(null), []);
   const create = useMutation(orpc.conversation.create.mutationOptions());
   const blocked =
     models.data && model ? missingCredentialsMessage(model, models.data.models, byok) : null;
@@ -35,7 +43,9 @@ export function NewConversationPage() {
     if (!model) return;
     const attachments = draft.uploaded;
     try {
-      const { id } = await create.mutateAsync({ model });
+      const { id } = await create.mutateAsync({ model, reasoningEffort: effort });
+      // The choice is stored on the Conversation now; the next new one starts at the Model's default.
+      setNewConversationEffort(null);
       void invalidateConversationList(queryClient, orpc);
       setPendingFirstMessage(id, { text, attachments });
       await navigate({ to: "conversation", id });
