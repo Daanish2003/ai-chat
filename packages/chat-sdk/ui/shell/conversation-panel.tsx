@@ -2,13 +2,19 @@ import type { AppRouterClient } from "../../core/server/routers/index";
 import { groupByDate } from "../../core/client/date-groups";
 import { modelLabel } from "../../core/client/models";
 import { relativeTime } from "../../core/client/relative-time";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { Share2Icon, Trash2Icon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { MoreHorizontalIcon, PinIcon, PinOffIcon, Share2Icon, Trash2Icon } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
+import { ShareDialog } from "../share/share-dialog";
 import { useDeleteConversation } from "../../core/client/react/delete-conversation";
+import {
+  usePinConversation,
+  useRenameConversation,
+} from "../../core/client/react/conversation-actions";
 import { useChatAdapter, useOrpc } from "../../core/client/react/provider";
 import { ProjectsSection } from "./projects-section";
 
@@ -16,7 +22,10 @@ export type ConversationSummary = Awaited<
   ReturnType<AppRouterClient["conversation"]["list"]>
 >["items"][number];
 
-/** The user's Conversations outside Projects, newest Message first, grouped by date. */
+/**
+ * The Conversation panel: the pinned Conversations at the top, then the user's Conversations
+ * outside Projects, newest Message first, grouped by date.
+ */
 export function ConversationPanel({ className }: { className?: string }) {
   const orpc = useOrpc();
   const conversations = useInfiniteQuery(
@@ -26,6 +35,7 @@ export function ConversationPanel({ className }: { className?: string }) {
       getNextPageParam: (page) => page.nextCursor ?? undefined,
     }),
   );
+  const pinned = useQuery(orpc.conversation.pinned.queryOptions());
   const rows = conversations.data?.pages.flatMap((page) => page.items) ?? [];
   const groups = groupByDate(rows, (row) => row.lastMessageAt);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = conversations;
@@ -48,6 +58,8 @@ export function ConversationPanel({ className }: { className?: string }) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const pinnedRows = pinned.data ?? [];
+
   return (
     <aside
       aria-label="Conversations"
@@ -55,12 +67,24 @@ export function ConversationPanel({ className }: { className?: string }) {
     >
       <div className="flex h-11 shrink-0 items-center justify-between border-b px-3">
         <span className="text-xs font-medium">Conversations</span>
-        <span className="text-[10px] text-muted-foreground">{rows.length}</span>
+        <span className="text-[10px] text-muted-foreground">{rows.length + pinnedRows.length}</span>
       </div>
-      {conversations.isSuccess && rows.length === 0 && (
+      {conversations.isSuccess && rows.length === 0 && pinnedRows.length === 0 && (
         <p className="px-3 py-6 text-center text-xs text-muted-foreground">No Conversations yet</p>
       )}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        {pinnedRows.length > 0 && (
+          <section aria-label="Pinned">
+            <h3 className="sticky top-0 z-10 bg-sidebar/95 px-3 py-1.5 text-[10px] font-medium text-muted-foreground">
+              Pinned
+            </h3>
+            <ul>
+              {pinnedRows.map((row) => (
+                <ConversationRow key={row.id} conversation={row} />
+              ))}
+            </ul>
+          </section>
+        )}
         <ProjectsSection />
         {groups.map((group) => (
           <section key={group.label} aria-label={group.label}>
@@ -83,11 +107,20 @@ export function ConversationPanel({ className }: { className?: string }) {
   );
 }
 
-/** One Conversation in a list: its title, preview and Model, with a delete button. */
+/** One Conversation in the panel, with its menu: rename, pin or unpin, share and delete. */
 export function ConversationRow({ conversation }: { conversation: ConversationSummary }) {
-  const title = conversation.title ?? "Untitled";
-  const remove = useDeleteConversation();
   const { Link } = useChatAdapter();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const remove = useDeleteConversation();
+  const rename = useRenameConversation();
+  const pin = usePinConversation();
+  const pinned = conversation.pinnedAt !== null;
+
+  const pick = (action: () => void) => {
+    setMenuOpen(false);
+    action();
+  };
 
   return (
     <li className="group relative border-b">
@@ -97,6 +130,7 @@ export function ConversationRow({ conversation }: { conversation: ConversationSu
         activeClassName="border-l-primary bg-sidebar-accent"
       >
         <div className="flex items-center gap-2">
+          {pinned && <PinIcon aria-label="Pinned" className="size-3 shrink-0 text-primary" />}
           <span className="flex-1 truncate text-xs font-medium">
             {conversation.title ?? <i className="text-muted-foreground">Untitled</i>}
           </span>
@@ -118,17 +152,65 @@ export function ConversationRow({ conversation }: { conversation: ConversationSu
           {conversation.hasError && <span className="text-destructive">error</span>}
         </div>
       </Link>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        title="Delete"
-        aria-label={`Delete "${title}"`}
-        disabled={remove.isPending}
-        onClick={() => remove.confirmDelete(conversation)}
-        className="absolute top-1.5 right-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 hover:text-destructive pointer-coarse:top-auto pointer-coarse:bottom-1.5 pointer-coarse:opacity-100"
-      >
-        <Trash2Icon />
-      </Button>
+      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+        <PopoverTrigger
+          aria-label={`Actions for "${conversation.title ?? "Untitled"}"`}
+          title="Conversation actions"
+          disabled={remove.isPending || pin.isPending}
+          className={cn(
+            buttonVariants({ variant: "ghost", size: "icon-xs" }),
+            "absolute top-1.5 right-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:top-auto pointer-coarse:bottom-1.5 pointer-coarse:opacity-100",
+          )}
+        >
+          <MoreHorizontalIcon />
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-44 p-1">
+          <div role="menu" className="flex flex-col">
+            <Button
+              variant="ghost"
+              size="sm"
+              role="menuitem"
+              className="justify-start"
+              onClick={() => pick(() => rename.promptRename(conversation))}
+            >
+              Rename
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              role="menuitem"
+              className="justify-start"
+              onClick={() => pick(() => pin.toggle(conversation))}
+            >
+              {pinned ? <PinOffIcon /> : <PinIcon />}
+              {pinned ? "Unpin" : "Pin"}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              role="menuitem"
+              className="justify-start"
+              onClick={() => pick(() => setSharing(true))}
+            >
+              <Share2Icon />
+              Share
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              role="menuitem"
+              className="justify-start hover:text-destructive"
+              onClick={() => pick(() => remove.confirmDelete(conversation))}
+            >
+              <Trash2Icon />
+              Delete
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+      {sharing && (
+        <ShareDialog conversationId={conversation.id} open={sharing} onOpenChange={setSharing} />
+      )}
     </li>
   );
 }
