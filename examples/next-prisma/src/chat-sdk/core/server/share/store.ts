@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 
 import { conversation, message } from "../db/schema/chat";
 import { sharedLink } from "../db/schema/share";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { loadPath } from "../chat/store";
 import { attachmentsOfMessages } from "../attachments/store";
@@ -108,6 +108,22 @@ export async function upsertSharedLink(
     if (!link) throw new Error("Saving the Shared link returned no row");
     return { error: null, link };
   });
+}
+
+/** The user's Shared links, newest share first, with each Conversation's current title. */
+export async function listSharedLinks(deps: Deps, userId: string) {
+  const rows = await deps.db
+    .select({
+      token: sharedLink.token,
+      conversationId: sharedLink.conversationId,
+      title: conversation.title,
+      sharedAt: sharedLink.updatedAt,
+    })
+    .from(sharedLink)
+    .innerJoin(conversation, eq(conversation.id, sharedLink.conversationId))
+    .where(eq(conversation.userId, userId))
+    .orderBy(desc(sharedLink.updatedAt));
+  return rows.map((row) => ({ ...row, title: row.title ?? "Untitled" }));
 }
 
 /** Deletes the Conversation's Shared link, if any; `false` when the Conversation isn't theirs. */
