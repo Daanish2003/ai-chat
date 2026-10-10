@@ -19,6 +19,7 @@ import { startRun } from "./run";
 import { findConversation, loadPath } from "./store";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
+import { quotaExceededCode, quotaRefusal } from "./quota";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 
@@ -60,6 +61,21 @@ export async function handleChat(
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const call = await resolveModelCall(deps, userId, model.id);
   if (!call) return refuse(400, addKeyMessage(model.provider));
+  // A Run on Host credentials is refused once its Quota's window has spent the budget (ADR 0007).
+  if (call.hostModel) {
+    const refusal = await quotaRefusal(deps, userId);
+    if (refusal) {
+      return Response.json(
+        {
+          message:
+            "You've used this window's Quota; try again after it resets, or add your own key",
+          code: quotaExceededCode,
+          resetsAt: refusal.resetsAt.toISOString(),
+        },
+        { status: 402 },
+      );
+    }
+  }
   // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
   const searchCredentials =
     command.webSearch && model.tools ? await resolveCredentials(deps, userId, tavilyService) : null;

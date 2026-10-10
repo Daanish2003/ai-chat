@@ -41,5 +41,7 @@ export async function recordRunUsage(
     outputTokens: usage.output,
     costMicros: runCostMicros(usage, reportedCost, meter.price),
     estimated: usage.estimated,
+    // Set in app code, like the window the Quota sums (chat/quota.ts), so a fake clock agrees.
+    createdAt: new Date(),
   });
 }
