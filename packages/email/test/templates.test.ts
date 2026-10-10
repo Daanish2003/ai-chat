@@ -44,6 +44,7 @@ describe("email templates", () => {
       expect(html).toMatch(/expires/i);
       expect(text).toMatch(/expires/i);
       expect(html).toContain(APP);
+      expect(html).toContain("You received this email");
       expect(text).toContain("You received this email");
     },
   );
@@ -58,6 +59,7 @@ describe("email templates", () => {
       expect(message.link).toBeUndefined();
       expect(message.subject).toContain(APP);
       expect(html).toContain(APP);
+      expect(html).toContain("You received this email");
       expect(text).toContain("You received this email");
     },
   );
