@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { seedSession, seedUser } from "./seed-user";
-import { type CapturedMail, waitForMail } from "./helpers";
+import { type CapturedMail, signInOnForm, submitAuthForm, waitForMail } from "./helpers";
 
 const NEW_PASSWORD = "brand-new-password-1";
 
@@ -57,15 +57,15 @@ test("a reset link sets a new password, signs out the other device, and a used l
   await otherContext.close();
 
   // The new password signs in; the old one no longer does.
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Already have an account? Sign In" }).click();
-  await page.getByLabel("Email").fill(seeded.email);
-  await page.getByLabel("Password").fill(seeded.password);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await signInOnForm(page, seeded.email, seeded.password);
   await expect(page.getByText("Invalid email or password")).toBeVisible();
 
   await page.getByLabel("Password").fill(NEW_PASSWORD);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await submitAuthForm(
+    page,
+    page.getByRole("button", { name: "Sign In" }),
+    "/api/auth/sign-in/email",
+  );
   await expect(page).toHaveURL(/\/c$/);
 
   // The notice arrived by email.

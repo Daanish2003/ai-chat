@@ -17,9 +17,13 @@ export type SeededUser = { id: string; name: string; email: string; password: st
 /**
  * Writes a verified user with a password, and a session for it, straight into the e2e database,
  * then sets the session cookie on `page` the way Better Auth signs it. Every call is a new user,
- * so no test waits on email or on the sign-up rate limit.
+ * so no test waits on email or on the sign-up rate limit. With `password: false` the user has no
+ * credential account (as if they signed up with GitHub or Google); `password` is then unusable.
  */
-export async function seedUser(page: Page): Promise<SeededUser> {
+export async function seedUser(
+  page: Page,
+  options: { password?: boolean } = {},
+): Promise<SeededUser> {
   const seeded: SeededUser = {
     id: randomUUID(),
     name: "E2E User",
@@ -37,15 +41,17 @@ export async function seedUser(page: Page): Promise<SeededUser> {
       createdAt: now,
       updatedAt: now,
     });
-    await db.insert(account).values({
-      id: randomUUID(),
-      accountId: seeded.id,
-      providerId: "credential",
-      userId: seeded.id,
-      password: await hashPassword(seeded.password),
-      createdAt: now,
-      updatedAt: now,
-    });
+    if (options.password !== false) {
+      await db.insert(account).values({
+        id: randomUUID(),
+        accountId: seeded.id,
+        providerId: "credential",
+        userId: seeded.id,
+        password: await hashPassword(seeded.password),
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
   } finally {
     await db.$client.end();
   }
