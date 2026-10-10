@@ -135,6 +135,16 @@ Nothing connects when you build `createChat` or `redisRuntime()`. The first use 
 
 Redis holds each Run's chunk log while the Run is live and for an hour after it ends. Postgres stays the source of truth for Conversations and Messages.
 
+## Rotating the key encryption secret
+
+Stored Provider and Tool credentials are encrypted under `keyEncryptionSecrets`: the first secret encrypts, and every secret decrypts (ADR 0010). Rotate on an event, such as a suspected leak or someone with access leaving, not on a schedule. Rotating is a runbook, not an outage:
+
+1. Put the new secret first in `keyEncryptionSecrets` (in `apps/web`, `KEY_ENCRYPTION_SECRET` becomes the new one and the old one moves to `KEY_ENCRYPTION_SECRET_PREVIOUS`), and deploy. Every process must hold the new keyring before the next step.
+2. Run `await chat.rotateKeys()` once, as a one-off command from your image (in `apps/web`: `node scripts/rotate-keys.ts`). Never run it in the pre-deploy step: the old version still running writes under the old key until the deploy finishes. It works in batches and is safe to re-run. It returns `{ reencrypted, unreadable }`.
+3. If `unreadable` is 0, remove the old secret and deploy again. If it isn't, find the rows under a key you no longer hold before removing it: a row under a removed key reads as missing, so its user re-enters the credential.
+
+`start()` never refuses to boot because rows are unreadable; it logs the counts instead.
+
 ## Who pays for Runs
 
 - `hostProviders` are the Host's own credentials, from your environment (never stored): `[{ provider, credentials, models: [...] }]`. Each model is `{ modelId, label?, images?, pdfs?, tools?, maxOutputTokens, inputUsdPerMillion, outputUsdPerMillion }`. `maxOutputTokens` is required: the Host's output cap for a Run on that model, handed to `adapterFor` (the production adapters don't apply it yet). The prices are per 1M tokens and kept with the model. Capability flags default to off unless the model is curated, in which case its curated flags apply. A Tool goes in the same list as `{ tool: "tavily", credentials, pricePerSearchUsd }`: a Host Tavily key that searches for users with no Tavily key of their own, each search recorded at that fixed price.

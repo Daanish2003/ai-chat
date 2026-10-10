@@ -16,7 +16,7 @@ import {
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
 import { exportUserData, type UserExport } from "./export-user";
-import { countUnreadableCredentials } from "./credentials/store";
+import { countUnreadableCredentials, rotateCredentialKeys } from "./credentials/store";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { rateLimitedFor, resolveRateLimits, rpcRateLimits, type RateLimits } from "./rate-limits";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
@@ -129,6 +129,12 @@ export function createChat(options: CreateChatOptions): {
   deleteUser: (userId: string) => Promise<void>;
   /** Everything the SDK keeps for a user, as one document (`version: 1`). Empty for an unknown id. */
   exportUser: (userId: string) => Promise<UserExport>;
+  /**
+   * Re-encrypts every stored secret under the keyring's first secret (ADR 0010). Batched and safe
+   * to re-run. `unreadable` counts rows no key can read; they are left in place and logged. Run it
+   * as a one-off command, never in the pre-deploy step.
+   */
+  rotateKeys: () => Promise<{ reencrypted: number; unreadable: number }>;
 } {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
@@ -176,6 +182,17 @@ export function createChat(options: CreateChatOptions): {
     },
     deleteUser: (userId) => deleteUserData(getDeps(), userId),
     exportUser: (userId) => exportUserData(getDeps(), userId),
+    rotateKeys: async () => {
+      const { reencrypted, unreadable } = await rotateCredentialKeys(getDeps());
+      const unreadableCount = unreadable.unknownKey + unreadable.corrupt;
+      if (unreadableCount > 0) {
+        (options.logger ?? console).error(
+          "Stored credentials can't be read; left in place",
+          unreadable,
+        );
+      }
+      return { reencrypted, unreadable: unreadableCount };
+    },
   };
 }
 
