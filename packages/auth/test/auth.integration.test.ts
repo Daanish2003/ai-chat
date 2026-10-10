@@ -1,6 +1,8 @@
 import { createDb } from "@ai-chat/db";
 import { account, user } from "@ai-chat/db/schema/auth";
 import { createMemorySender, type EmailSender } from "@ai-chat/email";
+import { randomUUID } from "node:crypto";
+
 import { eq } from "drizzle-orm";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
@@ -268,5 +270,91 @@ describe("change password", () => {
     expect(refused.status).toBe(400);
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(sender.messages.map((message) => message.template)).not.toContain("password-changed");
+  });
+});
+
+describe("change email", () => {
+  // The database persists between runs, so every run uses its own addresses.
+  const run = randomUUID().slice(0, 8);
+  const OLD = `old-address-${run}@example.com`;
+  const NEW = `new-address-${run}@example.com`;
+  const TAKEN = `taken-${run}@example.com`;
+  const REQUESTER = `requester-${run}@example.com`;
+  const FREE = `free-${run}@example.com`;
+  const RETURN_TO = `${BASE}/email-changed`;
+
+  async function signedIn(auth: ReturnType<typeof createAuth>, email: string) {
+    await signUp(auth, email, "mover-password-1");
+    await database.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+    const response = await post(auth, "/sign-in/email", { email, password: "mover-password-1" });
+    return response.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .join("; ");
+  }
+
+  function requestChange(auth: ReturnType<typeof createAuth>, cookie: string, newEmail: string) {
+    return auth.handler(
+      new Request(`${BASE}/api/auth/change-email`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: BASE, cookie },
+        body: JSON.stringify({ newEmail, callbackURL: RETURN_TO }),
+      }),
+    );
+  }
+
+  // Opens an emailed link with the given session, the way a browser would.
+  function open(auth: ReturnType<typeof createAuth>, link: string | undefined, cookie: string) {
+    return auth.handler(new Request(link ?? "", { headers: { cookie } }));
+  }
+
+  function changeMails(sender: { messages: { template: string; to: string }[] }) {
+    return sender.messages.filter(
+      (message) =>
+        message.template.startsWith("change-email") || message.template === "verify-new-email",
+    );
+  }
+
+  it("sends the confirmation to the current address, and changes nothing until the new one is verified", async () => {
+    const sender = createMemorySender();
+    const auth = createAuth(env, database, sender, makeLogger());
+    const cookie = await signedIn(auth, OLD);
+
+    const response = await requestChange(auth, cookie, NEW);
+
+    expect(response.status).toBe(200);
+    await vi.waitFor(() => expect(changeMails(sender)).toHaveLength(1));
+    expect(changeMails(sender)[0]).toMatchObject({ to: OLD, template: "change-email-confirm" });
+    expect(await userRow(OLD)).toHaveLength(1);
+    expect(await userRow(NEW)).toHaveLength(0);
+
+    const confirmed = await open(auth, sender.lastLinkTo(OLD), cookie);
+    expect(confirmed.status).toBe(302);
+    await vi.waitFor(() => expect(changeMails(sender)).toHaveLength(2));
+    expect(changeMails(sender)[1]).toMatchObject({ to: NEW, template: "verify-new-email" });
+    expect(await userRow(OLD)).toHaveLength(1);
+    expect(await userRow(NEW)).toHaveLength(0);
+
+    const verified = await open(auth, sender.lastLinkTo(NEW), cookie);
+    expect(verified.status).toBe(302);
+    expect(await userRow(NEW)).toHaveLength(1);
+    expect(await userRow(OLD)).toHaveLength(0);
+  });
+
+  it("answers an address that already has an account the same as a free one, and changes no account", async () => {
+    const sender = createMemorySender();
+    const auth = createAuth(env, database, sender, makeLogger());
+    await signUp(auth, TAKEN, "taken-password-1");
+    const cookie = await signedIn(auth, REQUESTER);
+
+    const taken = await requestChange(auth, cookie, TAKEN);
+    const free = await requestChange(auth, cookie, FREE);
+
+    expect(taken.status).toBe(free.status);
+    expect(await taken.json()).toEqual(await free.json());
+    await vi.waitFor(() => expect(changeMails(sender)).toHaveLength(1));
+    expect(changeMails(sender)).toEqual([expect.objectContaining({ to: REQUESTER })]);
+    expect(await userRow(REQUESTER)).toHaveLength(1);
+    expect(await userRow(TAKEN)).toHaveLength(1);
   });
 });
