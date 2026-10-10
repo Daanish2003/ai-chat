@@ -10,6 +10,7 @@
     "db:migrate": "prisma migrate deploy && node scripts/migrate.ts",
     "fake-provider": "node scripts/fake-ollama.ts",
     "smoke": "node --import ./scripts/register-ts.mjs scripts/smoke.ts",
+    "test:e2e": "playwright test",
     "postinstall": "prisma generate"
   },
   "dependencies": {
@@ -63,6 +64,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/node": "^26.6.4",
     "@types/pg": "^8.23.1",
