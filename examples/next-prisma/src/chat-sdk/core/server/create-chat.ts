@@ -6,12 +6,19 @@ import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
 import { quotaLookup } from "./chat/quota";
-import { createAppDeps, type AppDeps, type HostProvider, type QuotaSetting } from "./deps";
+import {
+  createAppDeps,
+  type AppDeps,
+  type HostProvider,
+  type HostTool,
+  type QuotaSetting,
+} from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
+import { exportUserData, type UserExport } from "./export-user";
 import { countUnreadableCredentials } from "./credentials/store";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
-import { resolveRateLimits, type RateLimits } from "./rate-limits";
+import { rateLimitedFor, resolveRateLimits, rpcRateLimits, type RateLimits } from "./rate-limits";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
 import { loadSharedConversation } from "./share/store";
@@ -39,8 +46,11 @@ export type CreateChatOptions = {
   /** Overrides for the default rate limits (spec 87). Each action is optional; `false` turns it off. */
   rateLimits?: RateLimits;
   logger?: Logger;
-  /** The Host's own credentials and the Models they pay for (ADR 0007). Never stored. */
-  hostProviders?: HostProvider[];
+  /**
+   * The Host's own credentials (ADR 0007). A Provider entry carries its Models; a Tool entry (`tool:
+   * "tavily"`) carries its price per search. Never stored.
+   */
+  hostProviders?: Array<HostProvider | HostTool>;
   /** Whether users may use their own Provider credentials. Defaults to `true` (ADR 0007). */
   byok?: boolean;
   /**
@@ -77,6 +87,10 @@ export function createChatHandler(
     if (!user && pathname !== sharedReadPath) return unauthorized();
 
     if (pathname === rpcPrefix || pathname.startsWith(`${rpcPrefix}/`)) {
+      if (user) {
+        const refused = await rpcRateLimitRefusal(deps, user.id, pathname.slice(rpcPrefix.length));
+        if (refused) return refused;
+      }
       const context: Context = { user, deps };
       const result = await rpc.handle(request, { prefix: rpcPrefix, context });
       return result.matched ? result.response : notFound();
@@ -113,6 +127,8 @@ export function createChat(options: CreateChatOptions): {
   stop: () => Promise<void>;
   /** Deletes everything the SDK holds for a user, in one transaction. Idempotent. */
   deleteUser: (userId: string) => Promise<void>;
+  /** Everything the SDK keeps for a user, as one document (`version: 1`). Empty for an unknown id. */
+  exportUser: (userId: string) => Promise<UserExport>;
 } {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
@@ -123,7 +139,8 @@ export function createChat(options: CreateChatOptions): {
       db: createDb({ DATABASE_URL: options.databaseUrl }),
       keyEncryptionSecrets: options.keyEncryptionSecrets,
       runtime: options.runtime ?? memoryRuntime(),
-      hostProviders: options.hostProviders ?? [],
+      hostProviders: (options.hostProviders ?? []).filter(isHostProvider),
+      hostTools: (options.hostProviders ?? []).filter(isHostTool),
       byok: options.byok ?? true,
       getQuota: quotaLookup(options.getQuota),
       rateLimits: resolveRateLimits(options.rateLimits),
@@ -158,7 +175,32 @@ export function createChat(options: CreateChatOptions): {
       await options.runtime?.close?.();
     },
     deleteUser: (userId) => deleteUserData(getDeps(), userId),
+    exportUser: (userId) => exportUserData(getDeps(), userId),
   };
+}
+
+const isHostTool = (entry: HostProvider | HostTool): entry is HostTool => "tool" in entry;
+const isHostProvider = (entry: HostProvider | HostTool): entry is HostProvider =>
+  !isHostTool(entry);
+
+/** Counts a hit on a limited RPC route and answers 429 with `Retry-After` once it is over its limit. */
+async function rpcRateLimitRefusal(
+  deps: AppDeps,
+  userId: string,
+  route: string,
+): Promise<Response | null> {
+  const rule = rpcRateLimits[route];
+  if (!rule) return null;
+  const retryAfter = await rateLimitedFor(
+    deps.counters,
+    deps.rateLimits[rule],
+    `${rule}:${userId}`,
+  );
+  if (retryAfter === null) return null;
+  return Response.json(
+    { message: "Too many requests; try again in a moment" },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
 }
 
 function unauthorized() {

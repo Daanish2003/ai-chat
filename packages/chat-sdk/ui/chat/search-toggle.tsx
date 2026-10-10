@@ -18,7 +18,10 @@ export function useWebSearch(model: string | null | undefined) {
   const models = useQuery(orpc.models.list.queryOptions());
   const [on, setOn] = useSearchPreference();
   const toggle = searchToggle({
-    hasTavilyKey: credentials.data?.some((saved) => saved.service === tavilyService) ?? false,
+    // The user's own Tavily key, or the Host's when it offers one (ADR 0007).
+    hasTavilyKey:
+      (credentials.data?.some((saved) => saved.service === tavilyService) ?? false) ||
+      (models.data?.webSearchOnHost ?? false),
     modelTools: models.data?.models.find((candidate) => candidate.id === model)?.tools ?? false,
     on,
   });
