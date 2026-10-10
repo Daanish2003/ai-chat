@@ -31,8 +31,6 @@ export async function deleteUserData(deps: AppDeps, userId: string): Promise<voi
     // 2b. Projects, after their Conversations; a Project's own Conversations are already gone.
     await tx.delete(project).where(eq(project.userId, userId));
 
-    // 2b. Projects, after their Conversations; a Project's own Conversations are already gone.
-
     // 3. Attachments and their bytes. The bytes live in Postgres, so they go with their rows. There
     // is no external blob store yet: an external one would delete its objects here, best-effort,
     // after the commit.
