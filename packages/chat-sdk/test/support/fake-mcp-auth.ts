@@ -13,6 +13,10 @@ export type FakeMcpAuth = {
   approve: (authorizeUrl: string, options?: { deny?: boolean }) => string;
   /** Every token request the server answered, for checks on what the SDK sent. */
   tokenRequests: Array<Record<string, string>>;
+  /** Whether the fake MCP server accepts this access token: one the server issued and has not revoked. */
+  accepts: (accessToken: string) => boolean;
+  /** Revokes a refresh token, so the next refresh with it is refused. */
+  revokeRefresh: (refreshToken: string) => void;
 };
 
 export const fakeMcpResource = "https://mcp.test/mcp";
@@ -30,7 +34,23 @@ export function createFakeMcpAuth({
   // code -> what the authorize step bound it to
   const codes = new Map<string, { challenge: string; redirectUri: string }>();
   const tokenRequests: Array<Record<string, string>> = [];
+  const accessTokens = new Set<string>();
+  const refreshTokens = new Set<string>();
   let counter = 0;
+  const issue = () => {
+    counter += 1;
+    const accessToken = `access-token-${counter}-${randomBytes(12).toString("hex")}`;
+    const refreshToken = `refresh-token-${counter}`;
+    accessTokens.add(accessToken);
+    refreshTokens.add(refreshToken);
+    return {
+      access_token: accessToken,
+      token_type: "Bearer",
+      refresh_token: refreshToken,
+      expires_in: 3600,
+      scope,
+    };
+  };
 
   const json = (body: unknown, status = 200) => Response.json(body, { status });
 
@@ -64,6 +84,11 @@ export function createFakeMcpAuth({
         `${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`,
       ).toString("base64")}`;
       if (basic !== expected) return json({ error: "invalid_client" }, 401);
+      if (form.grant_type === "refresh_token") {
+        if (!refreshTokens.has(form.refresh_token ?? ""))
+          return json({ error: "invalid_grant" }, 400);
+        return json(issue());
+      }
       const bound = codes.get(form.code ?? "");
       codes.delete(form.code ?? "");
       if (!bound) return json({ error: "invalid_grant" }, 400);
@@ -72,14 +97,7 @@ export function createFakeMcpAuth({
       if (challenge !== bound.challenge || form.redirect_uri !== bound.redirectUri) {
         return json({ error: "invalid_grant" }, 400);
       }
-      counter += 1;
-      return json({
-        access_token: `access-token-${counter}-${randomBytes(12).toString("hex")}`,
-        token_type: "Bearer",
-        refresh_token: `refresh-token-${counter}`,
-        expires_in: 3600,
-        scope,
-      });
+      return json(issue());
     }
     return new Response("Not found", { status: 404 });
   };
@@ -88,6 +106,10 @@ export function createFakeMcpAuth({
     fetch,
     resource: fakeMcpResource,
     tokenRequests,
+    accepts: (accessToken) => accessTokens.has(accessToken),
+    revokeRefresh: (refreshToken) => {
+      refreshTokens.delete(refreshToken);
+    },
     approve: (authorizeUrl, options) => {
       const url = new URL(authorizeUrl);
       const redirectUri = url.searchParams.get("redirect_uri") ?? "";

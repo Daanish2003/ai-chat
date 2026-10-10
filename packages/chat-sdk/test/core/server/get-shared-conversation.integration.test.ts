@@ -169,6 +169,50 @@ describe("chat.getSharedConversation", () => {
 });
 
 describe("chat.getSharedConversation with tool calls", () => {
+  it("shows an MCP tool call as used, with no arguments or result", async () => {
+    const owner = await insertUser();
+    const conv = await insertConversation(owner, { title: "MCP" });
+    const question = await insertMessage({
+      conversationId: conv.id,
+      role: "user",
+      text: "Issues?",
+    });
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "",
+      parts: storedParts([
+        {
+          type: "tool_call",
+          toolCallId: "call-mcp",
+          name: "linear_list_issues",
+          source: "mcp",
+          args: { team: "private" },
+          result: { issues: ["private"] },
+          state: "done",
+        },
+      ]),
+      active: true,
+    });
+    const { client } = chatFor(owner);
+    const link = await client.rpc.share.upsert({ conversationId: conv.id });
+
+    const shared = await chatFor(null).chat.getSharedConversation(link.token);
+    const [, reply] = shared?.messages ?? [];
+
+    expect(reply?.parts).toEqual([
+      expect.objectContaining({
+        type: "tool-call",
+        id: "call-mcp",
+        name: "linear_list_issues",
+        arguments: "",
+        metadata: expect.objectContaining({ source: "mcp", redacted: true }),
+      }),
+    ]);
+    expect(JSON.stringify(shared)).not.toContain("private");
+  });
+
   it("shows a host tool call as used, with no arguments or result, and a search in full", async () => {
     const owner = await insertUser();
     const conv = await insertConversation(owner, { title: "Tools" });

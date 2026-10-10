@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 import type { MessageUsage } from "../../../shared/chat/message-record";
+import type { ConversationTools } from "../../../shared/chat/conversation-tools";
 import type { StoredParts } from "../../../shared/message-parts";
 import { chatSchema } from "./chat-schema";
 
@@ -64,6 +65,11 @@ export const conversation = chatSchema.table(
     }),
     /** The Project this Conversation is in; null when it is in none. Deleting it deletes this. */
     projectId: uuid("project_id").references(() => project.id, { onDelete: "cascade" }),
+    /** The MCP tools switched on here: its Connections and allowed tools (spec #91). */
+    toolSettings: jsonb("tool_settings")
+      .$type<ConversationTools>()
+      .default(sql`'{"connections": [], "allowedTools": []}'::jsonb`)
+      .notNull(),
     /** When the Conversation was pinned; null when it is not pinned. */
     pinnedAt: timestamp("pinned_at"),
     /** Bumped only by new Messages, never by renames or Branch switches. */
