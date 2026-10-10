@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { useByok } from "../../core/client/react/byok";
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
 import { InstructionsField } from "../settings/instructions-field";
+import { SharedLinksSection } from "../settings/shared-links";
 import { TitleModelSelect } from "../settings/title-model-select";
 
 /**
@@ -84,6 +85,8 @@ export function KeySettingsPage() {
           </section>
         </>
       )}
+
+      <SharedLinksSection />
 
       <InstructionsField />
 

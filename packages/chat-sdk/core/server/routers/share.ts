@@ -4,6 +4,7 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure } from "../procedures";
 import {
   deleteSharedLink,
+  listSharedLinks,
   loadSharedConversation,
   shareStatus,
   upsertSharedLink,
@@ -38,6 +39,9 @@ export const shareRouter = {
     const owned = await deleteSharedLink(context.deps, context.user.id, input.conversationId);
     if (!owned) throw conversationNotFound();
   }),
+
+  /** The caller's Shared links, newest share first, for the settings page. */
+  list: protectedProcedure.handler(({ context }) => listSharedLinks(context.deps, context.user.id)),
 
   /** The share dialog's state: the link, whether it's stale, and why sharing is blocked. */
   forConversation: protectedProcedure
