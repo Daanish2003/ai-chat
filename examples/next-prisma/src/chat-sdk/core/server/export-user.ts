@@ -116,8 +116,8 @@ export async function exportUserData(deps: AppDeps, userId: string): Promise<Use
         .innerJoin(conversation, eq(conversation.id, sharedLink.conversationId))
         .where(eq(conversation.userId, userId));
 
-      const attachmentsByMessage = Map.groupBy(attachments, (row) => row.messageId);
-      const messagesByConversation = Map.groupBy(messages, (row) => row.conversationId);
+      const attachmentsByMessage = groupBy(attachments, (row) => row.messageId);
+      const messagesByConversation = groupBy(messages, (row) => row.conversationId);
 
       return {
         version: 1,
@@ -158,4 +158,16 @@ export async function exportUserData(deps: AppDeps, userId: string): Promise<Use
     },
     { isolationLevel: "repeatable read" },
   );
+}
+
+// `Map.groupBy` is ES2024, newer than some Hosts' TypeScript lib.
+function groupBy<T, K>(rows: T[], key: (row: T) => K): Map<K, T[]> {
+  const groups = new Map<K, T[]>();
+  for (const row of rows) {
+    const k = key(row);
+    const group = groups.get(k);
+    if (group) group.push(row);
+    else groups.set(k, [row]);
+  }
+  return groups;
 }
