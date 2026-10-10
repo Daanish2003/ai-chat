@@ -1,8 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
-import { stopRun } from "./chat/run";
+import { stopUserRuns } from "./chat/run";
 import { attachment, attachmentBlob } from "./db/schema/attachment";
-import { conversation, message, project } from "./db/schema/chat";
+import { conversation, project } from "./db/schema/chat";
 import { userCredentials } from "./db/schema/credentials";
 import { userSettings } from "./db/schema/settings";
 import { usage } from "./db/schema/usage";
@@ -19,12 +19,7 @@ export async function deleteUserData(deps: AppDeps, userId: string): Promise<voi
   await deps.db.transaction(async (tx) => {
     // 1. Stop the user's live Runs through the Stop path. The Run's owner aborts and, its row gone,
     // its later writes match nothing.
-    const live = await tx
-      .select({ id: message.id })
-      .from(message)
-      .innerJoin(conversation, eq(conversation.id, message.conversationId))
-      .where(and(eq(conversation.userId, userId), eq(message.status, "streaming")));
-    for (const { id } of live) await stopRun(deps, id, tx);
+    await stopUserRuns(deps, userId, tx);
 
     // 2. Conversations, which cascade to their Messages, Shared links and Message–Attachment links.
     await tx.delete(conversation).where(eq(conversation.userId, userId));
@@ -47,5 +42,18 @@ export async function deleteUserData(deps: AppDeps, userId: string): Promise<voi
     await tx.delete(userSettings).where(eq(userSettings.userId, userId));
     // 5. Usage rows, which no Conversation cascades to: a deleted account keeps no Quota history.
     await tx.delete(usage).where(eq(usage.userId, userId));
+  });
+}
+
+/**
+ * Deletes every Conversation the user owns, Project ones included, in one transaction. Their
+ * Messages, Shared links and Message–Attachment links go with them. The Projects stay, empty, and
+ * so do the Attachments, which a Conversation's delete never removed (the reaper takes unused ones).
+ * Live Runs in them stop first, as in `deleteUserData`.
+ */
+export async function deleteAllConversations(deps: AppDeps, userId: string): Promise<void> {
+  await deps.db.transaction(async (tx) => {
+    await stopUserRuns(deps, userId, tx);
+    await tx.delete(conversation).where(eq(conversation.userId, userId));
   });
 }

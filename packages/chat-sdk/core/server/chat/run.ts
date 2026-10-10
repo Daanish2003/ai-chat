@@ -1,5 +1,5 @@
 import { storedPartsSchema } from "../../shared/message-parts";
-import { message } from "../db/schema/chat";
+import { conversation, message } from "../db/schema/chat";
 import {
   type AnyTextAdapter,
   chat,
@@ -324,6 +324,19 @@ export async function stopRun(deps: AppDeps, messageId: string, db: Executor = d
 
 /** The database, or the transaction a caller is in (`deleteUser` stops Runs inside its own). */
 export type Executor = AppDeps["db"] | Parameters<Parameters<AppDeps["db"]["transaction"]>[0]>[0];
+
+/**
+ * Stops every live Run in the user's Conversations through the Stop path, inside the caller's
+ * transaction. Their owners write nothing more once the rows the caller deletes are gone.
+ */
+export async function stopUserRuns(deps: AppDeps, userId: string, db: Executor = deps.db) {
+  const live = await db
+    .select({ id: message.id })
+    .from(message)
+    .innerJoin(conversation, eq(conversation.id, message.conversationId))
+    .where(and(eq(conversation.userId, userId), eq(message.status, "streaming")));
+  for (const { id } of live) await stopRun(deps, id, db);
+}
 
 /**
  * Saves a streaming Message whose owner is gone as `stopped`, cancels its running searches and
