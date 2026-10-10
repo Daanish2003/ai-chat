@@ -37,7 +37,7 @@ export function modelGroups<T extends CuratedModel>(models: T[], search: string)
 export function missingCredentialsMessage(
   selected: string,
   available: CuratedModel[],
-  byok = true,
+  byok: boolean,
 ) {
   if (available.some((model) => model.id === selected)) return null;
   const prefix = parseModelId(selected)?.provider ?? "";

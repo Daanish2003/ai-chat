@@ -12,6 +12,7 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { invalidateConversationList } from "../../core/client/react/conversation-list";
+import { useByok } from "../../core/client/react/byok";
 import { useChatAdapter } from "../../core/client/react/provider";
 import { readSearchPreference } from "../../core/client/react/search-preference";
 
@@ -105,8 +106,9 @@ export function ChatView({
 
   // The selected Model's Provider may have lost its credentials; the server re-checks on send.
   const models = useQuery(orpc.models.list.queryOptions());
+  const byok = useByok();
   const blocked = models.data
-    ? missingCredentialsMessage(conversation.model, models.data.models)
+    ? missingCredentialsMessage(conversation.model, models.data.models, byok)
     : null;
   const search = useWebSearch(conversation.model);
 

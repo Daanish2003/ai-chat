@@ -69,32 +69,32 @@ describe("modelGroups with live lists", () => {
 
 describe("missingCredentialsMessage", () => {
   it("is null while the selected Model's Provider has credentials", () => {
-    expect(missingCredentialsMessage("openai:gpt-5.6", available)).toBeNull();
+    expect(missingCredentialsMessage("openai:gpt-5.6", available, true)).toBeNull();
   });
 
   it("asks for the Provider's key when its credentials are gone", () => {
-    expect(missingCredentialsMessage("openai:gpt-6-luna", available.slice(1, 3))).toBe(
+    expect(missingCredentialsMessage("openai:gpt-6-luna", available.slice(1, 3), true)).toBe(
       "Add an OpenAI key or pick another Model",
     );
-    expect(missingCredentialsMessage("anthropic:claude-opus-5-5", [])).toBe(
+    expect(missingCredentialsMessage("anthropic:claude-opus-5-5", [], true)).toBe(
       "Add an Anthropic key or pick another Model",
     );
   });
 
   it("asks for the key of a live-listed Model's Provider when its credentials are gone", () => {
-    expect(missingCredentialsMessage("openrouter:openai/gpt-5.5", available)).toBe(
+    expect(missingCredentialsMessage("openrouter:openai/gpt-5.5", available, true)).toBe(
       "Add an OpenRouter key or pick another Model",
     );
   });
 
   it("asks for another Model when a live-listed Model left its list", () => {
     expect(
-      missingCredentialsMessage("ollama:llama3.2:latest", [liveModel("ollama", "qwen3:8b")]),
+      missingCredentialsMessage("ollama:llama3.2:latest", [liveModel("ollama", "qwen3:8b")], true),
     ).toBe("Pick another Model");
   });
 
   it("asks for another Model when the selected one isn't offered any more", () => {
-    expect(missingCredentialsMessage("openai:gpt-2", available)).toBe("Pick another Model");
+    expect(missingCredentialsMessage("openai:gpt-2", available, true)).toBe("Pick another Model");
   });
 });
 
