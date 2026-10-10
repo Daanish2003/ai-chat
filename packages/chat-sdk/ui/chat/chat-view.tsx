@@ -3,7 +3,12 @@ import type { AppRouterClient } from "../../core/server/routers/index";
 import { ChatContainerContent, ChatContainerRoot } from "@/components/ui/prompt-kit/chat-container";
 import { ScrollButton } from "@/components/ui/prompt-kit/scroll-button";
 import type { ChatCommand } from "../../core/shared/chat/command";
-import { branchFrom, takePendingFirstMessage, toUIMessages } from "../../core/client/chat";
+import {
+  branchFrom,
+  contextCutIds,
+  takePendingFirstMessage,
+  toUIMessages,
+} from "../../core/client/chat";
 import { missingCredentialsMessage } from "../../core/client/models";
 import { rateLimitedErrorOf, runFetch } from "../../core/client/rate-limit";
 import { fetchServerSentEvents, type UIMessage, useChat } from "@tanstack/ai-react";
@@ -184,6 +189,9 @@ export function ChatView({
     }),
   );
 
+  // The Messages the Model's context starts at, on the Branch shown (issue #122).
+  const contextCuts = contextCutIds(messages);
+
   const highlighted = useFocusMessage({
     target: focusMessageId,
     onScreen: messages.map((message) => message.id),
@@ -212,6 +220,7 @@ export function ChatView({
               key={message.id}
               message={message}
               highlighted={message.id === highlighted}
+              contextCut={contextCuts.has(message.id)}
               actions={{
                 streaming: streaming || switchBranch.isPending,
                 model: conversation.model,

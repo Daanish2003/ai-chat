@@ -21,6 +21,7 @@ import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 import { quotaExceededCode, quotaRefusal } from "./quota";
 import { generationOptionsFor } from "./generation";
+import { compactionFor, contextBudgetOf, estimateModelMessageTokens } from "./compaction";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 
@@ -111,26 +112,52 @@ export async function handleChat(
   });
   const userParts =
     command.text === undefined ? undefined : storedParts([{ type: "text", text: command.text }]);
-  const messages = toModelMessages(
-    [
-      ...history.map((row) => ({
+  const userMessageId = uuidv7();
+  const assistantMessageId = uuidv7();
+  // Each stored Message with the model messages it sends, so a cut maps back to its Message (#122).
+  const sent = [
+    ...history.map((row) => ({
+      id: row.id,
+      stored: {
         role: row.role,
         parts: parseStoredParts(row.parts),
         model: row.model,
         attachments: attachments.ofHistory(row),
-      })),
-      ...(userParts
-        ? [{ role: "user" as const, parts: userParts, attachments: attachments.added }]
-        : []),
-    ],
-    {
+      },
+    })),
+    ...(userParts
+      ? [
+          {
+            id: userMessageId,
+            stored: { role: "user" as const, parts: userParts, attachments: attachments.added },
+          },
+        ]
+      : []),
+  ].map(({ id, stored }) => ({
+    id,
+    messages: toModelMessages([stored], {
       provider: model.provider,
       webSearch: searchCall !== null,
       reads: { images: model.images, pdfs: model.pdfs },
-    },
-  );
-  const userMessageId = uuidv7();
-  const assistantMessageId = uuidv7();
+    }),
+  }));
+  const messages = sent.flatMap((entry) => entry.messages);
+  const owners = sent.flatMap((entry) => entry.messages.map(() => entry.id));
+  const budget = contextBudgetOf({
+    contextWindow: model.contextWindow,
+    maxOutputTokens: model.maxOutputTokens,
+  });
+  // A new Message too big for the window on its own can't be sent, so it is refused before anything is written.
+  const newMessages = userParts ? (sent.at(-1)?.messages ?? []) : [];
+  if (
+    budget !== null &&
+    newMessages.reduce((total, message) => total + estimateModelMessageTokens(message), 0) > budget
+  ) {
+    return refuse(
+      400,
+      "This message is too long for the Model's context window. Shorten it or remove an attachment.",
+    );
+  }
   const now = new Date();
   const started = await deps.db.transaction(async (tx) => {
     // One run per Conversation (ADR 0002). Locking the Conversation row queues concurrent sends
@@ -198,6 +225,9 @@ export async function handleChat(
     webSearch: searchCall?.credentials,
     systemPrompts,
     modelOptions: generationOptionsFor(model.id, { maxOutputTokens: model.maxOutputTokens }),
+    // Only a Model with a known window is compacted; the others send every Message, as before.
+    compaction:
+      budget === null ? undefined : compactionFor({ budget, owners, reply: assistantMessageId }),
     // A Run on Host credentials is recorded against the user's Quota (ADR 0007).
     meter: call.hostModel ? { userId, model: model.id, price: call.hostModel } : undefined,
     // Each search on the Host's Tavily key is recorded at its price (ADR 0007).

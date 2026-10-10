@@ -51,6 +51,29 @@ describe("chat.getSharedConversation", () => {
     expect(shared?.messages.map(({ role }) => role)).toEqual(["user", "assistant"]);
   });
 
+  it("carries no context start, even when the reply has one (#122)", async () => {
+    const owner = await insertUser();
+    const conv = await insertConversation(owner);
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Hello.",
+      contextStartId: question.id,
+      active: true,
+    });
+    const { client } = chatFor(owner);
+    const link = await client.rpc.share.upsert({ conversationId: conv.id });
+
+    const shared = await chatFor(null).chat.getSharedConversation(link.token);
+
+    expect(shared?.messages).toHaveLength(2);
+    for (const shownMessage of shared?.messages ?? []) {
+      expect(shownMessage).not.toHaveProperty("contextStartId");
+    }
+  });
+
   it("never carries the owner's Instructions", async () => {
     const owner = await insertUser();
     const conv = await insertConversation(owner, { title: "Private" });

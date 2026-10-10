@@ -30,6 +30,7 @@ export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
       error,
       errorReason,
       usage,
+      contextStartId,
       siblings,
       attachments,
     }) => ({
@@ -43,14 +44,38 @@ export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
         error,
         errorReason,
         usage,
+        contextStartId,
         siblings,
         attachments,
       } satisfies MessageInfo & {
         siblings: SiblingPosition;
         attachments: AttachmentChip[];
+        contextStartId: string | null;
       },
     }),
   );
+}
+
+/**
+ * The Message a reply's context starts at, when the Model's window dropped older Messages for it
+ * (issue #122); null otherwise, and always null on a Shared link.
+ */
+export function messageContextStart(message: UIMessage): string | null {
+  const info = message.metadata as { contextStartId?: string | null } | undefined;
+  return info?.contextStartId ?? null;
+}
+
+/**
+ * The Messages of a Branch that the context marker sits above: each reply's context start, among
+ * the Messages passed in. Pass only one Branch's Messages, so each Branch shows its own cut-off.
+ */
+export function contextCutIds(messages: UIMessage[]): Set<string> {
+  const ids = new Set<string>();
+  for (const message of messages) {
+    const start = messageContextStart(message);
+    if (start !== null && messages.some((other) => other.id === start)) ids.add(start);
+  }
+  return ids;
 }
 
 /** A Shared link's Messages, for read-only `MessageRow`s. */
