@@ -1,6 +1,17 @@
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { useChatAdapter, useOrpc } from "../../core/client/react/provider";
 import { ConversationRow } from "../shell/conversation-panel";
@@ -46,6 +57,7 @@ export function ProjectPage({ projectId }: { projectId: string }) {
           <Link page={{ to: "new", projectId }} className={buttonVariants({ size: "sm" })}>
             New chat in this Project
           </Link>
+          <DeleteProjectButton projectId={projectId} />
         </div>
       </header>
       {editing && project.data && (
@@ -77,4 +89,71 @@ export function ProjectPage({ projectId }: { projectId: string }) {
       )}
     </div>
   );
+}
+
+/**
+ * Deletes the Project with its Conversations, after a confirmation that says how many go. The
+ * count is read when the dialog opens. On success the user leaves the Project's page.
+ */
+function DeleteProjectButton({ projectId }: { projectId: string }) {
+  const orpc = useOrpc();
+  const queryClient = useQueryClient();
+  const { navigate } = useChatAdapter();
+  const [open, setOpen] = useState(false);
+  const count = useQuery(
+    orpc.project.conversationCount.queryOptions({ input: { id: projectId }, enabled: open }),
+  );
+  const remove = useMutation(
+    orpc.project.delete.mutationOptions({
+      onSuccess: async ({ count: removed }) => {
+        setOpen(false);
+        toast.success(`Project deleted with ${conversationsLabel(removed)}`);
+        // The sidebar's Projects section, the Pinned section, the lists and the Shared links.
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: orpc.project.key() }),
+          queryClient.invalidateQueries({ queryKey: orpc.conversation.key() }),
+          queryClient.invalidateQueries({ queryKey: orpc.share.key() }),
+        ]);
+        await navigate({ to: "new" });
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+  const total = count.data?.count;
+
+  return (
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger render={<Button variant="destructive" size="sm" />}>
+        Delete Project
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete this Project?</AlertDialogTitle>
+          <AlertDialogDescription>
+            {count.isError
+              ? "Couldn't count this Project's Conversations, so it can't be deleted right now."
+              : total === undefined
+                ? "Checking how many Conversations it holds…"
+                : `This deletes the Project and its ${conversationsLabel(total)}, with their Messages and Shared links. This can't be undone.`}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <Button
+            variant="destructive"
+            disabled={total === undefined || remove.isPending}
+            onClick={() => remove.mutate({ id: projectId })}
+          >
+            {remove.isPending ? "Deleting…" : "Delete Project"}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+/** "1 Conversation", "3 Conversations", "no Conversations". */
+function conversationsLabel(count: number) {
+  if (count === 0) return "no Conversations";
+  return `${count} ${count === 1 ? "Conversation" : "Conversations"}`;
 }
