@@ -8,7 +8,7 @@ import { createClient, type RedisClientType } from "redis";
 export type RedisConnection = {
   command: () => Promise<RedisClientType>;
   subscriber: () => Promise<RedisClientType>;
-  /** Closes both connections; a later use opens them again. */
+  /** Closes both connections for good: any later use rejects, so nothing reopens after `stop()`. */
   close: () => Promise<void>;
 };
 
@@ -19,25 +19,20 @@ export function createRedisConnection(url: string): RedisConnection {
     client.on("error", (error: unknown) => console.error("Redis connection error", error));
   }
 
+  let closed = false;
+
   // The first use opens the client. A failed open is forgotten, so the next use tries again.
   const opener = (client: RedisClientType) => {
     let opened: Promise<RedisClientType> | undefined;
-    const open = () => {
+    return () => {
+      if (closed) return Promise.reject(new Error("The Redis connection is closed"));
       opened ??= client.connect().catch((error: unknown) => {
         opened = undefined;
         throw error;
       });
       return opened;
     };
-    return {
-      open,
-      reset: () => {
-        opened = undefined;
-      },
-    };
   };
-  const commandOpener = opener(commandClient);
-  const subscriberOpener = opener(subscriberClient);
 
   const closeClient = (client: RedisClientType) => {
     if (client.isReady) return client.close();
@@ -47,11 +42,10 @@ export function createRedisConnection(url: string): RedisConnection {
   };
 
   return {
-    command: commandOpener.open,
-    subscriber: subscriberOpener.open,
+    command: opener(commandClient),
+    subscriber: opener(subscriberClient),
     close: async () => {
-      commandOpener.reset();
-      subscriberOpener.reset();
+      closed = true;
       await Promise.all([closeClient(commandClient), closeClient(subscriberClient)]);
     },
   };

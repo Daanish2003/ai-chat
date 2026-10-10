@@ -73,8 +73,14 @@ export function createRedisRunStreams(
     async open(runId) {
       if (open.has(runId)) return;
       open.set(runId, { queued: [], chain: Promise.resolve(), closed: false });
-      const client = await connection.command();
-      await client.xAdd(keyOf(runId), "*", { state: "open" satisfies Marker["state"] });
+      try {
+        const client = await connection.command();
+        await client.xAdd(keyOf(runId), "*", { state: "open" satisfies Marker["state"] });
+      } catch (error) {
+        // Forget the run, so a retried open writes its marker.
+        open.delete(runId);
+        throw error;
+      }
     },
 
     append(runId, chunk) {

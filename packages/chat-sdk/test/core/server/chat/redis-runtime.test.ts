@@ -1,5 +1,7 @@
 import net from "node:net";
 
+import type { StreamChunk } from "@tanstack/ai";
+
 import { afterAll, describe, expect, it } from "vitest";
 
 import { createChat } from "../../../../core/server/create-chat";
@@ -159,7 +161,7 @@ describe.skipIf(!redisUrl)("redisRuntime on a real Redis", () => {
         messageId: "m",
         delta: "a",
         timestamp: 0,
-      } as never);
+      } as StreamChunk);
       await a.runStreams.close(runId);
       const seenByB = [];
       for await (const entry of b.runStreams.read(runId, START)) seenByB.push(entry);
@@ -190,7 +192,7 @@ describe.skipIf(!redisUrl)("redisRuntime on a real Redis", () => {
         messageId: "m",
         delta: "x",
         timestamp: 0,
-      } as never);
+      } as StreamChunk);
       await runtime.runStreams.close(runIds[0]!);
 
       // One command connection and one subscriber connection, however many Runs are live.
