@@ -179,6 +179,22 @@ const chat = createChat({
 });
 ```
 
+## The Host's tools
+
+`tools` lets the Model call your own code on your server. Write each tool with TanStack AI's `toolDefinition(...).server(fn)` and pass the list to `createChat`. `fn` gets the call's arguments, and `context.context` holds `{ userId, conversationId }`, typed by passing `HostToolContext` to `.server<HostToolContext>(...)`. Every call shows in the reply as one collapsible row, and a Shared link shows only that the tool was used, never its arguments or result. A tool that throws fails only its own call. A reply makes at most 10 tool calls across the Host's tools. A tool's name must not be `web_search`, the SDK's own search tool.
+
+```ts
+const serverTime = toolDefinition({
+  name: "server_time",
+  description: "The current time on the server, in UTC.",
+  inputSchema: z.object({}),
+}).server<HostToolContext>(() => ({ now: new Date().toISOString() }));
+
+createChat({ /* ... */ tools: [serverTime] });
+```
+
+Host tools run without an approval step. To give a tool its own look in the chat, edit `ui/chat/tool-call-row.tsx` in your copy: the copy never overwrites `ui/`.
+
 ## Rate limits
 
 Run starts are limited per user, and the counters live in the `runtime`, so the limit holds across every process that shares it. The default is 20 Run starts a minute. A Run start over the limit answers 429 with `Retry-After` (in seconds), and the chat UI tells the user to try again in a moment.
