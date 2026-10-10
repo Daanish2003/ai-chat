@@ -116,7 +116,7 @@ test("the palette opens with the platform's shortcut and finds a Message", async
 
   await page.keyboard.press(process.platform === "darwin" ? "Meta+K" : "Control+K");
   const palette = page.getByRole("dialog");
-  await palette.getByRole("combobox").fill("pineapple");
+  await palette.getByRole("combobox", { name: /^Search Conversations/ }).fill("pineapple");
   const hit = palette.getByRole("group", { name: "In Messages" }).getByRole("option").first();
   await expect(hit).toContainText("pineapple");
   await hit.click();
