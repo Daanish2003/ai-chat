@@ -1,4 +1,4 @@
-import { findModel } from "../../../core/shared/chat/models";
+import { findModel, unknownReasoning } from "../../../core/shared/chat/models";
 import { describe, expect, it } from "vitest";
 
 import { missingCredentialsMessage, modelGroups, modelLabel } from "../../../core/client/models";
@@ -49,6 +49,9 @@ const liveModel = (provider: "openrouter" | "ollama", modelId: string) => ({
   images: false,
   pdfs: false,
   tools: true,
+  contextWindow: null,
+  maxOutputTokens: null,
+  reasoning: unknownReasoning(),
 });
 
 describe("modelGroups with live lists", () => {
