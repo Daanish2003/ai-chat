@@ -6,16 +6,16 @@ import {
 } from "../shared/chat/models";
 import { addKeyMessage, providers } from "../shared/credentials/services";
 
-export type ModelGroup = {
+export type ModelGroup<T extends CuratedModel = CuratedModel> = {
   provider: CuratedModel["provider"];
   label: string;
   /** The group is the Provider's live list (OpenRouter, Ollama), not a curated one. */
   live: boolean;
-  models: CuratedModel[];
+  models: T[];
 };
 
 /** The picker's list: `models` matching the search text (Model or Provider name), grouped by Provider. */
-export function modelGroups(models: CuratedModel[], search: string): ModelGroup[] {
+export function modelGroups<T extends CuratedModel>(models: T[], search: string): ModelGroup<T>[] {
   const query = search.trim().toLowerCase();
   return providers.flatMap(({ id, label }) => {
     const providerMatches = label.toLowerCase().includes(query);

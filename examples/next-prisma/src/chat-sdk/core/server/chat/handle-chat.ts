@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { attachmentsForSend } from "../attachments/send";
 import { linkAttachments, lockAttachments } from "../attachments/store";
 import { addKeyMessage, tavilyService } from "../../shared/credentials/services";
-import { resolveCredentials } from "../credentials/resolve";
+import { resolveCredentials, resolveModelCall } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import type { ChatUser } from "../context";
 import { uuidv7 } from "../lib/uuidv7";
@@ -43,8 +43,8 @@ export async function handleChat(
 
   const model = await resolveModel(deps, userId, command.model);
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
-  const credentials = await resolveCredentials(deps, userId, model.provider);
-  if (!credentials) return refuse(400, addKeyMessage(model.provider));
+  const call = await resolveModelCall(deps, userId, model.id);
+  if (!call) return refuse(400, addKeyMessage(model.provider));
   // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
   const searchCredentials =
     command.webSearch && model.tools ? await resolveCredentials(deps, userId, tavilyService) : null;
@@ -66,7 +66,9 @@ export async function handleChat(
   if (attachments.error) return refuse(attachments.error.status, attachments.error.message);
 
   // Everything that can fail runs before the Messages are written.
-  const adapter = deps.adapterFor(model.id, credentials);
+  const adapter = deps.adapterFor(model.id, call.credentials, {
+    maxOutputTokens: call.maxOutputTokens,
+  });
   const userParts =
     command.text === undefined ? undefined : storedParts([{ type: "text", text: command.text }]);
   const messages = toModelMessages(

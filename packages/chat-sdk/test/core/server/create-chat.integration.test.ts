@@ -38,6 +38,20 @@ describe("createChat", () => {
   });
 });
 
+describe("createChat start", () => {
+  it("refuses to start with neither Host credentials nor BYOK", async () => {
+    const chat = createChat({
+      databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/unreachable",
+      getUser: () => null,
+      keyEncryptionSecrets: ["test-key-encryption-secret-not-for-production"],
+      basePath,
+      byok: false,
+    });
+
+    await expect(chat.start()).rejects.toThrow(/hostProviders|byok/);
+  });
+});
+
 describe("the chat handler", () => {
   it("answers 401 to every request without a user, except the public Shared link read", async () => {
     const client = createTestChat({ user: null });

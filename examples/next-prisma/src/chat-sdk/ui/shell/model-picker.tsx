@@ -1,4 +1,4 @@
-import { type CuratedModel, findModel } from "../../core/shared/chat/models";
+import { type CuratedModel, findModel, type ListedModel } from "../../core/shared/chat/models";
 import { providerLabel } from "../../core/shared/credentials/services";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -31,7 +31,7 @@ export function ModelPicker({
   /** The selected Model, `"provider:model"`. */
   value: string | undefined;
   /** The Models the user can pick (`models.list`). */
-  models: CuratedModel[];
+  models: ListedModel[];
   onSelect: (model: string) => void;
   /** The selected Model can't be sent to (its Provider has no credentials). */
   invalid?: boolean;
@@ -106,6 +106,14 @@ export function ModelPicker({
                   )}
                 >
                   <span className="flex-1 truncate">{model.label}</span>
+                  {model.onHostCredentials && (
+                    <span
+                      className="rounded border px-1 text-[10px] text-muted-foreground"
+                      title="Runs on the Host's credentials"
+                    >
+                      Host
+                    </span>
+                  )}
                   <Capabilities model={model} />
                   <CheckIcon
                     aria-hidden

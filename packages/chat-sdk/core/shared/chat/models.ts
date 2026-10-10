@@ -17,6 +17,9 @@ export type CuratedModel = {
   tools: boolean;
 };
 
+/** A Model the user can pick (`models.list`). `onHostCredentials`: a Host pays for it (ADR 0007). */
+export type ListedModel = CuratedModel & { onHostCredentials: boolean };
+
 function model(
   provider: ProviderId,
   modelId: string,
