@@ -55,6 +55,7 @@ const sdkTables = [
   "conversation",
   "message",
   "message_attachment",
+  "project",
   "shared_link",
   "user_credentials",
   "user_settings",
@@ -216,7 +217,7 @@ describe("chat.migrate()", () => {
     expect(
       await rows(
         url,
-        `select c.title, c.model, c.reasoning_effort, m.role, m.parts, m.reasoning_effort as m_effort,
+        `select c.title, c.model, c.reasoning_effort, c.project_id, c.pinned_at, m.role, m.parts, m.reasoning_effort as m_effort,
                 m.usage, m.context_start_id, s.title_model, s.instructions
            from chat.conversation c
            join chat.message m on m.conversation_id = c.id
@@ -227,6 +228,8 @@ describe("chat.migrate()", () => {
         title: "Before",
         model: "openai:gpt",
         reasoning_effort: null,
+        project_id: null,
+        pinned_at: null,
         role: "user",
         parts: [],
         m_effort: null,
@@ -267,6 +270,22 @@ describe("chat.migrate()", () => {
     );
     // 'n' is ON DELETE SET NULL.
     expect(constraints).toEqual([{ confdeltype: "n" }]);
+  });
+
+  it("cascades a Project's delete to its Conversations through the foreign key", async () => {
+    const url = await scratchDatabase("project_fk");
+
+    await chatFor(url).migrate();
+
+    const constraints = await rows<{ confdeltype: string }>(
+      url,
+      `select c.confdeltype from pg_constraint c
+         join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+        where c.contype = 'f' and c.conrelid = 'chat.conversation'::regclass
+          and a.attname = 'project_id'`,
+    );
+    // 'c' is ON DELETE CASCADE.
+    expect(constraints).toEqual([{ confdeltype: "c" }]);
   });
 
   it("names the trigram operator class with its schema, and no foreign key leaves chat", async () => {
@@ -315,7 +334,7 @@ describe("chat.migrate()", () => {
     await expect(Promise.all([chat.migrate(), chat.migrate()])).resolves.toBeDefined();
 
     const applied = await rows<{ count: string }>(url, "select count(*) from chat.__migrations");
-    expect(applied).toEqual([{ count: "2" }]);
+    expect(applied).toEqual([{ count: "3" }]);
   });
 
   it("throws an error naming pg_trgm when the role may not create it", async () => {
