@@ -896,3 +896,110 @@ describe("conversation.pin and conversation.unpin", () => {
     });
   });
 });
+
+describe("conversation.move", () => {
+  it("moves a Conversation into a Project, so it leaves the main list and shows on the Project's", async () => {
+    const { user, client } = await signedIn();
+    const { id: projectId } = await client.project.create({ name: "Work" });
+    const conv = await insertConversation(user, { title: "Daily" });
+
+    await client.conversation.move({ id: conv.id, projectId });
+
+    expect(await listItems(client)).toEqual([]);
+    expect((await client.conversation.list({ projectId })).items.map((row) => row.id)).toEqual([
+      conv.id,
+    ]);
+  });
+
+  it("moves a Conversation from one Project to another", async () => {
+    const { user, client } = await signedIn();
+    const { id: from } = await client.project.create({ name: "From" });
+    const { id: to } = await client.project.create({ name: "To" });
+    const conv = await insertConversation(user, { projectId: from });
+
+    await client.conversation.move({ id: conv.id, projectId: to });
+
+    expect((await client.conversation.list({ projectId: from })).items).toEqual([]);
+    expect((await client.conversation.list({ projectId: to })).items.map((row) => row.id)).toEqual([
+      conv.id,
+    ]);
+  });
+
+  it("moves a Conversation out of its Project back into the main list", async () => {
+    const { user, client } = await signedIn();
+    const { id: projectId } = await client.project.create({ name: "Work" });
+    const conv = await insertConversation(user, { projectId });
+
+    await client.conversation.move({ id: conv.id, projectId: null });
+
+    expect((await client.conversation.list({ projectId })).items).toEqual([]);
+    expect((await listItems(client)).map((row) => row.id)).toEqual([conv.id]);
+  });
+
+  it("leaves the Model, the Messages and lastMessageAt as they were", async () => {
+    const { user, client } = await signedIn();
+    const { id: projectId } = await client.project.create({ name: "Work" });
+    const lastMessageAt = new Date("2026-10-03T09:30:00Z");
+    const conv = await insertConversation(user, {
+      model: "openai:gpt-5.6",
+      lastMessageAt,
+    });
+    await insertMessage({ conversationId: conv.id, role: "user", text: "Hello", active: true });
+
+    await client.conversation.move({ id: conv.id, projectId });
+
+    const [row] = await getTestDb().select().from(conversation).where(eq(conversation.id, conv.id));
+    expect(row).toMatchObject({ model: "openai:gpt-5.6", projectId, lastMessageAt });
+    const after = await client.conversation.get({ id: conv.id });
+    expect(after.messages.map((m) => m.role)).toEqual(["user"]);
+  });
+
+  it("keeps a pinned Conversation pinned when it moves, and still lists it under Pinned", async () => {
+    const { user, client } = await signedIn();
+    const { id: projectId } = await client.project.create({ name: "Work" });
+    const conv = await insertConversation(user, { pinnedAt: new Date("2026-10-02T08:00:00Z") });
+
+    await client.conversation.move({ id: conv.id, projectId });
+
+    const pinned = await client.conversation.pinned();
+    expect(pinned).toEqual([
+      expect.objectContaining({ id: conv.id, projectId, pinnedAt: expect.any(Date) }),
+    ]);
+    expect((await client.conversation.list({ projectId })).items.map((row) => row.id)).toEqual([
+      conv.id,
+    ]);
+    expect(await listItems(client)).toEqual([]);
+  });
+
+  it("answers NOT_FOUND for a Project that belongs to another user", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user, { title: "Mine" });
+    const other = await insertUser();
+    const { id: theirs } = await chatRpc({ user: other }).project.create({ name: "Theirs" });
+
+    await expect(
+      client.conversation.move({ id: conv.id, projectId: theirs }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    const [row] = await getTestDb().select().from(conversation).where(eq(conversation.id, conv.id));
+    expect(row?.projectId).toBeNull();
+  });
+
+  it("answers NOT_FOUND for another user's Conversation, and leaves it where it was", async () => {
+    const other = await insertUser();
+    const theirConversation = await insertConversation(other, { title: "Theirs" });
+    const { client } = await signedIn();
+    const { id: mine } = await client.project.create({ name: "Mine" });
+
+    await expect(
+      client.conversation.move({ id: theirConversation.id, projectId: mine }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(
+      client.conversation.move({ id: theirConversation.id, projectId: null }),
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
+    const [row] = await getTestDb()
+      .select()
+      .from(conversation)
+      .where(eq(conversation.id, theirConversation.id));
+    expect(row?.projectId).toBeNull();
+  });
+});

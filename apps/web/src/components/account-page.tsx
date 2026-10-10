@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { describeUserAgent } from "@/lib/user-agent";
 
-/** Account: the Profile, Password and Active sessions sections of settings. */
+/** Account: the Profile, Email, Password and Active sessions sections of settings. */
 export function AccountPage() {
   const { data: current } = authClient.useSession();
   if (!current) return null;
@@ -18,6 +18,7 @@ export function AccountPage() {
     <main className="mx-auto w-full max-w-2xl space-y-8 p-6">
       <h1 className="text-xl font-semibold">Account</h1>
       <ProfileSection name={current.user.name} />
+      <EmailSection email={current.user.email} />
       <PasswordSection />
       <SessionsSection currentSessionId={current.session.id} />
     </main>
@@ -60,6 +61,54 @@ function ProfileSection({ name }: { name: string }) {
           disabled={save.isPending || value.trim() === "" || value.trim() === name}
         >
           Save name
+        </Button>
+      </form>
+    </section>
+  );
+}
+
+/** The same answer for a free address and one that already has an account, so the form can't tell them apart. */
+function EmailSection({ email }: { email: string }) {
+  const [value, setValue] = useState("");
+  const request = useMutation({
+    mutationFn: async (newEmail: string) => {
+      const { error } = await authClient.changeEmail({
+        newEmail,
+        callbackURL: `${window.location.origin}/email-changed`,
+      });
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      setValue("");
+      toast.success("We sent a confirmation to your current address. Open it to continue.");
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-medium">Email</h2>
+      <p className="text-sm text-muted-foreground">Current address: {email}</p>
+      <form
+        className="flex flex-col gap-3 sm:flex-row sm:items-end"
+        onSubmit={(event) => {
+          event.preventDefault();
+          request.mutate(value.trim());
+        }}
+      >
+        <div className="flex-1 space-y-2">
+          <Label htmlFor="account-new-email">New email</Label>
+          <Input
+            id="account-new-email"
+            type="email"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            required
+            maxLength={255}
+          />
+        </div>
+        <Button type="submit" disabled={request.isPending || value.trim() === ""}>
+          Change email
         </Button>
       </form>
     </section>

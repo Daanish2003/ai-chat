@@ -24,6 +24,30 @@ export function usePinConversation() {
 }
 
 /**
+ * Moves a Conversation into a Project, or out of its Project with `null`, from its row menu. Refreshes
+ * the Conversation panel's lists (the main one, Pinned and each Project's) and the Projects list.
+ */
+export function useMoveConversation() {
+  const queryClient = useQueryClient();
+  const { orpc } = useChatAdapter();
+  const move = useMutation(
+    orpc.conversation.move.mutationOptions({
+      onSuccess: async () => {
+        await invalidateConversationList(queryClient, orpc);
+        await queryClient.invalidateQueries({ queryKey: orpc.project.list.key() });
+      },
+      onError: (error) => toast.error(error.message),
+    }),
+  );
+
+  return {
+    moveTo: (conversation: { id: string }, projectId: string | null) =>
+      move.mutate({ id: conversation.id, projectId }),
+    isPending: move.isPending,
+  };
+}
+
+/**
  * Renames a Conversation after the user types a new title (an empty one is ignored). Used by the
  * Conversation panel's row menu.
  */

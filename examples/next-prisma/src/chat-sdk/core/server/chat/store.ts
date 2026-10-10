@@ -43,6 +43,24 @@ export async function setConversationModel(deps: Deps, userId: string, id: strin
   return rows.length > 0;
 }
 
+/**
+ * Moves the user's Conversation into `projectId` (`null` takes it out of its Project). Only
+ * `projectId` changes: the Model, Messages, pin and `lastMessageAt` stay. `false` when it isn't theirs.
+ */
+export async function moveConversation(
+  deps: Deps,
+  userId: string,
+  id: string,
+  projectId: string | null,
+) {
+  const rows = await deps.db
+    .update(conversation)
+    .set({ projectId })
+    .where(ownConversation(userId, id))
+    .returning({ id: conversation.id });
+  return rows.length > 0;
+}
+
 /** Sets the user's Conversation's reasoning effort (`null` for the Model's default); `false` when it isn't theirs. */
 export async function setConversationReasoningEffort(
   deps: Deps,
