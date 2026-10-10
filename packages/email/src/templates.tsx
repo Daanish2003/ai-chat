@@ -66,7 +66,7 @@ const copy: { [N in TemplateName]: (props: TemplateProps<N>) => Copy } = {
     subject: `Confirm your email change for ${appName}`,
     heading: "Confirm your email change",
     paragraph:
-      "Someone asked to change the email address on your account. Confirm it with the button below.",
+      "Someone asked to change the email address on your account. This email went to your current address; confirm the change with the button below.",
     button: "Confirm change",
     expiry: EXPIRY,
     reason: "an email change was requested for your account",
