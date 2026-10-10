@@ -1,19 +1,25 @@
-import { conversation, message } from "../../../../core/server/db/schema/chat";
+import { conversation, message, project } from "../../../../core/server/db/schema/chat";
 import { getTestDb } from "../../../support/test-database";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
+import { uuidv7 } from "../../../../core/server/lib/uuidv7";
 import { saveCredentials } from "../../../../core/server/credentials/store";
-import { insertConversation, insertMessage } from "../../../support/conversations";
+import { insertConversation, insertMessage, testModel } from "../../../support/conversations";
 import { createTestDeps } from "../../../support/deps";
 import { createFakeAdapter, round, text } from "../../../support/fake-adapter";
 import { liveModelsFetch } from "../../../support/live-models";
 import { insertUser } from "../../../support/users";
-import { chatRpc, sendAs } from "../../../support/sdk";
+import { chatRpc, createTestChat, sendAs } from "../../../support/sdk";
 
 async function signedIn() {
   const user = await insertUser();
   return { user, client: chatRpc({ user }) };
+}
+
+/** The first page's rows, for the tests that don't follow the cursor. */
+async function listItems(client: ReturnType<typeof chatRpc>) {
+  return (await client.conversation.list({})).items;
 }
 
 describe("conversation.create", () => {
@@ -134,7 +140,7 @@ describe("conversation.list", () => {
     const other = await signedIn();
     await insertConversation(other.user);
 
-    const list = await client.conversation.list();
+    const list = await listItems(client);
 
     expect(list.map((row) => row.id)).toEqual([newer.id, older.id]);
   });
@@ -158,7 +164,7 @@ describe("conversation.list", () => {
       active: true,
     });
 
-    const [row] = await client.conversation.list();
+    const [row] = await listItems(client);
 
     expect(row).toEqual({
       id: conv.id,
@@ -168,6 +174,8 @@ describe("conversation.list", () => {
       preview: "Partial answer",
       hasError: true,
       shared: false,
+      pinnedAt: null,
+      projectId: null,
     });
   });
 
@@ -177,7 +185,7 @@ describe("conversation.list", () => {
     await insertMessage({ conversationId: conv.id, role: "user", text: "Hi", active: true });
     await client.share.upsert({ conversationId: conv.id });
 
-    await expect(client.conversation.list()).resolves.toMatchObject([{ shared: true }]);
+    await expect(listItems(client)).resolves.toMatchObject([{ shared: true }]);
   });
 
   it("previews the question while its reply hasn't written any text yet", async () => {
@@ -197,7 +205,7 @@ describe("conversation.list", () => {
       active: true,
     });
 
-    const [row] = await client.conversation.list();
+    const [row] = await listItems(client);
 
     expect(row).toMatchObject({ preview: "What is a CTE?", hasError: false });
   });
@@ -206,15 +214,150 @@ describe("conversation.list", () => {
     const { user, client } = await signedIn();
     await insertConversation(user);
 
-    const [row] = await client.conversation.list();
+    const [row] = await listItems(client);
 
     expect(row).toMatchObject({ title: null, preview: "", hasError: false });
   });
 
   it("rejects signed-out callers", async () => {
-    await expect(chatRpc().conversation.list()).rejects.toMatchObject({
+    await expect(listItems(chatRpc())).rejects.toMatchObject({
       code: "UNAUTHORIZED",
     });
+  });
+});
+
+describe("conversation.list paging", () => {
+  /** Inserts `count` Conversations, two per minute, so ties on `lastMessageAt` are exercised. */
+  async function seedConversations(userId: string, count: number) {
+    const rows = Array.from({ length: count }, (_, i) => ({
+      id: uuidv7(),
+      userId,
+      model: testModel,
+      lastMessageAt: new Date(Date.UTC(2026, 9, 1, 9, Math.floor(i / 2))),
+    }));
+    await getTestDb().insert(conversation).values(rows);
+    return rows;
+  }
+
+  /** Newest first, ties broken by the larger id first: the order the list must follow. */
+  const newestFirst = (rows: { id: string; lastMessageAt: Date }[]) =>
+    [...rows]
+      .sort(
+        (a, b) => b.lastMessageAt.getTime() - a.lastMessageAt.getTime() || (a.id < b.id ? 1 : -1),
+      )
+      .map((row) => row.id);
+
+  it("pages 120 Conversations 50, 50 and 20, with no gaps or repeats", async () => {
+    const { user, client } = await signedIn();
+    const rows = await seedConversations(user.id, 120);
+
+    const first = await client.conversation.list({});
+    const second = await client.conversation.list({ cursor: first.nextCursor ?? undefined });
+    const third = await client.conversation.list({ cursor: second.nextCursor ?? undefined });
+
+    expect([first.items, second.items, third.items].map((page) => page.length)).toEqual([
+      50, 50, 20,
+    ]);
+    expect(third.nextCursor).toBeNull();
+    const ids = [...first.items, ...second.items, ...third.items].map((row) => row.id);
+    expect(ids).toEqual(newestFirst(rows));
+  });
+
+  it("keeps the next page stable when a Conversation is added between page reads", async () => {
+    const { user, client } = await signedIn();
+    const rows = await seedConversations(user.id, 120);
+    const first = await client.conversation.list({});
+    await insertConversation(user, { lastMessageAt: new Date("2026-10-10T00:00:00Z") });
+
+    const second = await client.conversation.list({ cursor: first.nextCursor ?? undefined });
+
+    expect(second.items.map((row) => row.id)).toEqual(newestFirst(rows).slice(50, 100));
+  });
+
+  it("answers BAD_REQUEST for a cursor the server didn't write", async () => {
+    const { client } = await signedIn();
+    const tampered = Buffer.from(
+      JSON.stringify({ lastMessageAt: "2026-10-01 09:00:00", id: "not-a-uuid" }),
+    ).toString("base64url");
+
+    await expect(client.conversation.list({ cursor: "not-a-cursor" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+    await expect(client.conversation.list({ cursor: tampered })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+
+  it("leaves out Conversations in a Project and shows each row's pinnedAt and projectId", async () => {
+    const { user, client } = await signedIn();
+    const projectId = uuidv7();
+    await getTestDb().insert(project).values({ id: projectId, userId: user.id, name: "Work" });
+    await insertConversation(user, { title: "In a Project", projectId });
+    const pinnedAt = new Date("2026-10-02T08:00:00Z");
+    const pinned = await insertConversation(user, { title: "Pinned", pinnedAt });
+
+    const items = await listItems(client);
+
+    expect(items).toEqual([expect.objectContaining({ id: pinned.id, pinnedAt, projectId: null })]);
+  });
+
+  it("doesn't move a Conversation for a rename or a Branch switch, but moves it for a new Message", async () => {
+    const { user, client } = await signedIn();
+    const older = await insertConversation(user, {
+      title: "Older",
+      lastMessageAt: new Date("2026-10-01T10:00:00Z"),
+    });
+    const newer = await insertConversation(user, {
+      title: "Newer",
+      lastMessageAt: new Date("2026-10-05T10:00:00Z"),
+    });
+    const question = await insertMessage({ conversationId: older.id, role: "user", text: "Hi" });
+    const reply = await insertMessage({
+      conversationId: older.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Hello",
+      active: true,
+    });
+    const another = await insertMessage({
+      conversationId: older.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Another",
+    });
+
+    await client.conversation.rename({ id: older.id, title: "Renamed" });
+    await client.conversation.switchBranch({ messageId: another.id });
+    expect((await listItems(client)).map((row) => row.id)).toEqual([newer.id, older.id]);
+
+    const fake = createFakeAdapter({ rounds: [round(text("Sure"))] });
+    const deps = createTestDeps({ adapterFor: () => fake.adapter });
+    await saveCredentials(deps, user.id, {
+      service: "anthropic",
+      fields: { apiKey: "sk-ant-test-key" },
+      hint: "…-key",
+      verified: true,
+    });
+    const chat = createTestChat({ user, deps });
+    await chat.fetch(
+      new Request(chat.chatUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [],
+          forwardedProps: {
+            conversationId: older.id,
+            parentId: reply.id,
+            text: "Follow up",
+            attachmentIds: [],
+            model: testModel,
+            webSearch: false,
+          },
+        }),
+      }),
+    );
+
+    expect((await listItems(client)).map((row) => row.id)).toEqual([older.id, newer.id]);
   });
 });
 
@@ -227,7 +370,7 @@ describe("conversation.rename", () => {
 
     await client.conversation.rename({ id: conv.id, title: "  Recursive CTEs  " });
 
-    await expect(client.conversation.list()).resolves.toMatchObject([
+    await expect(listItems(client)).resolves.toMatchObject([
       { id: conv.id, title: "Recursive CTEs", lastMessageAt: conv.lastMessageAt },
     ]);
   });
@@ -270,7 +413,7 @@ describe("conversation.delete", () => {
 
     await client.conversation.delete({ id: conv.id });
 
-    await expect(client.conversation.list()).resolves.toEqual([]);
+    await expect(listItems(client)).resolves.toEqual([]);
     await expect(client.conversation.get({ id: conv.id })).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
@@ -328,7 +471,7 @@ describe("conversation.setModel", () => {
     await expect(client.conversation.get({ id: conv.id })).resolves.toMatchObject({
       model: "openai:gpt-6-luna",
     });
-    const [listed] = await client.conversation.list();
+    const [listed] = await listItems(client);
     expect(listed).toMatchObject({ model: "openai:gpt-6-luna", lastMessageAt: conv.lastMessageAt });
   });
 

@@ -1,20 +1,51 @@
 import type { AppRouterClient } from "../../core/server/routers/index";
+import { groupByDate } from "../../core/client/date-groups";
 import { modelLabel } from "../../core/client/models";
 import { relativeTime } from "../../core/client/relative-time";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { Share2Icon, Trash2Icon } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import { useDeleteConversation } from "../../core/client/react/delete-conversation";
 import { useChatAdapter, useOrpc } from "../../core/client/react/provider";
 
-type ConversationSummary = Awaited<ReturnType<AppRouterClient["conversation"]["list"]>>[number];
+type ConversationSummary = Awaited<
+  ReturnType<AppRouterClient["conversation"]["list"]>
+>["items"][number];
 
-/** The user's Conversations, newest Message first. */
+/** The user's Conversations outside Projects, newest Message first, grouped by date. */
 export function ConversationPanel({ className }: { className?: string }) {
   const orpc = useOrpc();
-  const conversations = useQuery(orpc.conversation.list.queryOptions());
+  const conversations = useInfiniteQuery(
+    orpc.conversation.list.infiniteOptions({
+      input: (cursor: string | undefined) => ({ cursor }),
+      initialPageParam: undefined,
+      getNextPageParam: (page) => page.nextCursor ?? undefined,
+    }),
+  );
+  const rows = conversations.data?.pages.flatMap((page) => page.items) ?? [];
+  const groups = groupByDate(rows, (row) => row.lastMessageAt);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = conversations;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Loads the next page once the end of the list scrolls into view.
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { root: scrollRef.current, rootMargin: "200px" },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <aside
@@ -23,16 +54,29 @@ export function ConversationPanel({ className }: { className?: string }) {
     >
       <div className="flex h-11 shrink-0 items-center justify-between border-b px-3">
         <span className="text-xs font-medium">Conversations</span>
-        <span className="text-[10px] text-muted-foreground">{conversations.data?.length}</span>
+        <span className="text-[10px] text-muted-foreground">{rows.length}</span>
       </div>
-      {conversations.data?.length === 0 && (
+      {conversations.isSuccess && rows.length === 0 && (
         <p className="px-3 py-6 text-center text-xs text-muted-foreground">No Conversations yet</p>
       )}
-      <ul className="flex-1 overflow-y-auto">
-        {conversations.data?.map((row) => (
-          <ConversationRow key={row.id} conversation={row} />
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        {groups.map((group) => (
+          <section key={group.label} aria-label={group.label}>
+            <h3 className="sticky top-0 z-10 bg-sidebar/95 px-3 py-1.5 text-[10px] font-medium text-muted-foreground">
+              {group.label}
+            </h3>
+            <ul>
+              {group.rows.map((row) => (
+                <ConversationRow key={row.id} conversation={row} />
+              ))}
+            </ul>
+          </section>
         ))}
-      </ul>
+        <div ref={sentinelRef} />
+        {isFetchingNextPage && (
+          <p className="px-3 py-2 text-center text-[10px] text-muted-foreground">Loading…</p>
+        )}
+      </div>
     </aside>
   );
 }

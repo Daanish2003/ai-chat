@@ -69,7 +69,7 @@ describe("the chat handler", () => {
     const user = await insertUser();
     const conv = await insertConversation(user, { title: "Hello" });
 
-    const list = await createTestChat({ user }).rpc.conversation.list();
+    const list = (await createTestChat({ user }).rpc.conversation.list({})).items;
 
     expect(list.map(({ id }) => id)).toEqual([conv.id]);
   });

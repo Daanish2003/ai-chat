@@ -1,7 +1,8 @@
 import { conversation, message, type MessageRow } from "../db/schema/chat";
 import { sharedLink } from "../db/schema/share";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { z } from "zod";
 
 import { attachmentsOfMessages } from "../attachments/store";
 import type { AppDeps } from "../deps";
@@ -59,19 +60,50 @@ const previewLength = 160;
 const leaf = alias(message, "leaf");
 const leafParent = alias(message, "leaf_parent");
 
+/** Conversations per page of the main Conversation list. */
+export const conversationPageSize = 50;
+
 /**
- * The user's Conversations for the Conversation panel, newest Message first, each with a one-line
- * preview of its Active Branch's last Message and whether that Message ended in an error. A reply
- * that hasn't written any text yet previews the Message it answers.
- * `shared` says whether the Conversation has a Shared link.
+ * Where the next page starts: the last row's `lastMessageAt` as Postgres prints it (full
+ * precision, which a JS `Date` would lose) and its id.
  */
-export async function listConversations(deps: Deps, userId: string) {
+const conversationCursorShape = z.object({
+  lastMessageAt: z.string().regex(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?$/),
+  id: z.uuid(),
+});
+type ConversationCursor = z.infer<typeof conversationCursorShape>;
+
+function encodeConversationCursor(cursor: ConversationCursor) {
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+
+/** The decoded cursor, or `undefined` when it isn't one this module wrote. */
+export function decodeConversationCursor(cursor: string): ConversationCursor | undefined {
+  try {
+    return conversationCursorShape.parse(JSON.parse(Buffer.from(cursor, "base64url").toString()));
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * One page of the user's Conversations that are in no Project, for the Conversation panel: newest
+ * Message first, ties broken by id, `conversationPageSize` at a time. Each row has a one-line
+ * preview of its Active Branch's last Message and whether that Message ended in an error. A reply
+ * that hasn't written any text yet previews the Message it answers. `shared` says whether the
+ * Conversation has a Shared link. Pass the previous page's `nextCursor` for the next one.
+ */
+export async function listConversations(deps: Deps, userId: string, cursor?: ConversationCursor) {
+  const lastMessageAtText = sql<string>`${conversation.lastMessageAt}::text`;
   const rows = await deps.db
     .select({
       id: conversation.id,
       title: conversation.title,
       model: conversation.model,
       lastMessageAt: conversation.lastMessageAt,
+      lastMessageAtText,
+      pinnedAt: conversation.pinnedAt,
+      projectId: conversation.projectId,
       preview: sql<
         string | null
       >`left(coalesce(nullif(${leaf.searchText}, ''), ${leafParent.searchText}), ${previewLength})`,
@@ -82,13 +114,30 @@ export async function listConversations(deps: Deps, userId: string) {
     .leftJoin(leaf, eq(leaf.id, conversation.activeLeafId))
     .leftJoin(leafParent, eq(leafParent.id, leaf.parentId))
     .leftJoin(sharedLink, eq(sharedLink.conversationId, conversation.id))
-    .where(eq(conversation.userId, userId))
-    .orderBy(desc(conversation.lastMessageAt), desc(conversation.id));
-  return rows.map(({ preview, lastStatus, ...row }) => ({
-    ...row,
-    preview: (preview ?? "").replace(/\s+/g, " ").trim(),
-    hasError: lastStatus === "error",
-  }));
+    .where(
+      and(
+        eq(conversation.userId, userId),
+        isNull(conversation.projectId),
+        cursor &&
+          sql`(${conversation.lastMessageAt}, ${conversation.id}) < (${cursor.lastMessageAt}::timestamp, ${cursor.id}::uuid)`,
+      ),
+    )
+    .orderBy(desc(conversation.lastMessageAt), desc(conversation.id))
+    .limit(conversationPageSize + 1);
+
+  const page = rows.slice(0, conversationPageSize);
+  const last = page.at(-1);
+  return {
+    items: page.map(({ preview, lastStatus, lastMessageAtText: _text, ...row }) => ({
+      ...row,
+      preview: (preview ?? "").replace(/\s+/g, " ").trim(),
+      hasError: lastStatus === "error",
+    })),
+    nextCursor:
+      rows.length > conversationPageSize && last
+        ? encodeConversationCursor({ lastMessageAt: last.lastMessageAtText, id: last.id })
+        : null,
+  };
 }
 
 /** The Message, or `undefined` when it doesn't exist or is in someone else's Conversation. */
