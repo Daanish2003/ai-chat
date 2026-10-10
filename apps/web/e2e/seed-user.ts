@@ -26,7 +26,6 @@ export async function seedUser(page: Page): Promise<SeededUser> {
     email: `e2e-${randomUUID()}@example.com`,
     password: "password1234",
   };
-  const token = randomBytes(24).toString("base64url");
   const now = new Date();
   const db = createDb({ DATABASE_URL: e2eDatabaseUrl() });
   try {
@@ -47,10 +46,26 @@ export async function seedUser(page: Page): Promise<SeededUser> {
       createdAt: now,
       updatedAt: now,
     });
+  } finally {
+    await db.$client.end();
+  }
+  await seedSession(page, seeded.id);
+  return seeded;
+}
+
+/**
+ * Writes a session for an existing user and sets its cookie on `page`'s browser context, so a
+ * second device (another context) can be signed in as the same user.
+ */
+export async function seedSession(page: Page, userId: string) {
+  const token = randomBytes(24).toString("base64url");
+  const now = new Date();
+  const db = createDb({ DATABASE_URL: e2eDatabaseUrl() });
+  try {
     await db.insert(session).values({
       id: randomUUID(),
       token,
-      userId: seeded.id,
+      userId,
       expiresAt: new Date(now.getTime() + sessionLifetimeMs),
       createdAt: now,
       updatedAt: now,
@@ -69,5 +84,4 @@ export async function seedUser(page: Page): Promise<SeededUser> {
       sameSite: "Lax",
     },
   ]);
-  return seeded;
 }

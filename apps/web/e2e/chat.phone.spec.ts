@@ -48,12 +48,15 @@ test("a Conversation fits the screen, with its title and Message actions showing
   await expectNoSidewaysScroll(page);
 });
 
-test("the login, Keys and new Conversation pages fit the screen", async ({ page }) => {
+test("the login, Keys, Account and new Conversation pages fit the screen", async ({ page }) => {
   await page.goto("/login");
   await expectNoSidewaysScroll(page);
   await signInAsSeededUser(page);
   await expectNoSidewaysScroll(page);
   await page.goto("/settings/keys");
   await expect(page.getByRole("heading", { name: "Keys & settings" })).toBeVisible();
+  await expectNoSidewaysScroll(page);
+  await page.goto("/settings/account");
+  await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
   await expectNoSidewaysScroll(page);
 });
