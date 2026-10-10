@@ -168,7 +168,7 @@ export async function continueSharedConversation(
   const [link] = await deps.db.select().from(sharedLink).where(eq(sharedLink.token, token));
   if (!link) return "not_found";
   const path = await loadPath(deps, link.conversationId, link.leafMessageId);
-  const lastModel = path.findLast((row) => row.role === "assistant")?.model;
+  const lastModel = path.filter((row) => row.role === "assistant").at(-1)?.model;
   const usable = lastModel ? await resolveModel(deps, userId, lastModel) : undefined;
   const model =
     usable && (await resolveModelCall(deps, userId, usable.id))
