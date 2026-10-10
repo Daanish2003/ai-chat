@@ -1,7 +1,42 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 import { baseURL, fakeOllamaHost } from "./env";
 import { type SeededUser, seedUser } from "./seed-user";
+
+/** Retries after a 429 from Better Auth's per-IP limit on sign-in and password change. */
+const MAX_RATE_LIMIT_RETRIES = 3;
+
+/**
+ * Clicks a form's submit button and waits for Better Auth's response to `path`. Better Auth allows
+ * 3 requests per 10 seconds from one IP to sign-in and password-change endpoints, and every test
+ * shares that IP, so a 429 waits out its `X-Retry-After` window and submits again. The form keeps
+ * its values after an error, so a retry needs no refill.
+ */
+export async function submitAuthForm(page: Page, button: Locator, path: string) {
+  for (let retry = 0; ; retry++) {
+    const response = page.waitForResponse(
+      (r) => r.url().includes(path) && r.request().method() === "POST",
+    );
+    await button.click();
+    const result = await response;
+    if (result.status() !== 429 || retry === MAX_RATE_LIMIT_RETRIES) return result;
+    const retryAfter = Number(result.headers()["x-retry-after"] ?? 10);
+    await page.waitForTimeout((retryAfter + 1) * 1000);
+  }
+}
+
+/** Signs in on the login form, backing off on a rate limit. Returns the sign-in response. */
+export async function signInOnForm(page: Page, email: string, password: string) {
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Already have an account? Sign In" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password").fill(password);
+  return submitAuthForm(
+    page,
+    page.getByRole("button", { name: "Sign In" }),
+    "/api/auth/sign-in/email",
+  );
+}
 
 /** Signs in as a new seeded, verified user (so tests don't share data) on the new Conversation page. */
 export async function signInAsSeededUser(page: Page): Promise<SeededUser> {

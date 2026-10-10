@@ -1,14 +1,18 @@
 import { expect, type Page, test } from "@playwright/test";
 
-import { mailboxFor, signInAsSeededUser, waitForMail } from "./helpers";
+import {
+  mailboxFor,
+  signInAsSeededUser,
+  signInOnForm,
+  submitAuthForm,
+  waitForMail,
+} from "./helpers";
 import { seedSession, seedUser } from "./seed-user";
 
 const NEW_PASSWORD = "brand-new-password-1";
 
-// Better Auth allows 3 sign-in and password-change requests per 10 seconds from one IP, and every
-// e2e test comes from the same IP. Serial tests keep these requests spread out; a retry waits out
-// a window that a parallel spec happened to fill.
-test.describe.configure({ mode: "serial", retries: 1 });
+// The tests in this file change passwords and sign in a lot; the helpers back off on 429s.
+test.describe.configure({ mode: "serial" });
 
 /** Signs out through the user menu, which lands on the login page. */
 async function signOut(page: Page) {
@@ -30,16 +34,16 @@ async function changePassword(
   if (options.signOutOthers) {
     await page.getByRole("checkbox", { name: "Sign out my other sessions" }).click();
   }
-  await page.getByRole("button", { name: "Change password" }).click();
+  await submitAuthForm(
+    page,
+    page.getByRole("button", { name: "Change password" }),
+    "/api/auth/change-password",
+  );
 }
 
 /** Signs in from the login page with the email and password given. */
 async function signIn(page: Page, email: string, password: string) {
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Already have an account? Sign In" }).click();
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password").fill(password);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await signInOnForm(page, email, password);
 }
 
 test("changing the password signs in with the new one, and mails a notice", async ({ page }) => {
