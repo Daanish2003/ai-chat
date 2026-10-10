@@ -1,4 +1,5 @@
 import { Button } from "@ai-chat/ui/components/button";
+import { Checkbox } from "@ai-chat/ui/components/checkbox";
 import { Input } from "@ai-chat/ui/components/input";
 import { Label } from "@ai-chat/ui/components/label";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,7 +9,7 @@ import { toast } from "sonner";
 import { authClient } from "@/lib/auth-client";
 import { describeUserAgent } from "@/lib/user-agent";
 
-/** Account: the Profile and Active sessions sections of settings. */
+/** Account: the Profile, Password and Active sessions sections of settings. */
 export function AccountPage() {
   const { data: current } = authClient.useSession();
   if (!current) return null;
@@ -17,6 +18,7 @@ export function AccountPage() {
     <main className="mx-auto w-full max-w-2xl space-y-8 p-6">
       <h1 className="text-xl font-semibold">Account</h1>
       <ProfileSection name={current.user.name} />
+      <PasswordSection />
       <SessionsSection currentSessionId={current.session.id} />
     </main>
   );
@@ -61,6 +63,118 @@ function ProfileSection({ name }: { name: string }) {
         </Button>
       </form>
     </section>
+  );
+}
+
+/** Password: a change form for a user with a password. OAuth-only users get no form. */
+function PasswordSection() {
+  const accounts = useQuery({
+    queryKey: ["account", "accounts"],
+    queryFn: async () => {
+      const { data, error } = await authClient.listAccounts();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+  const hasPassword = accounts.data?.some((account) => account.providerId === "credential");
+
+  return (
+    <section className="space-y-3">
+      <h2 className="text-sm font-medium">Password</h2>
+      {hasPassword ? (
+        <ChangePasswordForm />
+      ) : hasPassword === false ? (
+        <p className="text-sm text-muted-foreground">
+          You sign in with GitHub or Google, so there is no password to change.
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function ChangePasswordForm() {
+  const queryClient = useQueryClient();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [signOutOthers, setSignOutOthers] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const change = useMutation({
+    mutationFn: async () => {
+      const { error } = await authClient.changePassword({
+        currentPassword,
+        newPassword,
+        revokeOtherSessions: signOutOthers,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setCurrentPassword("");
+      setNewPassword("");
+      setError(null);
+      toast.success("Password changed");
+      queryClient.invalidateQueries({ queryKey: ["account", "sessions"] });
+    },
+    onError: (failure: { code?: string; message?: string }) => {
+      setError(
+        failure.code === "INVALID_PASSWORD"
+          ? "Current password is incorrect"
+          : (failure.message ?? "Could not change the password"),
+      );
+    },
+  });
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        change.mutate();
+      }}
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="account-current-password">Current password</Label>
+          <Input
+            id="account-current-password"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={(event) => setCurrentPassword(event.target.value)}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="account-new-password">New password</Label>
+          <Input
+            id="account-new-password"
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            required
+          />
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="account-sign-out-others"
+          checked={signOutOthers}
+          onCheckedChange={setSignOutOthers}
+        />
+        <Label htmlFor="account-sign-out-others">Sign out my other sessions</Label>
+      </div>
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <Button
+        type="submit"
+        disabled={change.isPending || currentPassword === "" || newPassword === ""}
+      >
+        Change password
+      </Button>
+    </form>
   );
 }
 
