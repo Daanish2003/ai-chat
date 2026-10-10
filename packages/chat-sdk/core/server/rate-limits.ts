@@ -5,23 +5,49 @@ export type RateLimit = { limit: number; windowSeconds: number };
 
 /**
  * What `createChat` takes: each limited action may be overridden, and `false` turns that limit off.
- * Only Run starts are limited so far; the other actions of spec 87 join this type as they land.
+ * Every limit so far is per user.
  */
 export type RateLimits = {
   /** Run starts, per user. */
   runStart?: RateLimit | false;
+  /** Attachment uploads, per user. */
+  attachmentUpload?: RateLimit | false;
+  /** Provider and Tool credential saves (each one runs a check), per user. */
+  credentialSave?: RateLimit | false;
+  /** Conversation searches, per user. */
+  conversationSearch?: RateLimit | false;
 };
 
-export type ResolvedRateLimits = { runStart: RateLimit | false };
+export type ResolvedRateLimits = {
+  runStart: RateLimit | false;
+  attachmentUpload: RateLimit | false;
+  credentialSave: RateLimit | false;
+  conversationSearch: RateLimit | false;
+};
 
 export const defaultRateLimits: ResolvedRateLimits = {
   runStart: { limit: 20, windowSeconds: 60 },
+  attachmentUpload: { limit: 30, windowSeconds: 60 },
+  credentialSave: { limit: 10, windowSeconds: 60 },
+  conversationSearch: { limit: 60, windowSeconds: 60 },
 };
 
 /** The defaults, with each override in place. An override of `undefined` keeps the default. */
 export function resolveRateLimits(overrides: RateLimits = {}): ResolvedRateLimits {
-  return { runStart: overrides.runStart ?? defaultRateLimits.runStart };
+  return {
+    runStart: overrides.runStart ?? defaultRateLimits.runStart,
+    attachmentUpload: overrides.attachmentUpload ?? defaultRateLimits.attachmentUpload,
+    credentialSave: overrides.credentialSave ?? defaultRateLimits.credentialSave,
+    conversationSearch: overrides.conversationSearch ?? defaultRateLimits.conversationSearch,
+  };
 }
+
+/** The RPC routes (under the handler's `/rpc`) that have a limit, and the limit each one uses. */
+export const rpcRateLimits: Record<string, keyof ResolvedRateLimits | undefined> = {
+  "/attachment/upload": "attachmentUpload",
+  "/credentials/save": "credentialSave",
+  "/search/query": "conversationSearch",
+};
 
 /**
  * Counts one hit against a limit and returns the seconds to wait (for `Retry-After`) once the

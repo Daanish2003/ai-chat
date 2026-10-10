@@ -295,7 +295,12 @@ function PaletteBody({
           </div>
         ))}
         {searching && <p className="px-4 py-2 text-xs text-muted-foreground">Searching…</p>}
-        {items.length === 0 && !searching && (
+        {search.isError && !searching && (
+          <p role="alert" className="px-4 py-2 text-xs text-destructive">
+            {search.error.message}
+          </p>
+        )}
+        {items.length === 0 && !searching && !search.isError && (
           <p className="px-4 py-6 text-center text-xs text-muted-foreground">No matches</p>
         )}
       </div>

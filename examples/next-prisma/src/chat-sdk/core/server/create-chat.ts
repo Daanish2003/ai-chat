@@ -11,7 +11,7 @@ import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
 import { countUnreadableCredentials } from "./credentials/store";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
-import { resolveRateLimits, type RateLimits } from "./rate-limits";
+import { rateLimitedFor, resolveRateLimits, rpcRateLimits, type RateLimits } from "./rate-limits";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
 import { loadSharedConversation } from "./share/store";
@@ -77,6 +77,10 @@ export function createChatHandler(
     if (!user && pathname !== sharedReadPath) return unauthorized();
 
     if (pathname === rpcPrefix || pathname.startsWith(`${rpcPrefix}/`)) {
+      if (user) {
+        const refused = await rpcRateLimitRefusal(deps, user.id, pathname.slice(rpcPrefix.length));
+        if (refused) return refused;
+      }
       const context: Context = { user, deps };
       const result = await rpc.handle(request, { prefix: rpcPrefix, context });
       return result.matched ? result.response : notFound();
@@ -159,6 +163,26 @@ export function createChat(options: CreateChatOptions): {
     },
     deleteUser: (userId) => deleteUserData(getDeps(), userId),
   };
+}
+
+/** Counts a hit on a limited RPC route and answers 429 with `Retry-After` once it is over its limit. */
+async function rpcRateLimitRefusal(
+  deps: AppDeps,
+  userId: string,
+  route: string,
+): Promise<Response | null> {
+  const rule = rpcRateLimits[route];
+  if (!rule) return null;
+  const retryAfter = await rateLimitedFor(
+    deps.counters,
+    deps.rateLimits[rule],
+    `${rule}:${userId}`,
+  );
+  if (retryAfter === null) return null;
+  return Response.json(
+    { message: "Too many requests; try again in a moment" },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
 }
 
 function unauthorized() {
