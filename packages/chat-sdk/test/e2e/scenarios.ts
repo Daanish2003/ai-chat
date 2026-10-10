@@ -4,7 +4,7 @@ import type {
   PlaywrightWorkerArgs,
   PlaywrightWorkerOptions,
   TestType,
-} from "@playwright/test";
+} from "@e2e-types/playwright-test";
 
 import { chatPage } from "./chat-page";
 import { slowMarker } from "./fake-ollama";

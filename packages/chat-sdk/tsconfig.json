@@ -6,7 +6,8 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "paths": {
       "@/components/ui/*": ["../ui/src/components/*"],
-      "@/lib/utils": ["../ui/src/lib/utils"]
+      "@/lib/utils": ["../ui/src/lib/utils"],
+      "@e2e-types/playwright-test": ["../../apps/web/node_modules/@playwright/test"]
     }
   },
   "include": [
@@ -18,5 +19,5 @@
     "test/**/*.tsx",
     "scripts/**/*.ts"
   ],
-  "exclude": ["node_modules", "test/e2e"]
+  "exclude": ["node_modules"]
 }

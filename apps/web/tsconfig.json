@@ -24,7 +24,7 @@
       "@/components/ui/*": ["../../packages/ui/src/components/*"],
       "@/lib/utils": ["../../packages/ui/src/lib/utils"],
       "@ai-chat/ui/*": ["../../packages/ui/src/*"],
-      "@playwright/test": ["./node_modules/@playwright/test"]
+      "@e2e-types/playwright-test": ["./node_modules/@playwright/test"]
     }
   }
 }
