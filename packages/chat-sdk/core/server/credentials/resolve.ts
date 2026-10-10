@@ -4,7 +4,7 @@ import {
   type CuratedModel,
   unknownReasoning,
 } from "../../shared/chat/models";
-import type { AppDeps, Credentials, HostModel, HostProvider } from "../deps";
+import type { AppDeps, Credentials, HostModel, HostProvider, HostTool } from "../deps";
 import { listCredentials, loadCredentials } from "./store";
 
 type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets">;
@@ -61,6 +61,35 @@ export async function resolveModelCall(
         maxOutputTokens: offered.model.maxOutputTokens,
         hostModel: offered.model,
       }
+    : null;
+}
+
+/** What a Tool call uses: the credentials, and the price of a search when a Host pays for it. */
+export type ToolCall = {
+  credentials: Credentials;
+  /** Set on a Host Tool: each search on it is recorded at this price (ADR 0007). */
+  pricePerSearchUsd?: number;
+};
+
+type ToolDeps = Pick<AppDeps, "db" | "keyEncryptionSecrets" | "hostTools" | "byok">;
+
+/**
+ * The credentials a Tool call uses (ADR 0007), the same rule as a Model's: the user's own Tool
+ * credential wins and is never metered; with `byok` off it is ignored. Otherwise the Host's Tool.
+ * `null` when neither applies.
+ */
+export async function resolveToolCall(
+  deps: ToolDeps,
+  userId: string,
+  tool: HostTool["tool"],
+): Promise<ToolCall | null> {
+  if (deps.byok) {
+    const own = await resolveCredentials(deps, userId, tool);
+    if (own) return { credentials: own };
+  }
+  const offered = deps.hostTools.find((entry) => entry.tool === tool);
+  return offered
+    ? { credentials: offered.credentials, pricePerSearchUsd: offered.pricePerSearchUsd }
     : null;
 }
 
