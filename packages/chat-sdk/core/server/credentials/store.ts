@@ -78,16 +78,36 @@ export type RotationResult = {
   unreadable: { unknownKey: number; corrupt: number };
 };
 
+/** How many scans a rotation makes before it gives up on rows a concurrent write keeps changing. */
+const maxRotationPasses = 3;
+
 /**
  * Re-encrypts every stored credential whose key isn't the keyring's first (ADR 0010), in batches
- * ordered by row key. A row no key can read stays in place and is counted. A row a concurrent save
- * changed is left for the next run, so a re-run finishes whatever an earlier one missed.
+ * ordered by row key. A row no key can read stays in place and is counted. A row a concurrent write
+ * changed between the read and the update is caught by another scan, up to `maxRotationPasses`.
  */
 export async function rotateCredentialKeys(
   deps: Deps,
   { batchSize = 100 }: { batchSize?: number } = {},
 ): Promise<RotationResult> {
-  const result: RotationResult = { reencrypted: 0, unreadable: { unknownKey: 0, corrupt: 0 } };
+  let reencrypted = 0;
+  for (let pass = 1; ; pass += 1) {
+    const scan = await rotateOnce(deps, batchSize);
+    reencrypted += scan.reencrypted;
+    // The last scan saw every row, so its unreadable count is the whole picture.
+    if (scan.raced === 0 || pass === maxRotationPasses) {
+      return { reencrypted, unreadable: scan.unreadable };
+    }
+  }
+}
+
+/** One scan over every row; `raced` counts updates that found the row already changed. */
+async function rotateOnce(deps: Deps, batchSize: number) {
+  const result = {
+    reencrypted: 0,
+    raced: 0,
+    unreadable: { unknownKey: 0, corrupt: 0 },
+  };
   let after: { userId: string; service: string } | undefined;
   for (;;) {
     const rows = await deps.db
@@ -130,6 +150,7 @@ export async function rotateCredentialKeys(
           ),
         )
         .returning({ service: userCredentials.service });
+      if (updated.length === 0) result.raced += 1;
       result.reencrypted += updated.length;
     }
     const last = rows.at(-1);

@@ -10,6 +10,8 @@
  */
 import { registerHooks } from "node:module";
 
+import { log } from "evlog";
+
 registerHooks({
   resolve(specifier, context, nextResolve) {
     try {
@@ -43,7 +45,7 @@ const chat = createChat({
   ),
   basePath: "/api/chat",
   getUser: () => null,
-  logger: console,
+  logger: log,
 });
 
 const result = await chat.rotateKeys();
