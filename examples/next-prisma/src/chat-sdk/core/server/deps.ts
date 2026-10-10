@@ -48,6 +48,8 @@ export type Limits = {
   reapIntervalMs: number;
   /** How long `stop()` lets local Runs finish before it ends them. */
   drainMs: number;
+  /** How long one `fetch_url` page may take, from the request to its last byte. */
+  fetchTimeoutMs: number;
 };
 
 /**
@@ -147,6 +149,7 @@ export const defaultLimits: Limits = {
   leaseMs: 30_000,
   reapIntervalMs: 30_000,
   drainMs: 250_000,
+  fetchTimeoutMs: 10_000,
 };
 
 /** The production `AppDeps`. */

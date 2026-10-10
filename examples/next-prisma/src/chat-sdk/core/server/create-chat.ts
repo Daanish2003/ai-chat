@@ -4,6 +4,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { handleChat } from "./chat/handle-chat";
 import type { HostServerTool } from "./chat/host-tools";
 import { webSearchToolName } from "../shared/chat/web-search";
+import { fetchUrlToolName } from "../shared/chat/fetch-url";
 import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
@@ -151,10 +152,10 @@ export function createChat(options: CreateChatOptions): {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
   }
-  if (options.tools?.some((tool) => tool.name === webSearchToolName)) {
-    throw new Error(
-      `A Host tool can't be named "${webSearchToolName}": the SDK's search tool has it`,
-    );
+  for (const builtIn of [webSearchToolName, fetchUrlToolName]) {
+    if (options.tools?.some((tool) => tool.name === builtIn)) {
+      throw new Error(`A Host tool can't be named "${builtIn}": the SDK's tool has it`);
+    }
   }
   let deps: AppDeps | undefined;
   const getDeps = () => {

@@ -1,5 +1,5 @@
 import type { AttachmentInfo } from "../../core/shared/attachments/kinds";
-import { replySegments, sourcesOf } from "../../core/shared/chat/sources";
+import { pageSourcesOf, replySegments, sourcesOf } from "../../core/shared/chat/sources";
 import { toolCallOf } from "../../core/shared/chat/tool-call";
 import { webSearchOf } from "../../core/shared/chat/web-search";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
   RefreshCwIcon,
   UserIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import {
   describeError,
@@ -43,7 +43,7 @@ import {
 } from "./attachments";
 
 import { SearchRow } from "./search-row";
-import { replyComponents, ReplySources } from "./source-chips";
+import { replyComponents, ReplySources, SourceChips } from "./source-chips";
 import { ToolCallRow } from "./tool-call-row";
 import { UsageInfo } from "./usage-info";
 
@@ -385,7 +385,10 @@ function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
         ) : segment.type === "searches" ? (
           <SearchRow key={segment.key} searches={segment.searches} sources={sources} />
         ) : (
-          <ToolCallRow key={segment.key} call={segment.call} />
+          <Fragment key={segment.key}>
+            <ToolCallRow call={segment.call} />
+            <SourceChips sources={pageSourcesOf(segment.call, sources)} />
+          </Fragment>
         ),
       )}
     </ReplySources>
