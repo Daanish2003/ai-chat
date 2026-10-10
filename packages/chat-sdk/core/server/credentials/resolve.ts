@@ -27,6 +27,8 @@ export type ModelCall = {
   credentials: Credentials;
   /** Set on a Host Model: bounds the Run (ADR 0007). */
   maxOutputTokens?: number;
+  /** Set on a Host Model: its price, which a call on it is recorded with (ADR 0007). */
+  hostModel?: HostModel;
 };
 
 type ModelDeps = Pick<AppDeps, "db" | "keyEncryptionSecrets" | "hostProviders" | "byok">;
@@ -52,6 +54,7 @@ export async function resolveModelCall(
     ? {
         credentials: offered.hostProvider.credentials,
         maxOutputTokens: offered.model.maxOutputTokens,
+        hostModel: offered.model,
       }
     : null;
 }

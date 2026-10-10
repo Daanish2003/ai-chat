@@ -5,6 +5,7 @@ import { attachment, attachmentBlob } from "./db/schema/attachment";
 import { conversation, message, project } from "./db/schema/chat";
 import { userCredentials } from "./db/schema/credentials";
 import { userSettings } from "./db/schema/settings";
+import { usage } from "./db/schema/usage";
 import type { AppDeps } from "./deps";
 
 /**
@@ -44,5 +45,7 @@ export async function deleteUserData(deps: AppDeps, userId: string): Promise<voi
     // 4. Credentials and settings.
     await tx.delete(userCredentials).where(eq(userCredentials.userId, userId));
     await tx.delete(userSettings).where(eq(userSettings.userId, userId));
+    // 5. Usage rows, which no Conversation cascades to: a deleted account keeps no Quota history.
+    await tx.delete(usage).where(eq(usage.userId, userId));
   });
 }

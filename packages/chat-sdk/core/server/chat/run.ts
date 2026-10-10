@@ -15,6 +15,7 @@ import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../../s
 import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
+import { addRunUsage, recordRunUsage, type RunTotals, type UsageMeter } from "./usage";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -36,12 +37,15 @@ export async function startRun(
     adapter,
     messages,
     webSearch,
+    meter,
   }: {
     messageId: string;
     adapter: AnyTextAdapter;
     messages: ModelMessage[];
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
     webSearch?: Credentials;
+    /** Set on a Run on Host credentials: the Run is recorded in `chat.usage` (ADR 0007). */
+    meter?: UsageMeter;
   },
 ): Promise<void> {
   const abortController = new AbortController();
@@ -81,6 +85,8 @@ export async function startRun(
 
   /** Whether the log already holds its own RUN_FINISHED or RUN_ERROR. */
   let logEnded = false;
+  /** The Run's usage, summed over its RUN_FINISHED chunks (ADR 0007). */
+  let totals: RunTotals | undefined;
   let ids: { threadId: string; runId: string } | undefined;
   let timedOut = false;
   const capTimer = setTimeout(() => {
@@ -117,6 +123,7 @@ export async function startRun(
         if (chunk.type === EventType.RUN_FINISHED || chunk.type === EventType.RUN_ERROR) {
           logEnded = true;
         }
+        if (chunk.type === EventType.RUN_FINISHED) totals = addRunUsage(totals, chunk.usage);
         ids ??= runIdsOf(chunk);
         void deps.runStreams
           .append(messageId, chunk)
@@ -162,6 +169,17 @@ export async function startRun(
             ),
           )
           .catch((caught: unknown) => console.error(`Logging Message ${messageId} failed`, caught));
+      }
+      // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
+      if (meter) {
+        await recordRunUsage(deps, meter, {
+          totals,
+          completed: !timedOut && !abortController.signal.aborted && error === undefined,
+          messages,
+          outputText: searchTextOf(parts.parts()),
+        }).catch((caught: unknown) =>
+          console.error(`Recording usage of ${messageId} failed`, caught),
+        );
       }
       await deps.runStreams.close(messageId);
       deps.lifecycle.runs.delete(messageId);
