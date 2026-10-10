@@ -1,7 +1,7 @@
 import { conversation } from "../db/schema/chat";
 import { desc, eq } from "drizzle-orm";
 
-import { listCredentials, loadCredentials } from "../credentials/store";
+import { resolveCredentials, resolvedServices } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import { ollamaModels, openRouterModels } from "./live-models";
 import {
@@ -25,7 +25,7 @@ export async function listAvailableModels(
   deps: Deps,
   userId: string,
 ): Promise<{ models: CuratedModel[]; defaultModel: string | null }> {
-  const services = (await listCredentials(deps, userId)).map((credential) => credential.service);
+  const services = await resolvedServices(deps, userId);
   const models = [
     ...curatedModels.filter((model) => services.includes(model.provider)),
     ...(
@@ -75,6 +75,6 @@ export async function resolveModel(
 async function liveModels(deps: Deps, userId: string, provider: string) {
   if (provider === "openrouter") return openRouterModels(deps.fetch);
   if (provider !== "ollama") return [];
-  const host = (await loadCredentials(deps, userId, "ollama"))?.host;
+  const host = (await resolveCredentials(deps, userId, "ollama"))?.host;
   return host ? ollamaModels(deps.fetch, host) : [];
 }

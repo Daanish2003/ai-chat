@@ -2,7 +2,7 @@ import { conversation, message } from "../db/schema/chat";
 import { chat } from "@tanstack/ai";
 import { and, eq, isNull } from "drizzle-orm";
 
-import { loadCredentials } from "../credentials/store";
+import { resolveCredentials } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import { loadSettings } from "../settings/store";
 import { isKnownModel, providerOf } from "../../shared/chat/models";
@@ -67,7 +67,7 @@ async function generateTitle(
   const { titleModel } = await loadSettings(deps, userId);
   const model = titleModel ?? replyModel ?? "";
   if (!isKnownModel(model)) return "";
-  const credentials = await loadCredentials(deps, userId, providerOf(model));
+  const credentials = await resolveCredentials(deps, userId, providerOf(model));
   if (!credentials) return "";
   try {
     const { text } = await chat({
