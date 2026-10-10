@@ -65,6 +65,11 @@ export function ChatView(props: ChatViewProps) {
       onDecided={(conversation) =>
         setRestarted({ conversation, generation: (restarted?.generation ?? 0) + 1 })
       }
+      // The restarted snapshot is the decision's, still streaming. Once its join ends, the
+      // refetched Conversation replaces it, or the page would keep showing the reply as streaming.
+      onSynced={(conversation) =>
+        setRestarted((current) => (current ? { ...current, conversation } : current))
+      }
     />
   );
 }
@@ -80,9 +85,12 @@ function ChatThread({
   focusMessageId,
   onFocused = () => {},
   onDecided,
+  onSynced,
 }: ChatViewProps & {
   /** Called with the refetched Conversation once a decision has started its Run. */
   onDecided: (conversation: ConversationData) => void;
+  /** Called with the refetched Conversation once a joined Run's log has closed. */
+  onSynced: (conversation: ConversationData) => void;
 }) {
   const queryClient = useQueryClient();
   const { orpc, chatUrl } = useChatAdapter();
@@ -126,7 +134,9 @@ function ChatThread({
   // state and the Conversation panel row are final. A reply this page sent does this in `run`.
   const joining = useRef(false);
   const joinEnded = useEffectEvent(() => {
-    void fetchConversation().finally(() => invalidateConversationList(queryClient, orpc));
+    void fetchConversation()
+      .then(onSynced)
+      .finally(() => invalidateConversationList(queryClient, orpc));
   });
   useEffect(() => {
     if (isLoading) {
