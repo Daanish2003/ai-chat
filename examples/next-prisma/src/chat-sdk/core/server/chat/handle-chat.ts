@@ -21,6 +21,7 @@ import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 import { quotaExceededCode, quotaRefusal } from "./quota";
 import { generationOptionsFor } from "./generation";
+import { effortFor } from "../../shared/chat/models";
 import { compactionFor, contextBudgetOf, estimateModelMessageTokens } from "./compaction";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
@@ -83,6 +84,8 @@ export async function handleChat(
   // user's own, else the Host's (ADR 0007).
   const searchCall =
     command.webSearch && model.tools ? await resolveToolCall(deps, userId, tavilyService) : null;
+  // The Host's tools are offered to a Model that has tools (`createChat({ tools })`).
+  const hostTools = model.tools ? deps.tools : [];
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({
@@ -138,11 +141,14 @@ export async function handleChat(
     messages: toModelMessages([stored], {
       provider: model.provider,
       webSearch: searchCall !== null,
+      hostTools: hostTools.length > 0,
       reads: { images: model.images, pdfs: model.pdfs },
     }),
   }));
   const messages = sent.flatMap((entry) => entry.messages);
   const owners = sent.flatMap((entry) => entry.messages.map(() => entry.id));
+  // The Conversation's choice, when the Model offers it: the Run sends it and the reply records it.
+  const effort = effortFor(model, owned.reasoningEffort);
   const budget = contextBudgetOf({
     contextWindow: model.contextWindow,
     maxOutputTokens: model.maxOutputTokens,
@@ -199,6 +205,7 @@ export async function handleChat(
         role: "assistant",
         parts: storedParts([]),
         model: model.id,
+        reasoningEffort: effort ?? null,
         status: "streaming",
         createdAt: new Date(now.getTime() + 1),
         // The Run's lease starts now (ADR 0006); the Run's snapshot timer keeps it fresh.
@@ -223,8 +230,13 @@ export async function handleChat(
     adapter,
     messages,
     webSearch: searchCall?.credentials,
+    hostTools,
+    context: { userId, conversationId: owned.id },
     systemPrompts,
-    modelOptions: generationOptionsFor(model.id, { maxOutputTokens: model.maxOutputTokens }),
+    modelOptions: generationOptionsFor(model.id, {
+      maxOutputTokens: model.maxOutputTokens,
+      effort,
+    }),
     // Only a Model with a known window is compacted; the others send every Message, as before.
     compaction:
       budget === null ? undefined : compactionFor({ budget, owners, reply: assistantMessageId }),
