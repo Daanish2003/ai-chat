@@ -4,7 +4,7 @@ import { createChat, memoryRuntime, redisRuntime } from "@ai-chat/chat-sdk/serve
 import { log } from "evlog";
 
 import { appName, sender } from "./email";
-import { ENV } from "./env.server";
+import { ENV, ssrfAllowHosts } from "./env.server";
 
 export const db = createDb(ENV);
 export const auth = createAuth({ ...ENV, APP_NAME: appName }, db, sender, log);
@@ -16,6 +16,7 @@ export const chat = createChat({
   runtime: ENV.REDIS_URL ? redisRuntime({ url: ENV.REDIS_URL }) : memoryRuntime(),
   logger: log,
   basePath: "/api/chat",
+  fetchAllowHosts: ssrfAllowHosts,
   getUser: async (request) => {
     const session = await auth.api.getSession({ headers: request.headers });
     return session?.user ? { id: session.user.id } : null;

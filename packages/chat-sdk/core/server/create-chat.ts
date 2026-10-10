@@ -73,6 +73,12 @@ export type CreateChatOptions = {
    * must not be `web_search`, the SDK's own search tool.
    */
   tools?: HostServerTool[];
+  /**
+   * Test-only: `host` or `host:port` entries that `fetch_url` may reach over plain HTTP and at a
+   * private address (the end-to-end tests' fake page). Never set it in production; `apps/web` sets
+   * it only from `SSRF_ALLOW_HOSTS`, which needs a localhost `BETTER_AUTH_URL`.
+   */
+  fetchAllowHosts?: string[];
 };
 
 /**
@@ -180,6 +186,7 @@ export function createChat(options: CreateChatOptions): {
       getQuota: quotaLookup(options.getQuota),
       rateLimits: resolveRateLimits(options.rateLimits),
       tools: options.tools ?? [],
+      fetchAllowHosts: options.fetchAllowHosts,
     });
     return deps;
   };

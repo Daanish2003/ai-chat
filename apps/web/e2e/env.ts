@@ -21,6 +21,8 @@ export const serverEnv = {
   EMAIL_FROM: "AI Chat <no-reply@example.com>",
   APP_NAME: "AI Chat",
   RESEND_API_KEY: "re_e2e_not_sent",
+  // The fake page `fetch_url` reads is served by the fake Ollama host, on localhost (see fake-ollama.ts).
+  SSRF_ALLOW_HOSTS: `localhost:${fakeOllamaPort}`,
   // Set only by a run with Redis (`redis.spec.ts`); otherwise the server runs on memory.
   ...(process.env.REDIS_URL ? { REDIS_URL: process.env.REDIS_URL } : {}),
 };

@@ -4,6 +4,27 @@ import { createServer, type Server } from "node:http";
 /** The Model the fake Ollama host lists as installed. */
 export const fakeModel = "e2e-model";
 
+/** A prompt with this marker, and a link in it, makes the fake Model call `fetch_url` on the link. */
+export const fetchMarker = "[fetch]";
+const fetchToolName = "fetch_url";
+
+/** The page the fake host serves for `fetch_url`: its title and the text the reply quotes. */
+export const fetchedPagePath = "/e2e/article";
+export const fetchedPageTitle = "Launch notes";
+export const fetchedPageText = "The launch date is 14 March.";
+
+/** The reply to a `fetch_url` result: the page it read, cited by its link, and what it says. */
+export function fetchedReply(toolResult: string): string {
+  const result = JSON.parse(toolResult) as {
+    url?: string;
+    title?: string;
+    content?: string;
+    error?: string;
+  };
+  if (result.error) return `The page could not be read: ${result.error}.`;
+  return `According to [${result.title}](${result.url}): ${result.content}`;
+}
+
 /** A reply long enough to see streaming, with Markdown and a code block. */
 export function fakeReply(prompt: string) {
   return [
@@ -31,6 +52,14 @@ export const slowMarker = "[slow]";
  */
 export function startFakeOllama(port: number): Promise<Server> {
   const server = createServer((request, response) => {
+    if (request.url === fetchedPagePath && request.method === "GET") {
+      response.setHeader("content-type", "text/html; charset=utf-8");
+      response.end(
+        `<!doctype html><html><head><title>${fetchedPageTitle}</title></head>` +
+          `<body><main><p>${fetchedPageText}</p></main></body></html>`,
+      );
+      return;
+    }
     if (request.url === "/api/tags") {
       response.setHeader("content-type", "application/json");
       response.end(JSON.stringify({ models: [{ name: fakeModel }] }));
@@ -44,12 +73,44 @@ export function startFakeOllama(port: number): Promise<Server> {
     let body = "";
     request.on("data", (chunk: Buffer) => (body += chunk.toString()));
     request.on("end", () => {
-      const { messages, stream = true } = JSON.parse(body) as {
+      const {
+        messages,
+        stream = true,
+        tools = [],
+      } = JSON.parse(body) as {
         messages: { role: string; content: string }[];
         stream?: boolean;
+        tools?: { function?: { name?: string } }[];
       };
       const prompt = messages.filter((message) => message.role === "user").at(-1)?.content ?? "";
-      const text = fakeReply(prompt.slice(0, 80));
+      const last = messages.at(-1);
+      // Answers from a tool result the stream has just added, as a Model would.
+      const answering = stream && last?.role === "tool";
+      // Scripted: a prompt with the marker and a link asks for `fetch_url`, when the request offers it.
+      const link = /https?:\/\/\S+/.exec(prompt)?.[0];
+      const offered = tools.some((tool) => tool.function?.name === fetchToolName);
+      if (stream && !answering && link && offered && prompt.includes(fetchMarker)) {
+        response.setHeader("content-type", "application/x-ndjson");
+        const call = {
+          function: { name: fetchToolName, arguments: { url: link } },
+        };
+        response.end(
+          `${JSON.stringify({
+            model: fakeModel,
+            created_at: new Date().toISOString(),
+            message: { role: "assistant", content: "", tool_calls: [call] },
+            done: true,
+            done_reason: "stop",
+            prompt_eval_count: 1,
+            eval_count: 1,
+          })}\n`,
+        );
+        return;
+      }
+      const text =
+        last?.role === "tool" && stream
+          ? fetchedReply(last.content)
+          : fakeReply(prompt.slice(0, 80));
       const line = (content: string, done: boolean) =>
         JSON.stringify({
           model: fakeModel,
