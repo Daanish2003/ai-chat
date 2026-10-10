@@ -16,6 +16,7 @@ import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
 import { addUsage, messageUsage, normalizeUsage, promptCharactersOf, type RunUsage } from "./usage";
+import { recordRunUsage, type UsageMeter } from "./host-usage";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -39,6 +40,7 @@ export async function startRun(
     messages,
     webSearch,
     systemPrompts,
+    meter,
   }: {
     messageId: string;
     /** The Provider of the Model, which decides how its usage is normalised. */
@@ -49,6 +51,8 @@ export async function startRun(
     webSearch?: Credentials;
     /** The reply's system prompts, from `systemPromptsFor` when the Run starts. */
     systemPrompts: string[];
+    /** Set on a Run on Host credentials: the Run is recorded in `chat.usage` (ADR 0007). */
+    meter?: UsageMeter;
   },
 ): Promise<void> {
   const abortController = new AbortController();
@@ -59,6 +63,9 @@ export async function startRun(
   const parts = createPartsBuilder();
   // The Run's usage, summed over its model iterations as the stream is read (issue #117).
   let total: RunUsage | undefined;
+  /** The Provider-reported cost in USD, summed over the Run's iterations, when it reports one. */
+  let reportedCost: number | undefined;
+  let costComplete = true;
   const promptCharacters = promptCharactersOf(messages);
 
   let writes = Promise.resolve();
@@ -125,6 +132,10 @@ export async function startRun(
           // The AG-UI array form is converted back to TanStack's shape first.
           const tokens = Array.isArray(chunk.usage) ? fromSpecTokenUsage(chunk.usage) : chunk.usage;
           if (tokens) total = addUsage(total, normalizeUsage(provider, tokens));
+          // A Provider that reports a cost (OpenRouter) prices a Host Run exactly (ADR 0007). A cost
+          // reported for only some iterations would undercount, so it is used only when all report one.
+          if (tokens?.cost === undefined) costComplete = false;
+          else reportedCost = (reportedCost ?? 0) + tokens.cost;
         }
         if (chunk.type === EventType.RUN_ERROR) {
           error = { message: chunk.message, code: chunk.code ?? chunk.error?.code };
@@ -163,6 +174,12 @@ export async function startRun(
         parts: parts.parts().parts,
       });
       await write(withParts({ ...ending, usage }));
+      // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
+      if (meter) {
+        await recordRunUsage(deps, meter, usage, costComplete ? reportedCost : undefined).catch(
+          (caught: unknown) => console.error(`Recording usage of ${messageId} failed`, caught),
+        );
+      }
       void unsubscribeStop().catch((error: unknown) =>
         console.error(`Unsubscribing Stop of ${messageId} failed`, error),
       );

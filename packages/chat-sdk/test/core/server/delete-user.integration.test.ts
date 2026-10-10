@@ -17,6 +17,7 @@ import { conversation, message, project } from "../../../core/server/db/schema/c
 import { userCredentials } from "../../../core/server/db/schema/credentials";
 import { sharedLink } from "../../../core/server/db/schema/share";
 import { userSettings } from "../../../core/server/db/schema/settings";
+import { usage } from "../../../core/server/db/schema/usage";
 import { uuidv7 } from "../../../core/server/lib/uuidv7";
 import { insertAttachment, linkTestAttachments } from "../../support/attachments";
 import { insertConversation, insertMessage } from "../../support/conversations";
@@ -53,6 +54,16 @@ async function seedOwner(user: TestUser) {
     .insert(userSettings)
     .values({ userId: user.id, titleModel: "anthropic:x", instructions: "Be terse." });
   await getTestDb().insert(project).values({ id: uuidv7(), userId: user.id, name: "Work" });
+  await getTestDb().insert(usage).values({
+    id: uuidv7(),
+    userId: user.id,
+    kind: "run",
+    model: "anthropic:claude-sonnet-5-5",
+    inputTokens: 1,
+    outputTokens: 1,
+    costMicros: 1,
+    estimated: false,
+  });
   return { conv, question, reply, file, link, deps };
 }
 
@@ -93,6 +104,7 @@ async function ownedRows(userId: string) {
     ),
     settings: await count(db.select().from(userSettings).where(eq(userSettings.userId, userId))),
     projects: await count(db.select().from(project).where(eq(project.userId, userId))),
+    usage: await count(db.select().from(usage).where(eq(usage.userId, userId))),
   };
 }
 
@@ -106,6 +118,7 @@ const emptyRows = {
   credentials: 0,
   settings: 0,
   projects: 0,
+  usage: 0,
 };
 
 describe("deleteUserData", () => {

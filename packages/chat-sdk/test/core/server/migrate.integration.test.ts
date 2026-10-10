@@ -57,6 +57,7 @@ const sdkTables = [
   "message_attachment",
   "project",
   "shared_link",
+  "usage",
   "user_credentials",
   "user_settings",
 ];
@@ -83,6 +84,7 @@ describe("chat.migrate()", () => {
       "message_role",
       "message_status",
       "reasoning_effort",
+      "usage_kind",
     ]);
   });
 
@@ -334,7 +336,7 @@ describe("chat.migrate()", () => {
     await expect(Promise.all([chat.migrate(), chat.migrate()])).resolves.toBeDefined();
 
     const applied = await rows<{ count: string }>(url, "select count(*) from chat.__migrations");
-    expect(applied).toEqual([{ count: "3" }]);
+    expect(applied).toEqual([{ count: "4" }]);
   });
 
   it("throws an error naming pg_trgm when the role may not create it", async () => {

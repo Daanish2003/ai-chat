@@ -178,6 +178,8 @@ export async function handleChat(
     messages,
     webSearch: searchCredentials ?? undefined,
     systemPrompts,
+    // A Run on Host credentials is recorded against the user's Quota (ADR 0007).
+    meter: call.hostModel ? { userId, model: model.id, price: call.hostModel } : undefined,
   });
   // The response reads the Run's log from the start, like any joiner (ADR 0006).
   return resumeServerSentEventsResponse({
