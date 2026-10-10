@@ -45,6 +45,7 @@ export async function startRun(
     messages,
     webSearch,
     systemPrompts,
+    modelOptions,
     meter,
     searchMeter,
   }: {
@@ -57,6 +58,8 @@ export async function startRun(
     webSearch?: Credentials;
     /** The reply's system prompts, from `systemPromptsFor` when the Run starts. */
     systemPrompts: string[];
+    /** The Provider's options for the Run, from `generationOptionsFor` (max output, reasoning). */
+    modelOptions?: Record<string, unknown>;
     /** Set on a Run on Host credentials: the Run is recorded in `chat.usage` (ADR 0007). */
     meter?: UsageMeter;
     /** Set when the search runs on the Host's Tavily key: each search is recorded (ADR 0007). */
@@ -138,6 +141,7 @@ export async function startRun(
         abortController,
         ...(tools && { tools }),
         ...(systemPrompts.length > 0 && { systemPrompts }),
+        modelOptions,
       });
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);

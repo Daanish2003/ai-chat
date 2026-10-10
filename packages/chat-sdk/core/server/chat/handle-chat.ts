@@ -20,6 +20,7 @@ import { findConversation, loadPath } from "./store";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 import { quotaExceededCode, quotaRefusal } from "./quota";
+import { generationOptionsFor } from "./generation";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 
@@ -196,6 +197,7 @@ export async function handleChat(
     messages,
     webSearch: searchCall?.credentials,
     systemPrompts,
+    modelOptions: generationOptionsFor(model.id, { maxOutputTokens: model.maxOutputTokens }),
     // A Run on Host credentials is recorded against the user's Quota (ADR 0007).
     meter: call.hostModel ? { userId, model: model.id, price: call.hostModel } : undefined,
     // Each search on the Host's Tavily key is recorded at its price (ADR 0007).
