@@ -27,6 +27,42 @@ export function unknownReasoning(): ReasoningSupport {
   return { efforts: [], off: false, defaultEffort: null };
 }
 
+/** A reasoning choice a Conversation stores: `off` or an effort. `null` is the Model's default. */
+export type ReasoningChoice = ReasoningEffort | "off";
+
+const choiceLabels: Record<ReasoningChoice, string> = {
+  off: "Off",
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+};
+
+/** How a reasoning choice reads in the UI; `null` is the Model's default. */
+export function reasoningChoiceLabel(choice: ReasoningChoice | null): string {
+  return choice === null ? "Model default" : choiceLabels[choice];
+}
+
+/** Providers whose adapters take no reasoning setting here, so their Models offer no choice. */
+const noReasoningControl = new Set(["mistral", "bedrock", "ollama"]);
+
+/** The choices the reasoning control offers for a Model: `off` where allowed, then its efforts. Empty hides the control. */
+export function reasoningChoices(model: {
+  provider: string;
+  reasoning: ReasoningSupport;
+}): ReasoningChoice[] {
+  if (noReasoningControl.has(model.provider)) return [];
+  return [...(model.reasoning.off ? (["off"] as const) : []), ...model.reasoning.efforts];
+}
+
+/** The effort a Run sends for a Conversation's stored choice: the choice when the Model offers it, else `undefined` (the Model's default). */
+export function effortFor(
+  model: { provider: string; reasoning: ReasoningSupport },
+  stored: ReasoningChoice | null,
+): ReasoningChoice | undefined {
+  if (stored === null) return undefined;
+  return reasoningChoices(model).includes(stored) ? stored : undefined;
+}
+
 export type CuratedModel = {
   /** `"provider:model"`, as stored in `conversation.model` and `message.model`. */
   id: string;

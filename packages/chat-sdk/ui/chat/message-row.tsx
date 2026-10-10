@@ -140,7 +140,9 @@ export function MessageRow({
                 })}
               </time>
             )}
-            {!isUser && info.usage && <UsageInfo usage={info.usage} />}
+            {!isUser && (info.usage || info.reasoningEffort) && (
+              <UsageInfo usage={info.usage} reasoningEffort={info.reasoningEffort} />
+            )}
             {actions && (
               <BranchArrows
                 message={message}

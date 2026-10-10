@@ -12,6 +12,10 @@ import { useNewConversationModel } from "../../core/client/react/new-conversatio
 import { useChatLocation, useOrpc } from "../../core/client/react/provider";
 import { ShareButton } from "../share/share-dialog";
 import { ModelPicker } from "./model-picker";
+import {
+  ConversationReasoningEffort,
+  NewConversationReasoningEffort,
+} from "./reasoning-effort-select";
 
 /** The bar above the page: the Conversation title (renamed inline) or the page's name. */
 export function TopBar({
@@ -138,12 +142,15 @@ function ConversationModelPicker({ id }: { id: string }) {
 
   if (!value || !models.data) return null;
   return (
-    <ModelPicker
-      value={value}
-      models={models.data.models}
-      invalid={missingCredentialsMessage(value, models.data.models, byok) !== null}
-      onSelect={(model) => setModel.mutate({ id, model })}
-    />
+    <>
+      <ModelPicker
+        value={value}
+        models={models.data.models}
+        invalid={missingCredentialsMessage(value, models.data.models, byok) !== null}
+        onSelect={(model) => setModel.mutate({ id, model })}
+      />
+      <ConversationReasoningEffort id={id} />
+    </>
   );
 }
 
@@ -156,14 +163,17 @@ function NewConversationModelPicker() {
 
   if (!models.data) return null;
   return (
-    <ModelPicker
-      value={model}
-      models={models.data.models}
-      invalid={
-        model !== undefined && missingCredentialsMessage(model, models.data.models, byok) !== null
-      }
-      onSelect={(next) => void setModel(next)}
-    />
+    <>
+      <ModelPicker
+        value={model}
+        models={models.data.models}
+        invalid={
+          model !== undefined && missingCredentialsMessage(model, models.data.models, byok) !== null
+        }
+        onSelect={(next) => void setModel(next)}
+      />
+      <NewConversationReasoningEffort />
+    </>
   );
 }
 
