@@ -7,6 +7,7 @@ import type { RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
 import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search";
 import type { ChatRuntime } from "./runtime";
+import type { ProviderId } from "../shared/credentials/services";
 
 export type { SearchErrorReason, SearchResult };
 
@@ -45,11 +46,45 @@ export type Limits = {
   drainMs: number;
 };
 
+/**
+ * A Model the Host pays for (ADR 0007). Prices are per 1M tokens, kept with the Model so a
+ * third-party price snapshot never changes the Host's spending. Capability flags default to off.
+ */
+export type HostModel = {
+  modelId: string;
+  label?: string;
+  images?: boolean;
+  pdfs?: boolean;
+  tools?: boolean;
+  /** Bounds one Run's output (ADR 0007). */
+  maxOutputTokens: number;
+  inputUsdPerMillion: number;
+  outputUsdPerMillion: number;
+};
+
+/** The Host's own credentials for a Provider, and the Models they pay for. */
+export type HostProvider = {
+  provider: ProviderId;
+  credentials: Credentials;
+  models: HostModel[];
+};
+
 /** Everything the server entry points need from the outside world, built once at server start. */
 export type AppDeps = {
   db: Database;
-  /** Builds the TanStack AI text adapter for a `"provider:model"` id. */
-  adapterFor: (model: string, credentials: Credentials) => AnyTextAdapter;
+  /**
+   * Builds the TanStack AI text adapter for a `"provider:model"` id. `options.maxOutputTokens` is
+   * set for a Host Model (ADR 0007); a user's own Model is uncapped.
+   */
+  adapterFor: (
+    model: string,
+    credentials: Credentials,
+    options?: { maxOutputTokens?: number },
+  ) => AnyTextAdapter;
+  /** The Host credentials (`hostProviders`, ADR 0007). Never stored. */
+  hostProviders: HostProvider[];
+  /** Whether users may use their own Provider credentials (`byok`, ADR 0007). */
+  byok: boolean;
   searchClient: SearchClient;
   /** Every Run's chunk log, which its POST response and any joiner read (ADR 0006). */
   runStreams: RunStreams;
@@ -79,14 +114,20 @@ export function createAppDeps({
   db,
   keyEncryptionSecret,
   runtime,
+  hostProviders,
+  byok,
 }: {
   db: Database;
   keyEncryptionSecret: string;
   runtime: ChatRuntime;
+  hostProviders: HostProvider[];
+  byok: boolean;
 }): AppDeps {
   return {
     db,
     adapterFor,
+    hostProviders,
+    byok,
     searchClient: createTavilyClient(globalThis.fetch),
     runStreams: runtime.runStreams,
     pubsub: runtime.pubsub,

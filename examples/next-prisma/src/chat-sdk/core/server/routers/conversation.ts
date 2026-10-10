@@ -13,7 +13,7 @@ import {
   switchBranch,
 } from "../chat/store";
 import { addKeyMessage } from "../../shared/credentials/services";
-import { resolveCredentials } from "../credentials/resolve";
+import { resolveModelCall } from "../credentials/resolve";
 import { protectedProcedure } from "../procedures";
 import { uuidv7 } from "../lib/uuidv7";
 
@@ -96,7 +96,7 @@ export const conversationRouter = {
           message: `"${input.model}" is not an available Model`,
         });
       }
-      if (!(await resolveCredentials(context.deps, userId, model.provider))) {
+      if (!(await resolveModelCall(context.deps, userId, model.id))) {
         throw new ORPCError("BAD_REQUEST", { message: addKeyMessage(model.provider) });
       }
       const updated = await setConversationModel(context.deps, userId, input.id, model.id);

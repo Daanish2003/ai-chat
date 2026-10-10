@@ -5,7 +5,7 @@ import { handleChat } from "./chat/handle-chat";
 import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
-import { createAppDeps, type AppDeps } from "./deps";
+import { createAppDeps, type AppDeps, type HostProvider } from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
@@ -31,6 +31,10 @@ export type CreateChatOptions = {
   basePath: string;
   runtime?: ChatRuntime;
   logger?: Logger;
+  /** The Host's own credentials and the Models they pay for (ADR 0007). Never stored. */
+  hostProviders?: HostProvider[];
+  /** Whether users may use their own Provider credentials. Defaults to `true` (ADR 0007). */
+  byok?: boolean;
 };
 
 /**
@@ -85,8 +89,8 @@ export function createChat(options: CreateChatOptions): {
   /** Creates the `chat` schema and applies the bundled migrations. Run it at deploy time. */
   migrate: () => Promise<void>;
   /**
-   * Refuses (throws) while the `chat` schema is behind the bundled migrations, then starts the
-   * reaper: now, and every 30 s (ADR 0006).
+   * Refuses (throws) with neither `hostProviders` nor `byok` on, or while the `chat` schema is
+   * behind the bundled migrations; then starts the reaper: now, and every 30 s (ADR 0006).
    */
   start: () => Promise<void>;
   /**
@@ -103,6 +107,8 @@ export function createChat(options: CreateChatOptions): {
       db: createDb({ DATABASE_URL: options.databaseUrl }),
       keyEncryptionSecret: options.keyEncryptionSecret,
       runtime: options.runtime ?? memoryRuntime(),
+      hostProviders: options.hostProviders ?? [],
+      byok: options.byok ?? true,
     });
     return deps;
   };
@@ -118,6 +124,9 @@ export function createChat(options: CreateChatOptions): {
       (await loadSharedConversation(getDeps(), token)) ?? null,
     migrate: () => migrateSchema(options.databaseUrl),
     start: async () => {
+      if (options.byok === false && !options.hostProviders?.length) {
+        throw new Error("Configure hostProviders, byok, or both: with neither, no one can chat");
+      }
       await assertMigrated(options.databaseUrl);
       await getLifecycle().start();
     },

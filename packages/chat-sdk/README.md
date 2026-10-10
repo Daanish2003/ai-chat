@@ -106,6 +106,37 @@ const data = await chat.getSharedConversation(token);
 - `start()` refuses to run while the `chat` schema is behind the bundled migrations.
 - `stop()` refuses new Runs with 503 while it drains.
 
+## Who pays for Runs
+
+- `hostProviders` are the Host's own credentials, from your environment (never stored): `[{ provider, credentials, models: [...] }]`. Each model is `{ modelId, label?, images?, pdfs?, tools?, maxOutputTokens, inputUsdPerMillion, outputUsdPerMillion }`. `maxOutputTokens` is required: the Host's output cap for a Run on that model, handed to `adapterFor` (the production adapters don't apply it yet). The prices are per 1M tokens and kept with the model. Capability flags default to off unless the model is curated, in which case its curated flags apply.
+- `byok` (default `true`) lets users run on their own Provider credentials. Set it independently of `hostProviders`: `byok: false` with `hostProviders` is a company Host that runs only its own keys.
+- A user's own key for a Provider always wins over the Host's. The Model list marks the Models that run on Host credentials.
+- `start()` throws with neither `hostProviders` nor `byok`.
+
+```ts
+const chat = createChat({
+  databaseUrl,
+  getUser,
+  keyEncryptionSecret,
+  basePath: "/api/chat",
+  hostProviders: [
+    {
+      provider: "anthropic",
+      credentials: { apiKey: process.env.ANTHROPIC_API_KEY! },
+      models: [
+        {
+          modelId: "claude-haiku-4-5",
+          maxOutputTokens: 1024,
+          inputUsdPerMillion: 1,
+          outputUsdPerMillion: 5,
+        },
+      ],
+    },
+  ],
+  byok: true,
+});
+```
+
 Browser side: create a headless client and wrap your chat pages in the provider.
 
 ```tsx

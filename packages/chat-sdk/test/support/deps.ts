@@ -37,6 +37,8 @@ export function createTestDeps({
       throw new Error(`Unexpected network call in a test: ${String(input)}`);
     },
     keyEncryptionSecret: testKeyEncryptionSecret,
+    hostProviders: [],
+    byok: true,
     lifecycle: { stopping: false, runs: new Map() },
     ...overrides,
   };

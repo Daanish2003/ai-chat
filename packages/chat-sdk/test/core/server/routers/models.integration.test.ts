@@ -40,6 +40,7 @@ describe("models.list", () => {
       images: true,
       pdfs: false,
       tools: true,
+      onHostCredentials: false,
     });
   });
 
@@ -154,6 +155,7 @@ describe("models.list with live lists", () => {
         images: false,
         pdfs: false,
         tools: true,
+        onHostCredentials: false,
       },
       expect.objectContaining({ id: "ollama:llama3.2:latest" }),
     ]);
@@ -175,5 +177,76 @@ describe("models.list with live lists", () => {
     expect(live.urls).toEqual([]);
     expect(models.every((model) => model.provider === "gemini")).toBe(true);
     expect(defaultModel).toBe("gemini:gemini-3.8-flash");
+  });
+});
+
+describe("models.list with Host credentials", () => {
+  const hostProviders = [
+    {
+      provider: "anthropic" as const,
+      credentials: { apiKey: "sk-ant-host" },
+      models: [
+        {
+          modelId: "claude-haiku-4-5",
+          maxOutputTokens: 512,
+          inputUsdPerMillion: 1,
+          outputUsdPerMillion: 5,
+        },
+      ],
+    },
+  ];
+
+  it("lists the Host Models marked as Host Models for a user without credentials, and defaults to one", async () => {
+    const user = await insertUser();
+    const deps = createTestDeps({ hostProviders });
+
+    const { models, defaultModel } = await chatRpc({ user, deps }).models.list();
+
+    expect(models).toEqual([
+      {
+        id: "anthropic:claude-haiku-4-5",
+        provider: "anthropic",
+        modelId: "claude-haiku-4-5",
+        label: "Claude Haiku 4.5",
+        images: true,
+        pdfs: true,
+        tools: true,
+        onHostCredentials: true,
+      },
+    ]);
+    expect(defaultModel).toBe("anthropic:claude-haiku-4-5");
+  });
+
+  it("merges the Host Models with the user's own Models, and the user's own Provider wins", async () => {
+    const user = await insertUser();
+    const deps = createTestDeps({ hostProviders });
+    await addCredentials(user, "openai");
+    await saveCredentials(deps, user.id, {
+      service: "anthropic",
+      fields: { apiKey: "sk-ant-own" },
+      hint: "…-own",
+      verified: true,
+    });
+
+    const { models, defaultModel } = await chatRpc({ user, deps }).models.list();
+
+    expect(models.filter((model) => model.onHostCredentials)).toEqual([]);
+    expect(models.some((model) => model.id === "anthropic:claude-haiku-4-5")).toBe(true);
+    expect(defaultModel).toBe("openai:gpt-5.6");
+  });
+
+  it("lists a Host Model of a Provider the user has no key for, beside the user's own Models", async () => {
+    const user = await insertUser();
+    const deps = createTestDeps({ hostProviders });
+    await addCredentials(user, "openai");
+
+    const { models } = await chatRpc({ user, deps }).models.list();
+
+    expect(models.find((model) => model.id === "anthropic:claude-haiku-4-5")).toMatchObject({
+      onHostCredentials: true,
+    });
+    expect(models.find((model) => model.id === "openai:gpt-5.6")).toMatchObject({
+      onHostCredentials: false,
+    });
   });
 });
