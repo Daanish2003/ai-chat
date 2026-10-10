@@ -2,10 +2,12 @@ import type { Database } from "./db/index";
 import type { AnyTextAdapter } from "@tanstack/ai";
 
 import { adapterFor } from "./chat/adapters";
+import type { CounterStore } from "./chat/counters";
 import type { PubSub } from "./chat/pubsub";
 import type { RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
 import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search";
+import type { ResolvedRateLimits } from "./rate-limits";
 import type { ChatRuntime } from "./runtime";
 import type { ProviderId } from "../shared/credentials/services";
 
@@ -90,6 +92,10 @@ export type AppDeps = {
   runStreams: RunStreams;
   /** Control signals such as Stop, which a Run's owner subscribes to (ADR 0006). */
   pubsub: PubSub;
+  /** Rate-limit counters, shared through the runtime (spec 87). */
+  counters: CounterStore;
+  /** The limits on each action, defaults and overrides merged. */
+  rateLimits: ResolvedRateLimits;
   limits: Limits;
   /**
    * Set by `stop()`: once `stopping`, a new Run is refused with 503. `runs` holds this process's
@@ -116,12 +122,14 @@ export function createAppDeps({
   runtime,
   hostProviders,
   byok,
+  rateLimits,
 }: {
   db: Database;
   keyEncryptionSecrets: string[];
   runtime: ChatRuntime;
   hostProviders: HostProvider[];
   byok: boolean;
+  rateLimits: ResolvedRateLimits;
 }): AppDeps {
   return {
     db,
@@ -131,6 +139,8 @@ export function createAppDeps({
     searchClient: createTavilyClient(globalThis.fetch),
     runStreams: runtime.runStreams,
     pubsub: runtime.pubsub,
+    counters: runtime.counters,
+    rateLimits,
     limits: defaultLimits,
     lifecycle: { stopping: false, runs: new Map() },
     fetch: globalThis.fetch,

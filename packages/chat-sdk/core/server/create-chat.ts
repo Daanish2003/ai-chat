@@ -10,6 +10,7 @@ import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
 import { countUnreadableCredentials } from "./credentials/store";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
+import { resolveRateLimits, type RateLimits } from "./rate-limits";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
 import { loadSharedConversation } from "./share/store";
@@ -34,6 +35,8 @@ export type CreateChatOptions = {
   /** Where the handler is mounted, for example `/api/chat`. */
   basePath: string;
   runtime?: ChatRuntime;
+  /** Overrides for the default rate limits (spec 87). Each action is optional; `false` turns it off. */
+  rateLimits?: RateLimits;
   logger?: Logger;
   /** The Host's own credentials and the Models they pay for (ADR 0007). Never stored. */
   hostProviders?: HostProvider[];
@@ -116,6 +119,7 @@ export function createChat(options: CreateChatOptions): {
       runtime: options.runtime ?? memoryRuntime(),
       hostProviders: options.hostProviders ?? [],
       byok: options.byok ?? true,
+      rateLimits: resolveRateLimits(options.rateLimits),
     });
     return deps;
   };
