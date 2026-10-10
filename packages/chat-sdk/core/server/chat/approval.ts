@@ -21,6 +21,7 @@ import { mcpToolsFor } from "../mcp/tools";
 import { noConversationTools, type ConversationTools } from "../../shared/chat/conversation-tools";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
+import { projectInstructionsOf } from "../project/store";
 
 /** Why a decision didn't start a Run. `started` is the only success. */
 export type DecideResult =
@@ -88,7 +89,11 @@ export async function decideApproval(
   const hostTools = model.tools ? allowTools(deps.tools, askedSettings.allowedTools) : [];
   const mcp = model.tools && asked ? await mcpToolsFor(deps, userId, askedSettings) : undefined;
   const { instructions } = await loadSettings(deps, userId);
-  const systemPrompts = systemPromptsFor({ web: false, instructions });
+  const systemPrompts = systemPromptsFor({
+    web: false,
+    instructions,
+    projectInstructions: await projectInstructionsOf(deps, asked?.projectId ?? null),
+  });
   const messages = toModelMessages(
     history.map((row) => ({
       role: row.role,
