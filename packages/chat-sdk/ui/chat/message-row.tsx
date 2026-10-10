@@ -1,5 +1,6 @@
 import type { AttachmentInfo } from "../../core/shared/attachments/kinds";
 import { replySegments, sourcesOf } from "../../core/shared/chat/sources";
+import { toolCallOf } from "../../core/shared/chat/tool-call";
 import { webSearchOf } from "../../core/shared/chat/web-search";
 import { Button } from "@/components/ui/button";
 import { Loader } from "@/components/ui/prompt-kit/loader";
@@ -43,6 +44,7 @@ import {
 
 import { SearchRow } from "./search-row";
 import { replyComponents, ReplySources } from "./source-chips";
+import { ToolCallRow } from "./tool-call-row";
 import { UsageInfo } from "./usage-info";
 
 import { useByok } from "../../core/client/react/byok";
@@ -368,8 +370,10 @@ function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
           >
             {segment.content}
           </Markdown>
-        ) : (
+        ) : segment.type === "searches" ? (
           <SearchRow key={segment.key} searches={segment.searches} sources={sources} />
+        ) : (
+          <ToolCallRow key={segment.key} call={segment.call} />
         ),
       )}
     </ReplySources>
@@ -378,16 +382,19 @@ function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
 
 /**
  * A streaming reply shows the typing loader until text arrives: before its first token, and
- * after a finished search. A running search shows its own spinner instead.
+ * after a finished search or tool call. A running search or tool call shows its own spinner instead.
  */
 function waitingForText(parts: UIMessage["parts"]) {
   const shown = parts.filter((part) =>
-    part.type === "text" ? part.content !== "" : webSearchOf(part) !== null,
+    part.type === "text"
+      ? part.content !== ""
+      : webSearchOf(part) !== null || toolCallOf(part) !== null,
   );
   const last = shown.at(-1);
   if (!last) return true;
   if (last.type === "text") return false;
-  return webSearchOf(last)?.state !== "running";
+  const running = webSearchOf(last)?.state === "running" || toolCallOf(last)?.status === "running";
+  return !running;
 }
 
 /** Why the reply ended in `error`, with a way to fix a rejected key. */

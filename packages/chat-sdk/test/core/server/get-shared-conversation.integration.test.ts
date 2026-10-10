@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { createChatClient } from "../../../core/client/chat-client";
 import { createChat } from "../../../core/server/create-chat";
 import { conversation } from "../../../core/server/db/schema/chat";
+import { storedParts } from "../../../core/shared/message-parts";
 import { insertConversation, insertMessage } from "../../support/conversations";
 import { testKeyEncryptionSecret } from "../../support/deps";
 import { getTestDb, testDatabaseUrl } from "../../support/test-database";
@@ -141,5 +142,60 @@ describe("chat.getSharedConversation", () => {
     await getTestDb().delete(conversation).where(eq(conversation.id, conv.id));
 
     expect(await chat.getSharedConversation(link.token)).toBeNull();
+  });
+});
+
+describe("chat.getSharedConversation with tool calls", () => {
+  it("shows a host tool call as used, with no arguments or result, and a search in full", async () => {
+    const owner = await insertUser();
+    const conv = await insertConversation(owner, { title: "Tools" });
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Time?" });
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "",
+      parts: storedParts([
+        {
+          type: "tool_call",
+          toolCallId: "call-host",
+          name: "server_time",
+          source: "host",
+          args: { zone: "private" },
+          result: { now: "private" },
+          state: "done",
+        },
+        {
+          type: "web_search",
+          toolCallId: "call-search",
+          query: "tanstack",
+          state: "done",
+          results: [{ title: "TanStack", url: "https://tanstack.com", snippet: "Docs" }],
+        },
+      ]),
+      active: true,
+    });
+    const { client } = chatFor(owner);
+    const link = await client.rpc.share.upsert({ conversationId: conv.id });
+
+    const shared = await chatFor(null).chat.getSharedConversation(link.token);
+    const [, reply] = shared?.messages ?? [];
+
+    expect(reply?.parts).toEqual([
+      expect.objectContaining({
+        type: "tool-call",
+        id: "call-host",
+        name: "server_time",
+        arguments: "",
+        metadata: expect.objectContaining({ source: "host", redacted: true }),
+      }),
+      expect.objectContaining({
+        type: "tool-call",
+        id: "call-search",
+        name: "web_search",
+        output: { results: [{ title: "TanStack", url: "https://tanstack.com", snippet: "Docs" }] },
+      }),
+    ]);
+    expect(JSON.stringify(shared)).not.toContain("private");
   });
 });

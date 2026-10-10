@@ -146,6 +146,7 @@ describe("startRun", () => {
       provider: "anthropic",
       adapter: held.adapter,
       messages: [],
+      context: { userId: "user", conversationId: "conversation" },
       systemPrompts: [],
     });
     // Nothing is released, so no chunk arrives: only the timer can write the heartbeat.

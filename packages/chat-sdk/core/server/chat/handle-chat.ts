@@ -80,6 +80,8 @@ export async function handleChat(
   // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
   const searchCredentials =
     command.webSearch && model.tools ? await resolveCredentials(deps, userId, tavilyService) : null;
+  // The Host's tools are offered to a Model that has tools (`createChat({ tools })`).
+  const hostTools = model.tools ? deps.tools : [];
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({
@@ -124,6 +126,7 @@ export async function handleChat(
     {
       provider: model.provider,
       webSearch: searchCredentials !== null,
+      hostTools: hostTools.length > 0,
       reads: { images: model.images, pdfs: model.pdfs },
     },
   );
@@ -194,6 +197,8 @@ export async function handleChat(
     adapter,
     messages,
     webSearch: searchCredentials ?? undefined,
+    hostTools,
+    context: { userId, conversationId: owned.id },
     systemPrompts,
     // A Run on Host credentials is recorded against the user's Quota (ADR 0007).
     meter: call.hostModel ? { userId, model: model.id, price: call.hostModel } : undefined,

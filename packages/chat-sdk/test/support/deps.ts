@@ -24,6 +24,7 @@ export function createTestDeps({
       throw new Error(`No fake adapter for model "${model}"; pass adapterFor to createTestDeps`);
     },
     searchClient: createFakeSearchClient(),
+    tools: [],
     runStreams: createMemoryRunStreams(),
     pubsub: createMemoryPubSub(),
     counters: createMemoryCounters(),
