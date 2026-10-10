@@ -39,6 +39,7 @@ Install these in the Host. Versions come from `package.json` in this folder.
 - `@tanstack/react-query`, `react`, `sonner`
 - `drizzle-orm` and `pg` (the Postgres driver it uses)
 - `redis` (the Redis client, used by `redisRuntime()`)
+- `undici` and `ipaddr.js`, for the SSRF-guarded `fetch` (`core/server/lib/guarded-fetch.ts`). `undici` pins each connection to the address that was checked, and `ipaddr.js` classifies that address. Install `undici` at the major your Node bundles (7.x on Node 24): undici 8's dispatcher is rejected by Node's built-in `fetch`.
 - `@orpc/server`, `@orpc/tanstack-query`
 - `zod`
 
