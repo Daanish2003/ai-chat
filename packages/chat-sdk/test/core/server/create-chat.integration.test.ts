@@ -20,10 +20,21 @@ describe("createChat", () => {
       createChat({
         databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/unreachable",
         getUser: () => null,
-        keyEncryptionSecret: "test-key-encryption-secret-not-for-production",
+        keyEncryptionSecrets: ["test-key-encryption-secret-not-for-production"],
         basePath,
       }),
     ).not.toThrow();
+  });
+
+  it("rejects an empty keyring", () => {
+    expect(() =>
+      createChat({
+        databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/unreachable",
+        getUser: () => null,
+        keyEncryptionSecrets: [],
+        basePath,
+      }),
+    ).toThrow(/at least one/);
   });
 });
 

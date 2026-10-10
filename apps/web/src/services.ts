@@ -8,7 +8,9 @@ export const db = createDb(ENV);
 export const auth = createAuth(ENV, db);
 export const chat = createChat({
   databaseUrl: ENV.DATABASE_URL,
-  keyEncryptionSecret: ENV.KEY_ENCRYPTION_SECRET,
+  keyEncryptionSecrets: [ENV.KEY_ENCRYPTION_SECRET, ENV.KEY_ENCRYPTION_SECRET_PREVIOUS].filter(
+    (secret): secret is string => Boolean(secret),
+  ),
   basePath: "/api/chat",
   getUser: async (request) => {
     const session = await auth.api.getSession({ headers: request.headers });

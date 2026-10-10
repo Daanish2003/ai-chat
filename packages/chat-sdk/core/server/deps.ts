@@ -62,8 +62,8 @@ export type AppDeps = {
    */
   lifecycle: { stopping: boolean; runs: Map<string, AbortController> };
   fetch: typeof fetch;
-  /** `KEY_ENCRYPTION_SECRET`: encrypts Provider credentials and Tool credentials at rest (ADR 0003). */
-  keyEncryptionSecret: string;
+  /** The keyring (ADR 0010): the first secret encrypts Provider and Tool credentials, every entry decrypts. */
+  keyEncryptionSecrets: string[];
 };
 
 export const defaultLimits: Limits = {
@@ -77,11 +77,11 @@ export const defaultLimits: Limits = {
 /** The production `AppDeps`. */
 export function createAppDeps({
   db,
-  keyEncryptionSecret,
+  keyEncryptionSecrets,
   runtime,
 }: {
   db: Database;
-  keyEncryptionSecret: string;
+  keyEncryptionSecrets: string[];
   runtime: ChatRuntime;
 }): AppDeps {
   return {
@@ -93,6 +93,6 @@ export function createAppDeps({
     limits: defaultLimits,
     lifecycle: { stopping: false, runs: new Map() },
     fetch: globalThis.fetch,
-    keyEncryptionSecret,
+    keyEncryptionSecrets,
   };
 }

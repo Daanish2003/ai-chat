@@ -244,7 +244,7 @@ describe("createChat().deleteUser", () => {
     const chat = createChat({
       databaseUrl: testDatabaseUrl,
       getUser: () => null,
-      keyEncryptionSecret: testKey,
+      keyEncryptionSecrets: [testKey],
       basePath: "/api/chat",
     });
 

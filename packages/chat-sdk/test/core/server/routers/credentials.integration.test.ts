@@ -212,7 +212,9 @@ describe("credentials", () => {
   it("treats credentials that no longer decrypt as missing", async () => {
     const { client, user } = await signedIn(200);
     await client.credentials.save({ service: "anthropic", fields: { apiKey: goodKey } });
-    const rotated = createTestDeps({ keyEncryptionSecret: "a-different-secret-of-32-characters!" });
+    const rotated = createTestDeps({
+      keyEncryptionSecrets: ["a-different-secret-of-32-characters!"],
+    });
 
     await expect(chatRpc({ user, deps: rotated }).credentials.list()).resolves.toEqual([]);
     await expect(loadCredentials(rotated, user.id, "anthropic")).resolves.toBeNull();

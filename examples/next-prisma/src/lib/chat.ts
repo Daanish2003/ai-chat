@@ -8,7 +8,7 @@ import { auth } from "@/auth";
  */
 export const chat = createChat({
   databaseUrl: process.env.DATABASE_URL ?? "",
-  keyEncryptionSecret: process.env.KEY_ENCRYPTION_SECRET ?? "",
+  keyEncryptionSecrets: [process.env.KEY_ENCRYPTION_SECRET ?? ""],
   basePath: "/api/chat",
   getUser: async () => {
     const session = await auth();

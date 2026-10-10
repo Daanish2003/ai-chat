@@ -14,13 +14,13 @@ import {
   testDatabaseUrl,
 } from "../../support/test-database";
 
-const keyEncryptionSecret = "test-key-encryption-secret-not-for-production";
+const keyEncryptionSecrets = ["test-key-encryption-secret-not-for-production"];
 
 function chatFor(databaseUrl: string) {
   return createChat({
     databaseUrl,
     getUser: () => null,
-    keyEncryptionSecret,
+    keyEncryptionSecrets,
     basePath: "/api/chat",
   });
 }
