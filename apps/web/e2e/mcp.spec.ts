@@ -19,6 +19,8 @@ test("a Connection signed in on the keys page, switched on, runs a tool call onc
 
   // The Tools menu is in a Conversation's composer, so the Conversation starts with a plain reply.
   await page.goto("/c");
+  // The composer takes Enter only once the Model is picked, so wait for it.
+  await expect(page.getByRole("button", { name: "Model" })).toContainText("e2e-model");
   await send(page, "Set up the tracker");
   await expect(page).toHaveURL(/\/c\/[\w-]+$/);
 

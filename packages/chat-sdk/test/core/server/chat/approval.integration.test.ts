@@ -172,6 +172,21 @@ describe("a Host tool that needs Approval", () => {
     });
   });
 
+  it("the joined stream of the resumed Run ends with RUN_FINISHED, as the browser needs to stop waiting", async () => {
+    const { deps, conv, send, decide } = await setup({
+      rounds: [round(mailCall("call-1")), round(text("Sent."))],
+      runs: [],
+    });
+    await (await send()).text();
+    const reply = await replyOf(deps, conv.id);
+
+    const joined = await decide(reply.id, true);
+
+    const events = joined.split("\n").filter((line) => line.startsWith("data:"));
+    expect(events.at(-1)).toContain("RUN_FINISHED");
+    expect(events.some((line) => line.includes("RUN_ERROR"))).toBe(false);
+  });
+
   it("deny never runs the tool: the Model gets a denied result, the call is denied, and the reply completes", async () => {
     const runs: Runs = [];
     const { deps, conv, fake, send, decide } = await setup({
