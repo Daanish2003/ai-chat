@@ -90,12 +90,15 @@ export function MessageRow({
   userLabel = "You",
   actions,
   highlighted = false,
+  contextCut = false,
 }: {
   message: UIMessage;
   userLabel?: string;
   actions?: MessageActions;
   /** Marks the row as the search hit just opened. */
   highlighted?: boolean;
+  /** The Model's context starts at this Message on the Branch: a marker sits above it. */
+  contextCut?: boolean;
 }) {
   const info = messageInfo(message);
   const text = plainText(message);
@@ -114,6 +117,13 @@ export function MessageRow({
         highlighted && "bg-primary/10 ring-1 ring-primary/40 ring-inset",
       )}
     >
+      {contextCut && (
+        <p className="mx-auto mb-3 flex w-full max-w-4xl items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="h-px flex-1 bg-border" aria-hidden />
+          Earlier messages are no longer in the model's context
+          <span className="h-px flex-1 bg-border" aria-hidden />
+        </p>
+      )}
       <div className="mx-auto flex w-full max-w-4xl gap-3">
         <div
           className={cn(

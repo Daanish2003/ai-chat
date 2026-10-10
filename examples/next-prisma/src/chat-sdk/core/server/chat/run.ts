@@ -2,6 +2,7 @@ import { storedPartsSchema } from "../../shared/message-parts";
 import { conversation, message } from "../db/schema/chat";
 import {
   type AnyTextAdapter,
+  type ChatMiddleware,
   chat,
   EventType,
   fromSpecTokenUsage,
@@ -49,6 +50,7 @@ export async function startRun(
     context,
     systemPrompts,
     modelOptions,
+    compaction,
     meter,
     searchMeter,
   }: {
@@ -67,6 +69,11 @@ export async function startRun(
     systemPrompts: string[];
     /** The Provider's options for the Run, from `generationOptionsFor` (max output, reasoning). */
     modelOptions?: Record<string, unknown>;
+    /**
+     * Drops the oldest Messages a model call would send past the window (`compactionFor`). Its
+     * context start is saved on the Message when the Run ends.
+     */
+    compaction?: { middleware: ChatMiddleware; contextStartId: () => string | null };
     /** Set on a Run on Host credentials: the Run is recorded in `chat.usage` (ADR 0007). */
     meter?: UsageMeter;
     /** Set when the search runs on the Host's Tavily key: each search is recorded (ADR 0007). */
@@ -155,6 +162,7 @@ export async function startRun(
         ...(tools.length > 0 && { tools }),
         ...(systemPrompts.length > 0 && { systemPrompts }),
         modelOptions,
+        ...(compaction && { middleware: [compaction.middleware] }),
       });
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
@@ -204,7 +212,13 @@ export async function startRun(
         promptCharacters,
         parts: parts.parts().parts,
       });
-      await write(withParts({ ...ending, usage }));
+      await write(
+        withParts({
+          ...ending,
+          usage,
+          ...(compaction && { contextStartId: compaction.contextStartId() }),
+        }),
+      );
       // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
       if (meter) {
         await recordHostUsage(
