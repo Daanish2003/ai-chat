@@ -2,7 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import { expect, type Page } from "@playwright/test";
 
-import { baseURL, fakeOllamaHost } from "./env";
+import { fakeOllamaHost } from "./env";
+import { type SeededUser, seedUser } from "./seed-user";
 
 const newUser = () => ({
   name: "E2E User",
@@ -10,26 +11,12 @@ const newUser = () => ({
   password: "password1234",
 });
 
-/**
- * Signs up a new user (so tests don't share data) and lands on the new Conversation page.
- * Better Auth allows a few sign-ups per 10 s from one address, so a refused one waits and retries.
- */
-export async function signUp(page: Page) {
-  for (let attempt = 0; attempt < 10; attempt++) {
-    const response = await page.request.post("/api/auth/sign-up/email", {
-      data: newUser(),
-      headers: { origin: baseURL },
-    });
-    if (response.status() === 429) {
-      await page.waitForTimeout(Number(response.headers()["x-retry-after"] ?? 10) * 1000);
-      continue;
-    }
-    expect(response.ok()).toBe(true);
-    await page.goto("/c");
-    await expect(page).toHaveURL(/\/c$/);
-    return;
-  }
-  throw new Error("Sign-up stayed rate limited");
+/** Signs in as a new seeded, verified user (so tests don't share data) on the new Conversation page. */
+export async function signInAsSeededUser(page: Page): Promise<SeededUser> {
+  const seeded = await seedUser(page);
+  await page.goto("/c");
+  await expect(page).toHaveURL(/\/c$/);
+  return seeded;
 }
 
 /** Signs up through the form, retrying while it is rate limited. */
@@ -61,9 +48,9 @@ export async function addFakeOllama(page: Page) {
   await expect(row.getByText("Verified")).toBeVisible();
 }
 
-/** A signed-up user with the fake Ollama, on the new Conversation page. */
-export async function signUpWithModel(page: Page) {
-  await signUp(page);
+/** A seeded user with the fake Ollama, on the new Conversation page. */
+export async function signInAsSeededUserWithModel(page: Page) {
+  await signInAsSeededUser(page);
   await addFakeOllama(page);
   await page.goto("/c");
   await expect(page.getByRole("button", { name: "Model" })).toContainText("e2e-model");
@@ -75,7 +62,11 @@ export function messageRows(page: Page) {
 
 /** Sends `text` from the composer and waits for the whole reply. */
 export async function send(page: Page, text: string) {
+  // The composer ignores Enter while a reply streams; its button reads "Send" only once it is done.
+  const sendButton = page.getByRole("button", { name: "Send", exact: true });
+  await expect(sendButton).toBeVisible();
   await page.getByLabel("Message", { exact: true }).fill(text);
   await page.keyboard.press("Enter");
   await expect(messageRows(page).last()).toContainText("That's all.");
+  await expect(sendButton).toBeVisible();
 }

@@ -1,7 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 import { slowMarker } from "./fake-ollama";
-import { messageRows, send, signUp, signUpWithForm, signUpWithModel } from "./helpers";
+import {
+  messageRows,
+  send,
+  signInAsSeededUser,
+  signInAsSeededUserWithModel,
+  signUpWithForm,
+} from "./helpers";
 
 test("the home page sends a signed-out visitor to log in, and a new user to the chat", async ({
   page,
@@ -15,8 +21,22 @@ test("the home page sends a signed-out visitor to log in, and a new user to the 
   await expect(page.getByRole("heading", { name: "Bring your own key to start" })).toBeVisible();
 });
 
+test("a seeded user is signed in, and its password signs in on the form", async ({ page }) => {
+  const user = await signInAsSeededUser(page);
+  await page.goto("/settings/keys");
+  await expect(page.getByRole("heading", { name: "Keys & settings" })).toBeVisible();
+
+  await page.context().clearCookies();
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Already have an account? Sign In" }).click();
+  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Password").fill(user.password);
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await expect(page).toHaveURL(/\/c$/);
+});
+
 test("the first Message of a new Conversation is sent, streamed and kept", async ({ page }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
 
   await send(page, "Hello from the end-to-end test");
 
@@ -37,7 +57,7 @@ test("the first Message of a new Conversation is sent, streamed and kept", async
 });
 
 test("a follow-up continues the Conversation", async ({ page }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await send(page, "First question");
   await send(page, "Second question");
 
@@ -46,7 +66,7 @@ test("a follow-up continues the Conversation", async ({ page }) => {
 });
 
 test("Stop ends a reply early and marks it Stopped", async ({ page }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await page.getByLabel("Message", { exact: true }).fill(`Take your time ${slowMarker}`);
   await page.keyboard.press("Enter");
 
@@ -60,7 +80,7 @@ test("Stop ends a reply early and marks it Stopped", async ({ page }) => {
 });
 
 test("reloading during a streaming reply joins it live until it completes", async ({ page }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await page.getByLabel("Message", { exact: true }).fill(`Keep going ${slowMarker}`);
   await page.keyboard.press("Enter");
   await expect(messageRows(page).last()).toContainText("You said");
@@ -76,7 +96,7 @@ test("reloading during a streaming reply joins it live until it completes", asyn
 });
 
 test("editing a Message and regenerating a reply each start a new Branch", async ({ page }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await send(page, "Original question");
 
   const userRow = messageRows(page).first();
@@ -100,7 +120,7 @@ test("editing a Message and regenerating a reply each start a new Branch", async
 });
 
 test("the palette opens with the platform's shortcut and finds a Message", async ({ page }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await send(page, "Remember the word pineapple");
   await page.goto("/c");
 
@@ -119,7 +139,7 @@ test("the palette opens with the platform's shortcut and finds a Message", async
 });
 
 test("a Shared link shows the Conversation read-only to anyone", async ({ page, browser }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await send(page, "Something worth sharing");
 
   await page.getByRole("button", { name: "Share" }).click();
@@ -142,7 +162,7 @@ test("a Shared link shows the Conversation read-only to anyone", async ({ page, 
 
 test("on a wide screen the composer lines up with the Messages", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1000 });
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await send(page, "Line me up");
 
   const avatarColumn = (await messageRows(page).first().locator("> div").boundingBox())!;
@@ -154,7 +174,7 @@ test("on a wide screen the composer lines up with the Messages", async ({ page }
 });
 
 test("the Conversation panel stays collapsed after a reload", async ({ page }) => {
-  await signUp(page);
+  await signInAsSeededUser(page);
   const panel = page.getByRole("complementary", { name: "Conversations" });
   await expect(panel).toBeVisible();
 
