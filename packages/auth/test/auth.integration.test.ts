@@ -13,6 +13,10 @@ const env: AuthConfig = {
   BETTER_AUTH_URL: BASE,
   BETTER_AUTH_SECRET: "auth-integration-secret-0123456789abcdef",
   APP_NAME: "Acme Chat",
+  GITHUB_CLIENT_ID: "test-github-client-id",
+  GITHUB_CLIENT_SECRET: "test-github-client-secret",
+  GOOGLE_CLIENT_ID: "test-google-client-id.apps.googleusercontent.com",
+  GOOGLE_CLIENT_SECRET: "test-google-client-secret",
 };
 const database = createDb({ DATABASE_URL: process.env.TEST_DATABASE_URL ?? "" });
 
@@ -357,4 +361,27 @@ describe("change email", () => {
     expect(await userRow(REQUESTER)).toHaveLength(1);
     expect(await userRow(TAKEN)).toHaveLength(1);
   });
+});
+
+describe("social sign-in", () => {
+  it.each([
+    ["github", "https://github.com/login/oauth/authorize", "test-github-client-id"],
+    [
+      "google",
+      "https://accounts.google.com/o/oauth2/v2/auth",
+      "test-google-client-id.apps.googleusercontent.com",
+    ],
+  ])(
+    "starts %s at its authorize URL with the configured client and callback",
+    async (provider, authorize, clientId) => {
+      const auth = createAuth(env, database, createMemorySender(), makeLogger());
+      const response = await post(auth, "/sign-in/social", { provider, callbackURL: "/c" });
+      const { url } = (await response.json()) as { url: string };
+
+      const start = new URL(url);
+      expect(`${start.origin}${start.pathname}`).toBe(authorize);
+      expect(start.searchParams.get("client_id")).toBe(clientId);
+      expect(start.searchParams.get("redirect_uri")).toBe(`${BASE}/api/auth/callback/${provider}`);
+    },
+  );
 });

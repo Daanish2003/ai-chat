@@ -8,7 +8,21 @@ import { ENV, ssrfAllowHosts } from "./env.server";
 import { mcpServersOf } from "./mcp-server";
 
 export const db = createDb(ENV);
-export const auth = createAuth({ ...ENV, APP_NAME: appName }, db, sender, log);
+// The OAuth values are optional outside production (see .env.schema); an empty id makes the
+// provider's sign-in fail at the provider rather than at boot.
+export const auth = createAuth(
+  {
+    ...ENV,
+    APP_NAME: appName,
+    GITHUB_CLIENT_ID: ENV.GITHUB_CLIENT_ID ?? "",
+    GITHUB_CLIENT_SECRET: ENV.GITHUB_CLIENT_SECRET ?? "",
+    GOOGLE_CLIENT_ID: ENV.GOOGLE_CLIENT_ID ?? "",
+    GOOGLE_CLIENT_SECRET: ENV.GOOGLE_CLIENT_SECRET ?? "",
+  },
+  db,
+  sender,
+  log,
+);
 export const chat = createChat({
   databaseUrl: ENV.DATABASE_URL,
   keyEncryptionSecrets: [ENV.KEY_ENCRYPTION_SECRET, ENV.KEY_ENCRYPTION_SECRET_PREVIOUS].filter(
