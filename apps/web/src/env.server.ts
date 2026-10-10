@@ -1,4 +1,8 @@
 import { ENV } from "./env";
+import { ssrfAllowHostsOf } from "./ssrf-allow";
+
+// The SSRF allowance is for the end-to-end tests too: refused unless BETTER_AUTH_URL is localhost.
+export const ssrfAllowHosts = ssrfAllowHostsOf(ENV);
 
 // The capture mailbox is for the end-to-end tests on this machine only: its messages hold live
 // links, so it never runs against a public address.

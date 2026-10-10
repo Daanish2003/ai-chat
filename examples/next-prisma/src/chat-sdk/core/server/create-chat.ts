@@ -18,6 +18,8 @@ import {
 } from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
+import { type McpServerConfig, checkMcpServers } from "./mcp/servers";
+import { callbackRoute, connectRoute } from "./mcp/routes";
 import { exportUserData, type UserExport } from "./export-user";
 import { countUnreadableCredentials, rotateCredentialKeys } from "./credentials/store";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
@@ -73,6 +75,18 @@ export type CreateChatOptions = {
    * must not be `web_search`, the SDK's own search tool.
    */
   tools?: HostServerTool[];
+  /**
+   * Test-only: `host` or `host:port` entries that `fetch_url` may reach over plain HTTP and at a
+   * private address (the end-to-end tests' fake page). Never set it in production; `apps/web` sets
+   * it only from `SSRF_ALLOW_HOSTS`, which needs a localhost `BETTER_AUTH_URL`.
+   */
+  fetchAllowHosts?: string[];
+  /**
+   * Remote MCP servers the users may connect to (spec #91). Streamable HTTP over HTTPS only. Each
+   * server needs an OAuth client the Host registered with it ahead of time; the README says which
+   * redirect URI to register.
+   */
+  mcpServers?: McpServerConfig[];
 };
 
 /**
@@ -93,6 +107,8 @@ export function createChatHandler(
   const rpcPrefix = `${prefix}/rpc` as `/${string}`;
   const runPath = `${prefix}/run`;
   const exportPath = `${prefix}/export`;
+  const mcpConnectPath = `${prefix}/mcp/connect`;
+  const mcpCallbackPath = `${prefix}/mcp/callback`;
   const sharedReadPath = `${rpcPrefix}/share/get`;
   const rpc = new RPCHandler(appRouter, {
     interceptors: [onError((error) => logger.error(error))],
@@ -124,6 +140,15 @@ export function createChatHandler(
     }
     if (user && pathname === exportPath && request.method === "GET") {
       return exportResponse(deps, user.id);
+    }
+    if (
+      user &&
+      request.method === "GET" &&
+      (pathname === mcpConnectPath || pathname === mcpCallbackPath)
+    ) {
+      const redirectUri = `${new URL(request.url).origin}${mcpCallbackPath}`;
+      const route = pathname === mcpConnectPath ? connectRoute : callbackRoute;
+      return route(request, user.id, deps, redirectUri);
     }
     return notFound();
   };
@@ -163,6 +188,7 @@ export function createChat(options: CreateChatOptions): {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
   }
+  checkMcpServers(options.mcpServers ?? []);
   for (const builtIn of [webSearchToolName, fetchUrlToolName]) {
     if (options.tools?.some((tool) => tool.name === builtIn)) {
       throw new Error(`A Host tool can't be named "${builtIn}": the SDK's tool has it`);
@@ -180,6 +206,8 @@ export function createChat(options: CreateChatOptions): {
       getQuota: quotaLookup(options.getQuota),
       rateLimits: resolveRateLimits(options.rateLimits),
       tools: options.tools ?? [],
+      fetchAllowHosts: options.fetchAllowHosts,
+      mcpServers: options.mcpServers ?? [],
     });
     return deps;
   };

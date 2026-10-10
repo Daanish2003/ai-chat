@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 import { useByok } from "../../core/client/react/byok";
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
+import { ConnectionsSection } from "../settings/connections-section";
 import { DeleteAllConversationsSection } from "../settings/delete-all-conversations";
 import { ExportDataButton } from "../settings/export-data-button";
 import { InstructionsField } from "../settings/instructions-field";
@@ -87,6 +88,8 @@ export function KeySettingsPage() {
           </section>
         </>
       )}
+
+      <ConnectionsSection />
 
       <SharedLinksSection />
 

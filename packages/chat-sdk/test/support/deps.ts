@@ -48,6 +48,7 @@ export function createTestDeps({
     keyEncryptionSecrets: [testKeyEncryptionSecret],
     hostProviders: [],
     hostTools: [],
+    mcpServers: [],
     byok: true,
     getQuota: async () => null,
     lifecycle: { stopping: false, runs: new Map() },
