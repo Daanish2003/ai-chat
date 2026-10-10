@@ -12,6 +12,7 @@ import {
   listPinnedConversations,
   loadActiveBranch,
   maxPinnedConversations,
+  moveConversation,
   pinConversation,
   renameConversation,
   setConversationModel,
@@ -186,6 +187,25 @@ export const conversationRouter = {
     .handler(async ({ context, input }) => {
       const unpinned = await unpinConversation(context.deps, context.user.id, input.id);
       if (!unpinned) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }),
+
+  /**
+   * Moves the Conversation into one of the caller's Projects, or out of its Project when
+   * `projectId` is `null`. Its Model, Messages, pin and `lastMessageAt` stay as they are.
+   */
+  move: protectedProcedure
+    .input(z.object({ id: z.uuid(), projectId: z.uuid().nullable() }))
+    .handler(async ({ context, input }) => {
+      if (input.projectId && !(await findProject(context.deps, context.user.id, input.projectId))) {
+        throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      }
+      const moved = await moveConversation(
+        context.deps,
+        context.user.id,
+        input.id,
+        input.projectId,
+      );
+      if (!moved) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
     }),
 
   /** Deletes the Conversation for good; its Messages go with it (cascade). */

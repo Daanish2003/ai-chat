@@ -6,12 +6,20 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { MoreHorizontalIcon, PinIcon, PinOffIcon, Share2Icon, Trash2Icon } from "lucide-react";
+import {
+  FolderIcon,
+  MoreHorizontalIcon,
+  PinIcon,
+  PinOffIcon,
+  Share2Icon,
+  Trash2Icon,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { ShareDialog } from "../share/share-dialog";
 import { useDeleteConversation } from "../../core/client/react/delete-conversation";
 import {
+  useMoveConversation,
   usePinConversation,
   useRenameConversation,
 } from "../../core/client/react/conversation-actions";
@@ -107,18 +115,24 @@ export function ConversationPanel({ className }: { className?: string }) {
   );
 }
 
-/** One Conversation in the panel, with its menu: rename, pin or unpin, share and delete. */
+/** One Conversation in the panel, with its menu: rename, pin or unpin, move, share and delete. */
 export function ConversationRow({ conversation }: { conversation: ConversationSummary }) {
-  const { Link } = useChatAdapter();
+  const { Link, orpc } = useChatAdapter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const remove = useDeleteConversation();
   const rename = useRenameConversation();
   const pin = usePinConversation();
+  const move = useMoveConversation();
+  const projects = useQuery({ ...orpc.project.list.queryOptions(), enabled: moveOpen });
   const pinned = conversation.pinnedAt !== null;
+  // Moving to the Project the Conversation is already in does nothing, so it isn't offered.
+  const targets = (projects.data?.items ?? []).filter((item) => item.id !== conversation.projectId);
 
   const pick = (action: () => void) => {
     setMenuOpen(false);
+    setMoveOpen(false);
     action();
   };
 
@@ -152,11 +166,17 @@ export function ConversationRow({ conversation }: { conversation: ConversationSu
           {conversation.hasError && <span className="text-destructive">error</span>}
         </div>
       </Link>
-      <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+      <Popover
+        open={menuOpen}
+        onOpenChange={(open) => {
+          setMenuOpen(open);
+          if (!open) setMoveOpen(false);
+        }}
+      >
         <PopoverTrigger
           aria-label={`Actions for "${conversation.title ?? "Untitled"}"`}
           title="Conversation actions"
-          disabled={remove.isPending || pin.isPending}
+          disabled={remove.isPending || pin.isPending || move.isPending}
           className={cn(
             buttonVariants({ variant: "ghost", size: "icon-xs" }),
             "absolute top-1.5 right-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:top-auto pointer-coarse:bottom-1.5 pointer-coarse:opacity-100",
@@ -165,47 +185,100 @@ export function ConversationRow({ conversation }: { conversation: ConversationSu
           <MoreHorizontalIcon />
         </PopoverTrigger>
         <PopoverContent align="end" className="w-44 p-1">
-          <div role="menu" className="flex flex-col">
-            <Button
-              variant="ghost"
-              size="sm"
-              role="menuitem"
-              className="justify-start"
-              onClick={() => pick(() => rename.promptRename(conversation))}
-            >
-              Rename
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              role="menuitem"
-              className="justify-start"
-              onClick={() => pick(() => pin.toggle(conversation))}
-            >
-              {pinned ? <PinOffIcon /> : <PinIcon />}
-              {pinned ? "Unpin" : "Pin"}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              role="menuitem"
-              className="justify-start"
-              onClick={() => pick(() => setSharing(true))}
-            >
-              <Share2Icon />
-              Share
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              role="menuitem"
-              className="justify-start hover:text-destructive"
-              onClick={() => pick(() => remove.confirmDelete(conversation))}
-            >
-              <Trash2Icon />
-              Delete
-            </Button>
-          </div>
+          {moveOpen ? (
+            <div role="menu" aria-label="Move to Project" className="flex flex-col">
+              <Button
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                className="justify-start"
+                onClick={() => setMoveOpen(false)}
+              >
+                Back
+              </Button>
+              {conversation.projectId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  role="menuitem"
+                  className="justify-start"
+                  onClick={() => pick(() => move.moveTo(conversation, null))}
+                >
+                  Remove from Project
+                </Button>
+              )}
+              {targets.map((target) => (
+                <Button
+                  key={target.id}
+                  variant="ghost"
+                  size="sm"
+                  role="menuitem"
+                  className="justify-start"
+                  onClick={() => pick(() => move.moveTo(conversation, target.id))}
+                >
+                  <FolderIcon />
+                  <span className="truncate">{target.name}</span>
+                </Button>
+              ))}
+              {projects.isSuccess && targets.length === 0 && (
+                <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                  {conversation.projectId ? "No other Projects" : "No Projects yet"}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div role="menu" className="flex flex-col">
+              <Button
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                className="justify-start"
+                onClick={() => pick(() => rename.promptRename(conversation))}
+              >
+                Rename
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                className="justify-start"
+                onClick={() => pick(() => pin.toggle(conversation))}
+              >
+                {pinned ? <PinOffIcon /> : <PinIcon />}
+                {pinned ? "Unpin" : "Pin"}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                className="justify-start"
+                onClick={() => setMoveOpen(true)}
+              >
+                <FolderIcon />
+                Move to Project
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                className="justify-start"
+                onClick={() => pick(() => setSharing(true))}
+              >
+                <Share2Icon />
+                Share
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                role="menuitem"
+                className="justify-start hover:text-destructive"
+                onClick={() => pick(() => remove.confirmDelete(conversation))}
+              >
+                <Trash2Icon />
+                Delete
+              </Button>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
       {sharing && (
