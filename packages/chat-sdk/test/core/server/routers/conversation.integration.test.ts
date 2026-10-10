@@ -292,17 +292,17 @@ describe("conversation.list paging", () => {
     });
   });
 
-  it("leaves out Conversations in a Project and shows each row's pinnedAt and projectId", async () => {
+  it("leaves out Conversations in a Project and pinned ones, which show only under Pinned", async () => {
     const { user, client } = await signedIn();
     const projectId = uuidv7();
     await getTestDb().insert(project).values({ id: projectId, userId: user.id, name: "Work" });
     await insertConversation(user, { title: "In a Project", projectId });
-    const pinnedAt = new Date("2026-10-02T08:00:00Z");
-    const pinned = await insertConversation(user, { title: "Pinned", pinnedAt });
+    await insertConversation(user, { title: "Pinned", pinnedAt: new Date("2026-10-02T08:00:00Z") });
+    const plain = await insertConversation(user, { title: "Plain" });
 
     const items = await listItems(client);
 
-    expect(items).toEqual([expect.objectContaining({ id: pinned.id, pinnedAt, projectId: null })]);
+    expect(items.map((row) => row.id)).toEqual([plain.id]);
   });
 
   it("doesn't move a Conversation for a rename or a Branch switch, but moves it for a new Message", async () => {
@@ -769,5 +769,130 @@ describe("conversation reasoning effort", () => {
     await expect(
       client.conversation.setReasoningEffort({ id: conv.id, reasoningEffort: "high" }),
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+});
+
+describe("conversation.pin and conversation.unpin", () => {
+  it("pins a Conversation, so the Pinned read returns it and the main list drops it", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user, { title: "Daily" });
+
+    await client.conversation.pin({ id: conv.id });
+
+    const pinned = await client.conversation.pinned();
+    expect(pinned).toEqual([expect.objectContaining({ id: conv.id, pinnedAt: expect.any(Date) })]);
+    expect(await listItems(client)).toEqual([]);
+  });
+
+  it("unpins a Conversation, so it returns to the main list and leaves Pinned", async () => {
+    const { user, client } = await signedIn();
+    const conv = await insertConversation(user, { title: "Daily" });
+    await client.conversation.pin({ id: conv.id });
+
+    await client.conversation.unpin({ id: conv.id });
+
+    expect(await client.conversation.pinned()).toEqual([]);
+    expect((await listItems(client)).map((row) => row.id)).toEqual([conv.id]);
+  });
+
+  it("orders Pinned by when each Conversation was pinned, not by its last Message", async () => {
+    const { user, client } = await signedIn();
+    const pinnedFirst = await insertConversation(user, {
+      title: "Pinned first",
+      lastMessageAt: new Date("2026-10-09T10:00:00Z"),
+      pinnedAt: new Date("2026-10-01T10:00:00Z"),
+    });
+    const pinnedLater = await insertConversation(user, {
+      title: "Pinned later",
+      lastMessageAt: new Date("2026-10-01T10:00:00Z"),
+      pinnedAt: new Date("2026-10-05T10:00:00Z"),
+    });
+
+    expect((await client.conversation.pinned()).map((row) => row.id)).toEqual([
+      pinnedLater.id,
+      pinnedFirst.id,
+    ]);
+  });
+
+  it("neither moves a Conversation's last Message time nor the main list's order", async () => {
+    const { user, client } = await signedIn();
+    const older = await insertConversation(user, {
+      lastMessageAt: new Date("2026-10-01T10:00:00Z"),
+    });
+    const newer = await insertConversation(user, {
+      lastMessageAt: new Date("2026-10-05T10:00:00Z"),
+    });
+
+    await client.conversation.pin({ id: older.id });
+    const [row] = await getTestDb()
+      .select({ lastMessageAt: conversation.lastMessageAt })
+      .from(conversation)
+      .where(eq(conversation.id, older.id));
+    expect(row?.lastMessageAt).toEqual(older.lastMessageAt);
+    await client.conversation.unpin({ id: older.id });
+
+    expect((await listItems(client)).map((item) => item.id)).toEqual([newer.id, older.id]);
+  });
+
+  it("shows a pinned Conversation inside a Project under Pinned, not in the main list", async () => {
+    const { user, client } = await signedIn();
+    const projectId = uuidv7();
+    await getTestDb().insert(project).values({ id: projectId, userId: user.id, name: "Work" });
+    const inProject = await insertConversation(user, {
+      title: "In a Project",
+      projectId,
+      pinnedAt: new Date("2026-10-02T08:00:00Z"),
+    });
+
+    expect((await client.conversation.pinned()).map((row) => row.id)).toEqual([inProject.id]);
+    expect(await listItems(client)).toEqual([]);
+  });
+
+  it("caps pins at 20 and refuses a 21st until one is unpinned", async () => {
+    const { user, client } = await signedIn();
+    const conversations = [];
+    for (let i = 0; i < 21; i++) {
+      conversations.push(await insertConversation(user, { title: `Chat ${i}` }));
+    }
+    for (const conv of conversations.slice(0, 20)) {
+      await client.conversation.pin({ id: conv.id });
+    }
+    const last = conversations[20];
+    if (!last) throw new Error("Expected a 21st Conversation");
+
+    await expect(client.conversation.pin({ id: last.id })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: expect.stringContaining("Unpin one first"),
+    });
+
+    await client.conversation.unpin({ id: conversations[0]?.id ?? "" });
+    await client.conversation.pin({ id: last.id });
+    expect(await client.conversation.pinned()).toHaveLength(20);
+  });
+
+  it("pinning an already pinned Conversation at the cap is fine and keeps its place", async () => {
+    const { user, client } = await signedIn();
+    const first = await insertConversation(user, { pinnedAt: new Date("2026-10-01T10:00:00Z") });
+    for (let i = 1; i < 20; i++) {
+      await insertConversation(user, { pinnedAt: new Date(`2026-10-0${1 + (i % 9)}T11:00:00Z`) });
+    }
+
+    await expect(client.conversation.pin({ id: first.id })).resolves.toBeUndefined();
+    const pinnedIds = (await client.conversation.pinned()).map((row) => row.id);
+    expect(pinnedIds).toContain(first.id);
+    expect(pinnedIds).toHaveLength(20);
+  });
+
+  it("answers NOT_FOUND when pinning or unpinning another user's Conversation", async () => {
+    const owner = await signedIn();
+    const conv = await insertConversation(owner.user);
+    const other = await signedIn();
+
+    await expect(other.client.conversation.pin({ id: conv.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    await expect(other.client.conversation.unpin({ id: conv.id })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
   });
 });

@@ -9,11 +9,15 @@ import {
   deleteConversation,
   findConversation,
   listConversations,
+  listPinnedConversations,
   loadActiveBranch,
+  maxPinnedConversations,
+  pinConversation,
   renameConversation,
   setConversationModel,
   setConversationReasoningEffort,
   switchBranch,
+  unpinConversation,
 } from "../chat/store";
 import { unusableModelMessage } from "../../shared/credentials/services";
 import { resolveModelCall } from "../credentials/resolve";
@@ -46,8 +50,8 @@ export const conversationRouter = {
     }),
 
   /**
-   * One page of the caller's Conversations outside any Project for the Conversation panel, newest
-   * Message first, 50 at a time. Pass the previous page's `nextCursor` for the next one.
+   * One page of the caller's Conversations outside any Project and not pinned, for the Conversation
+   * panel, newest Message first, 50 at a time. Pass the previous page's `nextCursor` for the next one.
    */
   list: protectedProcedure
     .input(z.object({ cursor: z.string().optional() }))
@@ -143,6 +147,34 @@ export const conversationRouter = {
         input.reasoningEffort,
       );
       if (!updated) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }),
+
+  /**
+   * The caller's pinned Conversations, Project ones too, most recently pinned first. A pinned
+   * Conversation is listed only here, not in the main list. At most `maxPinnedConversations`.
+   */
+  pinned: protectedProcedure.handler(({ context }) =>
+    listPinnedConversations(context.deps, context.user.id),
+  ),
+
+  /** Pins the Conversation, so it shows under Pinned. Doesn't bump `lastMessageAt`. */
+  pin: protectedProcedure.input(z.object({ id: z.uuid() })).handler(async ({ context, input }) => {
+    const result = await pinConversation(context.deps, context.user.id, input.id);
+    if (result === "not_found")
+      throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    if (result === "limit") {
+      throw new ORPCError("BAD_REQUEST", {
+        message: `You can pin up to ${maxPinnedConversations} Conversations. Unpin one first.`,
+      });
+    }
+  }),
+
+  /** Unpins the Conversation; it returns to the main list by date. Doesn't bump `lastMessageAt`. */
+  unpin: protectedProcedure
+    .input(z.object({ id: z.uuid() }))
+    .handler(async ({ context, input }) => {
+      const unpinned = await unpinConversation(context.deps, context.user.id, input.id);
+      if (!unpinned) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
     }),
 
   /** Deletes the Conversation for good; its Messages go with it (cascade). */
