@@ -5,6 +5,7 @@ import { ScrollButton } from "@/components/ui/prompt-kit/scroll-button";
 import type { ChatCommand } from "../../core/shared/chat/command";
 import { branchFrom, takePendingFirstMessage, toUIMessages } from "../../core/client/chat";
 import { missingCredentialsMessage } from "../../core/client/models";
+import { rateLimitedErrorOf, runFetch } from "../../core/client/rate-limit";
 import { fetchServerSentEvents, type UIMessage, useChat } from "@tanstack/ai-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
@@ -48,7 +49,7 @@ export function ChatView({
   // rides in the connection's body instead.
   const command = useRef<ChatCommand>(undefined);
   const [connection] = useState(() =>
-    fetchServerSentEvents(chatUrl, () => ({ body: command.current })),
+    fetchServerSentEvents(chatUrl, () => ({ body: command.current, fetchClient: runFetch })),
   );
   // A reply that is streaming when the page opens is joined: its Message id is its Run's id.
   const [joinedRunId] = useState(
@@ -215,7 +216,9 @@ export function ChatView({
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-2">
           {error && !sending && (
             <p role="alert" className="text-xs text-destructive">
-              {error.message}
+              {rateLimitedErrorOf(error)
+                ? "Too many messages. Try again in a moment."
+                : error.message}
             </p>
           )}
           {blocked && <MissingCredentialsBanner message={blocked} />}

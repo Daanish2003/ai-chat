@@ -1,8 +1,10 @@
 import { getTestDb } from "./test-database";
 
+import { createMemoryCounters } from "../../core/server/chat/counters";
 import { createMemoryPubSub } from "../../core/server/chat/pubsub";
 import { createMemoryRunStreams } from "../../core/server/chat/run-streams";
 import type { AppDeps, Limits } from "../../core/server/deps";
+import { resolveRateLimits } from "../../core/server/rate-limits";
 import { createFakeSearchClient } from "./fake-search-client";
 
 /** The `test` value of `KEY_ENCRYPTION_SECRET` in `apps/web/.env.schema`. */
@@ -24,6 +26,8 @@ export function createTestDeps({
     searchClient: createFakeSearchClient(),
     runStreams: createMemoryRunStreams(),
     pubsub: createMemoryPubSub(),
+    counters: createMemoryCounters(),
+    rateLimits: resolveRateLimits(),
     // Overrides merge, so a test that sets one limit keeps the rest.
     limits: {
       snapshotIntervalMs: 20,

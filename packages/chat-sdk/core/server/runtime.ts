@@ -1,5 +1,7 @@
+import { createMemoryCounters, type CounterStore } from "./chat/counters";
 import { createMemoryPubSub, type PubSub } from "./chat/pubsub";
 import { createRedisConnection } from "./chat/redis-connection";
+import { createRedisCounters } from "./chat/redis-counters";
 import { createRedisPubSub } from "./chat/redis-pubsub";
 import { createRedisRunStreams } from "./chat/redis-run-streams";
 import { createMemoryRunStreams, type RunStreams } from "./chat/run-streams";
@@ -10,13 +12,19 @@ export type ChatRuntime = {
   runStreams: RunStreams;
   /** Control signals between processes, such as Stop. */
   pubsub: PubSub;
+  /** Rate-limit counters, shared by every process of the runtime (spec 87). */
+  counters: CounterStore;
   /** Closes the runtime's connections. `stop()` calls it after the drain. */
   close?: () => Promise<void>;
 };
 
 /** The in-process runtime: Runs live in this process's memory only. */
 export function memoryRuntime(): ChatRuntime {
-  return { runStreams: createMemoryRunStreams(), pubsub: createMemoryPubSub() };
+  return {
+    runStreams: createMemoryRunStreams(),
+    pubsub: createMemoryPubSub(),
+    counters: createMemoryCounters(),
+  };
 }
 
 export type RedisRuntimeOptions = {
@@ -36,6 +44,7 @@ export function redisRuntime({ url, prefix = "chat:" }: RedisRuntimeOptions): Ch
   return {
     runStreams: createRedisRunStreams(connection, prefix),
     pubsub: createRedisPubSub(connection, prefix),
+    counters: createRedisCounters(connection, prefix),
     close: connection.close,
   };
 }

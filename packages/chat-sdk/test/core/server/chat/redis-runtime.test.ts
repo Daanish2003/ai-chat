@@ -9,10 +9,12 @@ import {
   createRedisConnection,
   type RedisConnection,
 } from "../../../../core/server/chat/redis-connection";
+import { createRedisCounters } from "../../../../core/server/chat/redis-counters";
 import { createRedisPubSub } from "../../../../core/server/chat/redis-pubsub";
 import { createRedisRunStreams } from "../../../../core/server/chat/redis-run-streams";
 import { START } from "../../../../core/server/chat/run-streams";
 import { redisRuntime } from "../../../../core/server/runtime";
+import { counterStoreContract } from "./counters.contract";
 import { pubsubContract } from "./pubsub.contract";
 import { runStreamsContract } from "./run-streams.contract";
 
@@ -149,6 +151,8 @@ describe.skipIf(!redisUrl)("redisRuntime on a real Redis", () => {
   pubsubContract("redis", () => createRedisPubSub(connection, testPrefix));
 
   runStreamsContract("redis", (options) => createRedisRunStreams(connection, testPrefix, options));
+
+  counterStoreContract("redis", () => createRedisCounters(connection, testPrefix));
 
   it("keeps runtimes with different prefixes apart", async () => {
     const a = redisRuntime({ url: redisUrl!, prefix: `${testPrefix}a:` });

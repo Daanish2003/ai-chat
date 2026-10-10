@@ -9,6 +9,7 @@ import { createAppDeps, type AppDeps } from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
+import { resolveRateLimits, type RateLimits } from "./rate-limits";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
 import { loadSharedConversation } from "./share/store";
@@ -30,6 +31,8 @@ export type CreateChatOptions = {
   /** Where the handler is mounted, for example `/api/chat`. */
   basePath: string;
   runtime?: ChatRuntime;
+  /** Overrides for the default rate limits (spec 87). Each action is optional; `false` turns it off. */
+  rateLimits?: RateLimits;
   logger?: Logger;
 };
 
@@ -103,6 +106,7 @@ export function createChat(options: CreateChatOptions): {
       db: createDb({ DATABASE_URL: options.databaseUrl }),
       keyEncryptionSecret: options.keyEncryptionSecret,
       runtime: options.runtime ?? memoryRuntime(),
+      rateLimits: resolveRateLimits(options.rateLimits),
     });
     return deps;
   };

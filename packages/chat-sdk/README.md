@@ -130,6 +130,21 @@ Nothing connects when you build `createChat` or `redisRuntime()`. The first use 
 
 Redis holds each Run's chunk log while the Run is live and for an hour after it ends. Postgres stays the source of truth for Conversations and Messages.
 
+## Rate limits
+
+Run starts are limited per user, and the counters live in the `runtime`, so the limit holds across every process that shares it. The default is 20 Run starts a minute. A Run start over the limit answers 429 with `Retry-After` (in seconds), and the chat UI tells the user to try again in a moment.
+
+Override a limit in `createChat`. Each limit is optional, and `false` turns it off:
+
+```ts
+const chat = createChat({
+  // ...
+  rateLimits: { runStart: { limit: 30, windowSeconds: 60 } },
+});
+```
+
+Only Run starts are limited so far. Sign-up, sign-in and password reset stay with your own auth.
+
 Browser side: create a headless client and wrap your chat pages in the provider.
 
 ```tsx

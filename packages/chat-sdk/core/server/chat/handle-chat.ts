@@ -10,6 +10,7 @@ import { resolveCredentials } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import type { ChatUser } from "../context";
 import { uuidv7 } from "../lib/uuidv7";
+import { rateLimitedFor } from "../rate-limits";
 import { resolveModel } from "./available-models";
 import { parseStoredParts, searchTextOf, toModelMessages } from "../../shared/chat/parts";
 import { chatCommandSchema } from "../../shared/chat/command";
@@ -26,6 +27,18 @@ export async function handleChat(
   deps: AppDeps,
 ): Promise<Response> {
   const userId = user.id;
+
+  const retryAfter = await rateLimitedFor(
+    deps.counters,
+    deps.rateLimits.runStart,
+    `run-start:${userId}`,
+  );
+  if (retryAfter !== null) {
+    return Response.json(
+      { message: "Too many messages; try again in a moment" },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
+    );
+  }
 
   const body: unknown = await request.json().catch(() => undefined);
   const parsed = chatCommandSchema.safeParse(
