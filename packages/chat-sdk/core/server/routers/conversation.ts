@@ -3,6 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
 import { resolveModel } from "../chat/available-models";
+import { deleteAllConversations } from "../delete-user";
 import {
   decodeConversationCursor,
   deleteConversation,
@@ -123,4 +124,12 @@ export const conversationRouter = {
       const deleted = await deleteConversation(context.deps, context.user.id, input.id);
       if (!deleted) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
     }),
+
+  /**
+   * Deletes every Conversation the caller owns, Project ones included, for good. Projects stay,
+   * empty. Shared links go with their Conversations.
+   */
+  deleteAll: protectedProcedure.handler(({ context }) =>
+    deleteAllConversations(context.deps, context.user.id),
+  ),
 };

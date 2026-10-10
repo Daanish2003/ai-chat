@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 import { useByok } from "../../core/client/react/byok";
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
+import { DeleteAllConversationsSection } from "../settings/delete-all-conversations";
 import { InstructionsField } from "../settings/instructions-field";
 import { SharedLinksSection } from "../settings/shared-links";
 import { TitleModelSelect } from "../settings/title-model-select";
@@ -91,6 +92,8 @@ export function KeySettingsPage() {
       <InstructionsField />
 
       <TitleModelSelect />
+
+      <DeleteAllConversationsSection />
     </main>
   );
 }
