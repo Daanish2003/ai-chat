@@ -21,7 +21,9 @@ export const credentialsRouter = {
     if (!context.deps.byok) {
       throw new ORPCError("FORBIDDEN", { message: "Your own keys are turned off on this app" });
     }
-    const result = await checkCredentials(input.service, input.fields, context.deps.fetch);
+    // The user's Ollama host is not guarded (see `AppDeps.ollamaFetch`).
+    const fetch = input.service === "ollama" ? context.deps.ollamaFetch : context.deps.fetch;
+    const result = await checkCredentials(input.service, input.fields, fetch);
     if (result.status === "rejected") {
       throw new ORPCError("BAD_REQUEST", {
         message: result.message,
