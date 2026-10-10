@@ -16,7 +16,12 @@ import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
 import { addUsage, messageUsage, normalizeUsage, promptCharactersOf, type RunUsage } from "./usage";
-import { recordRunUsage, type UsageMeter } from "./host-usage";
+import {
+  recordHostUsage,
+  recordSearchUsage,
+  type SearchMeter,
+  type UsageMeter,
+} from "./host-usage";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -41,6 +46,7 @@ export async function startRun(
     webSearch,
     systemPrompts,
     meter,
+    searchMeter,
   }: {
     messageId: string;
     /** The Provider of the Model, which decides how its usage is normalised. */
@@ -53,6 +59,8 @@ export async function startRun(
     systemPrompts: string[];
     /** Set on a Run on Host credentials: the Run is recorded in `chat.usage` (ADR 0007). */
     meter?: UsageMeter;
+    /** Set when the search runs on the Host's Tavily key: each search is recorded (ADR 0007). */
+    searchMeter?: SearchMeter;
   },
 ): Promise<void> {
   const abortController = new AbortController();
@@ -116,6 +124,12 @@ export async function startRun(
           credentials: webSearch,
           parts,
           onChange: () => (changed = true),
+          recordSearch: searchMeter
+            ? () =>
+                recordSearchUsage(deps, searchMeter).catch((caught: unknown) =>
+                  console.error(`Recording a search of ${messageId} failed`, caught),
+                )
+            : undefined,
         }),
       ];
       const stream = chat({
@@ -176,8 +190,14 @@ export async function startRun(
       await write(withParts({ ...ending, usage }));
       // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
       if (meter) {
-        await recordRunUsage(deps, meter, usage, costComplete ? reportedCost : undefined).catch(
-          (caught: unknown) => console.error(`Recording usage of ${messageId} failed`, caught),
+        await recordHostUsage(
+          deps,
+          "run",
+          meter,
+          usage,
+          costComplete ? reportedCost : undefined,
+        ).catch((caught: unknown) =>
+          console.error(`Recording usage of ${messageId} failed`, caught),
         );
       }
       void unsubscribeStop().catch((error: unknown) =>
