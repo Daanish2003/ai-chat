@@ -8,7 +8,10 @@ import { ENV, ssrfAllowHosts } from "./env.server";
 import { mcpServersOf } from "./mcp-server";
 
 export const db = createDb(ENV);
-export const auth = createAuth({ ...ENV, APP_NAME: appName }, db, sender, log);
+export const auth = createAuth({ ...ENV, APP_NAME: appName }, db, sender, log, {
+  // Runs before the user is deleted: a failure aborts the account delete, so the user can retry.
+  deleteChatData: (userId) => chat.deleteUser(userId),
+});
 export const chat = createChat({
   databaseUrl: ENV.DATABASE_URL,
   keyEncryptionSecrets: [ENV.KEY_ENCRYPTION_SECRET, ENV.KEY_ENCRYPTION_SECRET_PREVIOUS].filter(
