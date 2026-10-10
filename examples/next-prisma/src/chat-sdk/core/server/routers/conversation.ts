@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { resolveModel } from "../chat/available-models";
 import {
+  decodeConversationCursor,
   deleteConversation,
   findConversation,
   listConversations,
@@ -34,10 +35,20 @@ export const conversationRouter = {
       return { id };
     }),
 
-  /** The caller's Conversations for the Conversation panel, newest Message first. */
-  list: protectedProcedure.handler(({ context }) =>
-    listConversations(context.deps, context.user.id),
-  ),
+  /**
+   * One page of the caller's Conversations outside any Project for the Conversation panel, newest
+   * Message first, 50 at a time. Pass the previous page's `nextCursor` for the next one.
+   */
+  list: protectedProcedure
+    .input(z.object({ cursor: z.string().optional() }))
+    .handler(({ context, input }) => {
+      const cursor =
+        input.cursor === undefined ? undefined : decodeConversationCursor(input.cursor);
+      if (input.cursor !== undefined && !cursor) {
+        throw new ORPCError("BAD_REQUEST", { message: "Invalid cursor" });
+      }
+      return listConversations(context.deps, context.user.id, cursor);
+    }),
 
   /** The Conversation with its Active Branch, oldest Message first. */
   get: protectedProcedure.input(z.object({ id: z.uuid() })).handler(async ({ context, input }) => {

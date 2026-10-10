@@ -1,10 +1,31 @@
 import type { ProviderId } from "../credentials/services";
+import { modelsDevSnapshot } from "./models-snapshot";
 
 /**
  * The curated Model list: plain data, safe to import into the browser. Every `modelId` must be
  * in its adapter package's `*_MODELS` export (checked in `models.test.ts`). Capability flags
- * follow each package's model metadata.
+ * follow each package's model metadata. The limits and reasoning efforts come from the reviewed
+ * models.dev snapshot (`models-snapshot.ts`, `pnpm snapshot:models`).
  */
+
+/** A reasoning effort the chat offers. `off` is separate: see `ReasoningSupport`. */
+export type ReasoningEffort = "low" | "medium" | "high";
+
+/**
+ * What a Model's reasoning setting takes. `efforts` is empty when the Model has no control to
+ * show. `defaultEffort` is `"off"` or an effort the Provider uses when none is sent, or `null`
+ * when that isn't known.
+ */
+export type ReasoningSupport = {
+  efforts: ReasoningEffort[];
+  off: boolean;
+  defaultEffort: ReasoningEffort | "off" | null;
+};
+
+/** The reasoning support of a Model with no known control: no efforts, no `off`, no default. */
+export function unknownReasoning(): ReasoningSupport {
+  return { efforts: [], off: false, defaultEffort: null };
+}
 
 export type CuratedModel = {
   /** `"provider:model"`, as stored in `conversation.model` and `message.model`. */
@@ -15,6 +36,11 @@ export type CuratedModel = {
   images: boolean;
   pdfs: boolean;
   tools: boolean;
+  /** Tokens the Model reads in one request. `null` when unknown: never a guess. */
+  contextWindow: number | null;
+  /** Tokens the Model writes in one reply. `null` when unknown. */
+  maxOutputTokens: number | null;
+  reasoning: ReasoningSupport;
 };
 
 /** A Model the user can pick (`models.list`). `onHostCredentials`: a Host pays for it (ADR 0007). */
@@ -26,7 +52,20 @@ function model(
   label: string,
   capabilities: Pick<CuratedModel, "images" | "pdfs" | "tools">,
 ): CuratedModel {
-  return { id: `${provider}:${modelId}`, provider, modelId, label, ...capabilities };
+  const id = `${provider}:${modelId}`;
+  const limits = modelsDevSnapshot[id];
+  return {
+    id,
+    provider,
+    modelId,
+    label,
+    ...capabilities,
+    contextWindow: limits?.contextWindow ?? null,
+    maxOutputTokens: limits?.maxOutputTokens ?? null,
+    reasoning: limits
+      ? { efforts: [...limits.efforts], off: limits.off, defaultEffort: null }
+      : unknownReasoning(),
+  };
 }
 
 const anthropic = { images: true, pdfs: true, tools: true };

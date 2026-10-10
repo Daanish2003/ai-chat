@@ -41,6 +41,9 @@ describe("models.list", () => {
       pdfs: false,
       tools: true,
       onHostCredentials: false,
+      contextWindow: 1050000,
+      maxOutputTokens: 128000,
+      reasoning: { efforts: ["low", "medium", "high"], off: true, defaultEffort: null },
     });
   });
 
@@ -156,6 +159,9 @@ describe("models.list with live lists", () => {
         pdfs: false,
         tools: true,
         onHostCredentials: false,
+        contextWindow: null,
+        maxOutputTokens: null,
+        reasoning: { efforts: [], off: false, defaultEffort: null },
       },
       expect.objectContaining({ id: "ollama:llama3.2:latest" }),
     ]);
@@ -212,6 +218,10 @@ describe("models.list with Host credentials", () => {
         pdfs: true,
         tools: true,
         onHostCredentials: true,
+        // The window and efforts fall back to the curated Model; the output is the Host's cap.
+        contextWindow: 200000,
+        maxOutputTokens: 512,
+        reasoning: { efforts: [], off: false, defaultEffort: null },
       },
     ]);
     expect(defaultModel).toBe("anthropic:claude-haiku-4-5");
