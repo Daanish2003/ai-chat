@@ -39,6 +39,7 @@ Install these in the Host. Versions come from `package.json` in this folder.
 - `@tanstack/react-query`, `react`, `sonner`
 - `drizzle-orm` and `pg` (the Postgres driver it uses)
 - `redis` (the Redis client, used by `redisRuntime()`)
+- `html-to-text` (pinned at 10.0.1), which the `fetch_url` tool uses to turn an HTML page into text. Maintained, MIT, about 15M weekly downloads; the other candidates were `turndown` (converts to Markdown, not text), `@mozilla/readability` (needs a DOM, e.g. `linkedom`) and `node-html-parser`.
 - `undici` and `ipaddr.js`, for the SSRF-guarded `fetch` (`core/server/lib/guarded-fetch.ts`). `undici` pins each connection to the address that was checked, and `ipaddr.js` classifies that address. Install `undici` at the major your Node bundles (7.x on Node 24): undici 8's dispatcher is rejected by Node's built-in `fetch`.
 - `@orpc/server`, `@orpc/tanstack-query`
 - `zod`
@@ -193,6 +194,12 @@ const chat = createChat({
 ## The Host's tools
 
 `tools` lets the Model call your own code on your server. Write each tool with TanStack AI's `toolDefinition(...).server(fn)` and pass the list to `createChat`. `fn` gets the call's arguments, and `context.context` holds `{ userId, conversationId }`, typed by passing `HostToolContext` to `.server<HostToolContext>(...)`. Every call shows in the reply as one collapsible row, and a Shared link shows only that the tool was used, never its arguments or result. A tool that throws fails only its own call. A reply makes at most 10 tool calls across the Host's tools. A tool's name must not be `web_search`, the SDK's own search tool.
+
+## The Web toggle
+
+The composer's **Web** toggle covers two built-in tools: `web_search` (needs a Tavily key, the user's own or the Host's) and `fetch_url`, which reads one page at an http or https URL the user gave or a search returned. `fetch_url` needs no key, so without a Tavily key Web means fetch only, and the tooltip says so. The toggle is on by default and remembered per browser. It is unavailable, with the reason in its tooltip, when the Model has no tools. A fetched page is a Source, numbered with the search results and cited the same way.
+
+`fetch_url` takes HTML, plain text, Markdown and JSON (no PDFs or other binaries), refuses a body over 2 MB, cuts text to 20,000 characters, times out after 10 seconds, and makes at most 5 fetches per reply. It goes through `deps.fetch`, the guarded fetch, and ignores robots.txt.
 
 ```ts
 const serverTime = toolDefinition({

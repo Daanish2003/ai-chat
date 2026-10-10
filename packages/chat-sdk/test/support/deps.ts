@@ -36,6 +36,7 @@ export function createTestDeps({
       leaseMs: 30_000,
       reapIntervalMs: 30_000,
       drainMs: 250_000,
+      fetchTimeoutMs: 10_000,
       ...limits,
     },
     fetch: async (input) => {
