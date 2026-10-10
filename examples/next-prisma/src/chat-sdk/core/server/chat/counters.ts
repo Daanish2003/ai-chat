@@ -22,8 +22,13 @@ export function createMemoryCounters(): CounterStore {
       const now = Date.now();
       let window = windows.get(key);
       if (!window || window.expiresAt <= now) {
-        window = { count: 0, expiresAt: now + windowMs };
+        const opened = { count: 0, expiresAt: now + windowMs };
+        window = opened;
         windows.set(key, window);
+        // Drop the window once it has passed, so the map holds only open windows.
+        setTimeout(() => {
+          if (windows.get(key) === opened) windows.delete(key);
+        }, windowMs).unref?.();
       }
       window.count++;
       return { count: window.count, resetMs: window.expiresAt - now };
