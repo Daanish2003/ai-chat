@@ -41,6 +41,7 @@
     "pg": "^8.23.0",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "redis": "^6.3.0",
     "sonner": "catalog:",
     "zod": "catalog:"
   },

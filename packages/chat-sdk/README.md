@@ -38,6 +38,7 @@ Install these in the Host. Versions come from `package.json` in this folder.
 - `@tanstack/ai` and the provider packages it uses: `@tanstack/ai-anthropic`, `@tanstack/ai-bedrock`, `@tanstack/ai-byteplus`, `@tanstack/ai-client`, `@tanstack/ai-cloudflare`, `@tanstack/ai-gemini`, `@tanstack/ai-grok`, `@tanstack/ai-groq`, `@tanstack/ai-llmgateway`, `@tanstack/ai-lovable`, `@tanstack/ai-mistral`, `@tanstack/ai-ollama`, `@tanstack/ai-openai`, `@tanstack/ai-openrouter`, `@tanstack/ai-vercel-gateway`
 - `@tanstack/react-query`, `react`, `sonner`
 - `drizzle-orm` and `pg` (the Postgres driver it uses)
+- `redis` (the Redis client, used by `redisRuntime()`)
 - `@orpc/server`, `@orpc/tanstack-query`
 - `zod`
 
@@ -104,7 +105,30 @@ const data = await chat.getSharedConversation(token);
 
 - `getUser(request)` returns `{ id } | null`. The handler answers 401 when it returns `null`.
 - `start()` refuses to run while the `chat` schema is behind the bundled migrations.
-- `stop()` refuses new Runs with 503 while it drains.
+- `stop()` refuses new Runs with 503 while it drains, then closes the runtime's connections.
+
+## Several processes: `redisRuntime()`
+
+A Run is shared between the processes of your app through its `runtime`. The default, `memoryRuntime()`, keeps Runs in one process's memory, which is fine for local development and for a Host that runs as a single process.
+
+**Use `redisRuntime()` when more than one process can serve chat requests, including the overlap of a zero-downtime deploy.** Without it, a reader who reconnects to the other process loses the Run, and a Stop sent there does nothing.
+
+```ts
+const chat = createChat({
+  databaseUrl,
+  getUser,
+  keyEncryptionSecret,
+  basePath: "/api/chat",
+  runtime: redisRuntime({ url: process.env.REDIS_URL! }),
+});
+```
+
+- `url`: a `redis://` URL (or `rediss://`). Required.
+- `prefix`: prepended to every key and channel the SDK writes. Default `chat:`. Set it when the SDK shares a Redis with your own data.
+
+Nothing connects when you build `createChat` or `redisRuntime()`. The first use opens one command connection and one subscriber connection for the process, and `stop()` closes them after the drain, so the process exits cleanly on SIGTERM.
+
+Redis holds each Run's chunk log while the Run is live and for an hour after it ends. Postgres stays the source of truth for Conversations and Messages.
 
 Browser side: create a headless client and wrap your chat pages in the provider.
 
