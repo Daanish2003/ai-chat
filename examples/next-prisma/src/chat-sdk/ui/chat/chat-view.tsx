@@ -5,10 +5,12 @@ import { ScrollButton } from "@/components/ui/prompt-kit/scroll-button";
 import type { ChatCommand } from "../../core/shared/chat/command";
 import {
   branchFrom,
+  contextCutIds,
   messageInfo,
   takePendingFirstMessage,
   toUIMessages,
 } from "../../core/client/chat";
+import { contextFill, lastRunTokens } from "../../core/client/context-ring";
 import { missingCredentialsMessage } from "../../core/client/models";
 import { rateLimitedErrorOf, runFetch } from "../../core/client/rate-limit";
 import { fetchServerSentEvents, type UIMessage, useChat } from "@tanstack/ai-react";
@@ -25,6 +27,7 @@ import { quotaBlocksModel } from "../../core/client/quota";
 
 import { AttachButton, DraftAttachmentChips, useAttachmentDraft } from "./attachments";
 import { Composer } from "./composer";
+import { ContextOverflowNotice, ContextRing } from "./context-ring";
 import { MessageRow } from "./message-row";
 import { MissingCredentialsBanner } from "./missing-credentials-banner";
 import { QuotaBanner } from "./quota-banner";
@@ -148,11 +151,11 @@ function ChatThread({
   const waiting =
     messages.length > 0 &&
     messageInfo(messages[messages.length - 1]!).status === "awaiting_approval";
-  const decide = async (messageId: string, approved: boolean) => {
+  const decide = async (messageId: string, approved: boolean, allowForConversation?: boolean) => {
     // A second click while the first decision is in flight would be refused as stale.
     if (decideCall.isPending) return;
     try {
-      await decideCall.mutateAsync({ messageId, approved });
+      await decideCall.mutateAsync({ messageId, approved, allowForConversation });
     } catch (caught) {
       toast.error(`Deciding failed: ${(caught as Error).message}`);
       return;
@@ -168,9 +171,12 @@ function ChatThread({
     : null;
   // A spent Quota blocks the selected Model only when it's a Host Model; the user's own still runs.
   const quota = useQuota().data;
-  const quotaBlocked = quotaBlocksModel(
-    models.data?.models.find((model) => model.id === conversation.model),
-    quota,
+  const selectedModel = models.data?.models.find((model) => model.id === conversation.model);
+  const quotaBlocked = quotaBlocksModel(selectedModel, quota);
+  // The context ring: the last Run's tokens on this Branch, against the selected Model's window.
+  const context = contextFill(
+    lastRunTokens(conversation.messages),
+    selectedModel?.contextWindow ?? null,
   );
   const search = useWebSearch(conversation.model);
 
@@ -257,6 +263,9 @@ function ChatThread({
     }),
   );
 
+  // The Messages the Model's context starts at, on the Branch shown (issue #122).
+  const contextCuts = contextCutIds(messages);
+
   const highlighted = useFocusMessage({
     target: focusMessageId,
     onScreen: messages.map((message) => message.id),
@@ -285,13 +294,15 @@ function ChatThread({
               key={message.id}
               message={message}
               highlighted={message.id === highlighted}
+              contextCut={contextCuts.has(message.id)}
               actions={{
                 streaming: streaming || switchBranch.isPending,
                 model: conversation.model,
                 onEdit: (text, attachments) => startBranch(message.id, text, attachments),
                 onRegenerate: () => startBranch(message.id),
                 onSwitchBranch: (messageId) => switchBranch.mutate({ messageId }),
-                onDecide: (approved) => void decide(message.id, approved),
+                onDecide: (approved, allowForConversation) =>
+                  void decide(message.id, approved, allowForConversation),
               }}
             />
           ))}
@@ -313,6 +324,7 @@ function ChatThread({
           <QuotaMeter />
           {blocked && <MissingCredentialsBanner message={blocked} />}
           {quotaBlocked && quota && <QuotaBanner resetsAt={quota.resetsAt} />}
+          <ContextOverflowNotice fill={context} />
           <Composer
             onSend={(text) => {
               void send(text, draft.uploaded);
@@ -336,6 +348,7 @@ function ChatThread({
             <AttachButton draft={draft} disabled={!!blocked || quotaBlocked} />
             <SearchToggle search={search} />
             <ToolsMenu items={toolItems} onToggle={toggleTool} />
+            <ContextRing fill={context} />
           </Composer>
         </div>
       </div>

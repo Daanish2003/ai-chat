@@ -29,6 +29,28 @@ The destination is resolved from the folder you ran `pnpm` in. The script:
 2. Your `ui/` is untouched. If the release changed a component you also edited, merge that by hand: diff the new SDK's `ui/` against yours.
 3. Install any new dependencies listed below, then run your type check.
 
+### Updating to generation control
+
+Generation control adds the Instructions field, the reasoning effort control, the context ring, the per-Message token popover and the context marker. No `createChat` options changed. A Host copies `core/` again and runs `chat.migrate()`, which applies the new migration (the example's `db:migrate` runs it).
+
+If your `ui/` matches the SDK's, the copy is all you need. If it has drifted, port these by hand: copy the SDK's file and reapply your own edits.
+
+Changed components:
+
+- `chat/chat-view.tsx`: the context ring and its overflow notice, the context marker, and "Allow for this Conversation" in the approval call.
+- `chat/message-row.tsx`: the context marker, the per-Message `UsageInfo`, and the approval choice.
+- `chat/tool-call-row.tsx`: "Allow for this Conversation" next to Approve and Deny.
+- `chat/search-toggle.tsx`: the composer's toggle is labelled Web (see The Web toggle).
+- `pages/key-settings.tsx`: `InstructionsField`, and the credential sections shown only with `byok` on.
+- `pages/new-conversation.tsx`: the reasoning effort chosen before the first Message.
+- `shell/top-bar.tsx`: `ConversationReasoningEffort` and `NewConversationReasoningEffort` next to the Model picker.
+
+New components to copy: `chat/context-ring.tsx`, `chat/usage-info.tsx`, `settings/instructions-field.tsx`, `shell/reasoning-effort-select.tsx`.
+
+They need no new shadcn components: `button`, `label`, `popover`, `select`, `textarea` and `tooltip` are already in the list above.
+
+Later `ui/` changes a Host that copied an older SDK also needs to port: the Web toggle and the fetched-page Source chip (#157, `chat/search-toggle.tsx` and `chat/source-chips.tsx`), the context ring (#123, `chat/context-ring.tsx`), the approval choice "Allow for this Conversation" (#159, `chat/tool-call-row.tsx`), Connections (#160, `settings/connections-section.tsx` and `pages/key-settings.tsx`) and the tools menu (#161, `chat/tools-menu.tsx`). Compare each against the SDK's `ui/` with the diff in step 2 of Updating.
+
 ## Dependencies
 
 Install these in the Host. Versions come from `package.json` in this folder.

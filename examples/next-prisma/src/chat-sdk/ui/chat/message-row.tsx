@@ -1,5 +1,5 @@
 import type { AttachmentInfo } from "../../core/shared/attachments/kinds";
-import { replySegments, sourcesOf } from "../../core/shared/chat/sources";
+import { pageSourcesOf, replySegments, sourcesOf } from "../../core/shared/chat/sources";
 import { toolCallOf } from "../../core/shared/chat/tool-call";
 import { webSearchOf } from "../../core/shared/chat/web-search";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ import {
   RefreshCwIcon,
   UserIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 import {
   describeError,
@@ -43,9 +43,11 @@ import {
 } from "./attachments";
 
 import { SearchRow } from "./search-row";
+import { replyComponents, ReplySources, SourceChips } from "./source-chips";
 import { ToolCallRow } from "./tool-call-row";
-import { replyComponents, ReplySources } from "./source-chips";
+import { UsageInfo } from "./usage-info";
 
+import { useByok } from "../../core/client/react/byok";
 import { useChatAdapter } from "../../core/client/react/provider";
 
 function plainText(message: UIMessage) {
@@ -74,8 +76,11 @@ type MessageActions = {
   onRegenerate: () => void;
   /** Shows the Branch through this sibling. */
   onSwitchBranch: (messageId: string) => void;
-  /** Answers the call this reply waits on: approve (`true`) or deny (ADR 0008). */
-  onDecide?: (approved: boolean) => void;
+  /**
+   * Answers the call this reply waits on: approve (`true`) or deny (ADR 0008). An approval with
+   * `allowForConversation` also allows the tool for the Conversation (#159).
+   */
+  onDecide?: (approved: boolean, allowForConversation?: boolean) => void;
 };
 
 /**
@@ -90,12 +95,15 @@ export function MessageRow({
   userLabel = "You",
   actions,
   highlighted = false,
+  contextCut = false,
 }: {
   message: UIMessage;
   userLabel?: string;
   actions?: MessageActions;
   /** Marks the row as the search hit just opened. */
   highlighted?: boolean;
+  /** The Model's context starts at this Message on the Branch: a marker sits above it. */
+  contextCut?: boolean;
 }) {
   const info = messageInfo(message);
   const text = plainText(message);
@@ -114,6 +122,13 @@ export function MessageRow({
         highlighted && "bg-primary/10 ring-1 ring-primary/40 ring-inset",
       )}
     >
+      {contextCut && (
+        <p className="mx-auto mb-3 flex w-full max-w-4xl items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="h-px flex-1 bg-border" aria-hidden />
+          Earlier messages are no longer in the model's context
+          <span className="h-px flex-1 bg-border" aria-hidden />
+        </p>
+      )}
       <div className="mx-auto flex w-full max-w-4xl gap-3">
         <div
           className={cn(
@@ -141,6 +156,9 @@ export function MessageRow({
                   minute: "2-digit",
                 })}
               </time>
+            )}
+            {!isUser && (info.usage || info.reasoningEffort) && (
+              <UsageInfo usage={info.usage} reasoningEffort={info.reasoningEffort} />
             )}
             {actions && (
               <BranchArrows
@@ -361,7 +379,7 @@ function AssistantParts({
   onDecide,
 }: {
   parts: UIMessage["parts"];
-  onDecide?: (approved: boolean) => void;
+  onDecide?: (approved: boolean, allowForConversation?: boolean) => void;
 }) {
   const sources = sourcesOf(parts);
   return (
@@ -378,7 +396,10 @@ function AssistantParts({
         ) : segment.type === "searches" ? (
           <SearchRow key={segment.key} searches={segment.searches} sources={sources} />
         ) : (
-          <ToolCallRow key={segment.key} call={segment.call} onDecide={onDecide} />
+          <Fragment key={segment.key}>
+            <ToolCallRow call={segment.call} onDecide={onDecide} />
+            <SourceChips sources={pageSourcesOf(segment.call, sources)} />
+          </Fragment>
         ),
       )}
     </ReplySources>
@@ -405,11 +426,12 @@ function waitingForText(parts: UIMessage["parts"]) {
 /** Why the reply ended in `error`, with a way to fix a rejected key. */
 function ErrorMessage({ info }: { info: MessageInfo }) {
   const { Link } = useChatAdapter();
+  const byok = useByok();
   const { text, keySettings } = describeError(info);
   return (
     <SystemMessage variant="error" fill role="alert" className="max-w-[80ch]">
       {text}
-      {keySettings && (
+      {keySettings && byok && (
         <>
           {" "}
           <Link page={{ to: "keys" }} className="font-medium underline underline-offset-2">

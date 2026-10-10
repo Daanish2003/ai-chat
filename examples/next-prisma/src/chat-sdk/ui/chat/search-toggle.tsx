@@ -9,8 +9,8 @@ import { useOrpc } from "../../core/client/react/provider";
 import { useSearchPreference } from "../../core/client/react/search-preference";
 
 /**
- * Search for `model`: available with a Tavily key and a Model with tools; `enabled` is what a
- * send's `webSearch` carries (the server re-checks it).
+ * The Web toggle for `model`: available when the Model has tools (search also needs a Tavily key);
+ * `enabled` is what a send's `webSearch` carries (the server re-checks it).
  */
 export function useWebSearch(model: string | null | undefined) {
   const orpc = useOrpc();
@@ -28,7 +28,7 @@ export function useWebSearch(model: string | null | undefined) {
   return { ...toggle, on, setOn };
 }
 
-/** The composer's Search toggle; disabled with the reason in its tooltip when unavailable. */
+/** The composer's Web toggle; disabled with the reason in its tooltip when unavailable. */
 export function SearchToggle({ search }: { search: ReturnType<typeof useWebSearch> }) {
   return (
     <Tooltip>
@@ -47,7 +47,7 @@ export function SearchToggle({ search }: { search: ReturnType<typeof useWebSearc
           !search.available && "cursor-not-allowed opacity-50 hover:bg-transparent",
         )}
       >
-        <GlobeIcon className="size-3.5" aria-hidden /> Search
+        <GlobeIcon className="size-3.5" aria-hidden /> Web
       </TooltipTrigger>
       <TooltipContent>{search.tooltip}</TooltipContent>
     </Tooltip>
