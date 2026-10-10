@@ -4,7 +4,7 @@ import type { AnyTextAdapter } from "@tanstack/ai";
 import { adapterFor } from "./chat/adapters";
 import type { CounterStore } from "./chat/counters";
 import type { PubSub } from "./chat/pubsub";
-import type { HostTool } from "./chat/host-tools";
+import type { HostServerTool } from "./chat/host-tools";
 import type { RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
 import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search";
@@ -81,6 +81,16 @@ export type HostProvider = {
   models: HostModel[];
 };
 
+/**
+ * A Tool the Host pays for (ADR 0007): the Host's Tavily key, with a fixed price per search. A
+ * search on it is recorded in `chat.usage`, so it counts against the user's Quota.
+ */
+export type HostTool = {
+  tool: "tavily";
+  credentials: Credentials;
+  pricePerSearchUsd: number;
+};
+
 /** Everything the server entry points need from the outside world, built once at server start. */
 export type AppDeps = {
   db: Database;
@@ -95,13 +105,15 @@ export type AppDeps = {
   ) => AnyTextAdapter;
   /** The Host credentials (`hostProviders`, ADR 0007). Never stored. */
   hostProviders: HostProvider[];
+  /** The Host's Tools, such as a Tavily key for web search (`hostProviders`, ADR 0007). Never stored. */
+  hostTools: HostTool[];
   /** Whether users may use their own Provider credentials (`byok`, ADR 0007). */
   byok: boolean;
   /** A user's Quota on Host credentials, `null` when unlimited (ADR 0007). */
   getQuota: (userId: string) => Promise<Quota | null>;
   searchClient: SearchClient;
   /** The Host's own tools, offered to every reply whose Model has tools (`createChat({ tools })`). */
-  tools: HostTool[];
+  tools: HostServerTool[];
   /** Every Run's chunk log, which its POST response and any joiner read (ADR 0006). */
   runStreams: RunStreams;
   /** Control signals such as Stop, which a Run's owner subscribes to (ADR 0006). */
@@ -135,6 +147,7 @@ export function createAppDeps({
   keyEncryptionSecrets,
   runtime,
   hostProviders,
+  hostTools,
   byok,
   getQuota,
   rateLimits,
@@ -144,15 +157,17 @@ export function createAppDeps({
   keyEncryptionSecrets: string[];
   runtime: ChatRuntime;
   hostProviders: HostProvider[];
+  hostTools: HostTool[];
   byok: boolean;
   getQuota: AppDeps["getQuota"];
   rateLimits: ResolvedRateLimits;
-  tools: HostTool[];
+  tools: HostServerTool[];
 }): AppDeps {
   return {
     db,
     adapterFor,
     hostProviders,
+    hostTools,
     byok,
     getQuota,
     searchClient: createTavilyClient(globalThis.fetch),

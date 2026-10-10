@@ -1,77 +1,82 @@
-import { storedParts, type StoredPart } from "../../../../core/shared/message-parts";
-import { message } from "../../../../core/server/db/schema/chat";
-import { toolDefinition } from "@tanstack/ai";
+import { conversation } from "../../../../core/server/db/schema/chat";
+import { usage as usageRows } from "../../../../core/server/db/schema/usage";
 import { asc, eq } from "drizzle-orm";
-import { describe, expect, it } from "vitest";
-import { z } from "zod";
+import { describe, expect, it, vi } from "vitest";
 
-import type { HostToolContext } from "../../../../core/server/chat/host-tools";
-import { stopRun } from "../../../../core/server/chat/run";
 import { saveCredentials } from "../../../../core/server/credentials/store";
-import type { AppDeps } from "../../../../core/server/deps";
+import type { AppDeps, HostProvider, HostTool } from "../../../../core/server/deps";
 import { insertConversation } from "../../../support/conversations";
 import { createTestDeps, type TestDepsOverrides } from "../../../support/deps";
-import { createFakeAdapter, round, text, toolCall } from "../../../support/fake-adapter";
-import { sendAs } from "../../../support/sdk";
+import { createFakeAdapter, round, text, toolCall, withUsage } from "../../../support/fake-adapter";
+import { createFakeSearchClient, type FakeSearchClient } from "../../../support/fake-search-client";
 import { insertUser, type TestUser } from "../../../support/users";
+import { sendAs } from "../../../support/sdk";
+import { getTestDb } from "../../../support/test-database";
 
 const anthropicModel = "anthropic:claude-sonnet-5-5";
+const hostTavilyKey = { apiKey: "tvly-host-key" };
+const ownTavilyKey = { apiKey: "tvly-own-key" };
+const pricePerSearchUsd = 0.008;
 
-/** Resolves once the tool has been called; the test waits on it before it stops the reply. */
-function deferred() {
-  let resolve!: () => void;
-  const promise = new Promise<void>((done) => (resolve = done));
-  return { promise, resolve };
-}
+const hostTools: HostTool[] = [{ tool: "tavily", credentials: hostTavilyKey, pricePerSearchUsd }];
+const hostProviders: HostProvider[] = [
+  {
+    provider: "anthropic",
+    credentials: { apiKey: "sk-host-key" },
+    models: [
+      {
+        modelId: "claude-sonnet-5-5",
+        tools: true,
+        maxOutputTokens: 512,
+        inputUsdPerMillion: 3,
+        outputUsdPerMillion: 15,
+      },
+    ],
+  },
+];
 
-type Seen = { args: unknown; context: unknown; toolCallId?: string; signal?: AbortSignal };
+const searchCall = (id: string, query: string) =>
+  toolCall({ id, name: "web_search", input: { query } });
 
-/** A Host tool that records how it was called and answers with the time it was given. */
-function serverTime(seen: Seen[]) {
-  return toolDefinition({
-    name: "server_time",
-    description: "The current server time.",
-    inputSchema: z.object({ zone: z.string().optional() }),
-  }).server<HostToolContext>(async (args, ctx) => {
-    seen.push({
-      args,
-      context: ctx?.context,
-      toolCallId: ctx?.toolCallId,
-      signal: ctx?.abortSignal,
-    });
-    return { now: "2026-10-10T12:00:00.000Z" };
-  });
-}
+/** A reply that searches once, then answers. */
+const searchingReply = [
+  round(text("Let me look."), searchCall("call-1", "tanstack ai")),
+  round(text("Done.")),
+];
 
-const timeCall = (id: string, args: unknown = { zone: "UTC" }) =>
-  toolCall({ id, name: "server_time", input: args });
-
-/** A signed-in user with Anthropic credentials, and a fake adapter playing `rounds`. */
+/**
+ * A signed-in user and scripted adapters. Each `adapterFor` call takes the next script: the
+ * reply's, then (for an untitled Conversation) the title call's.
+ */
 async function setup({
-  rounds,
-  tools,
+  user,
+  scripts,
+  titled = true,
   deps: overrides = {},
+  searchClient = createFakeSearchClient({ results: [] }),
 }: {
-  rounds: Parameters<typeof createFakeAdapter>[0]["rounds"];
-  tools: AppDeps["tools"];
+  user: TestUser;
+  scripts: Parameters<typeof createFakeAdapter>[0]["rounds"][];
+  titled?: boolean;
   deps?: TestDepsOverrides;
+  searchClient?: FakeSearchClient;
 }) {
-  const user: TestUser = await insertUser();
-  const fake = createFakeAdapter({ rounds });
-  const deps = createTestDeps({
-    adapterFor: () => fake.adapter,
-    tools,
+  const fakes = scripts.map((rounds) => createFakeAdapter({ rounds }));
+  const pending = [...fakes];
+  const deps: AppDeps = createTestDeps({
+    adapterFor: () => {
+      const next = pending.shift();
+      if (!next) throw new Error("No more fake adapters");
+      return next.adapter;
+    },
+    searchClient,
     ...overrides,
   });
-  await saveCredentials(deps, user.id, {
-    service: "anthropic",
-    fields: { apiKey: "sk-ant-test-key" },
-    hint: "…-key",
-    verified: true,
+  const conv = await insertConversation(user, {
+    model: anthropicModel,
+    ...(titled ? { title: "Test Conversation" } : {}),
   });
-  // Titled, so a complete run doesn't call the adapter again to title it (#26).
-  const conv = await insertConversation(user, { title: "Host tools" });
-  const send = (command: { text?: string; parentId?: string | null } = {}) =>
+  const send = (webSearch: boolean) =>
     sendAs(
       new Request("http://localhost/api/chat/run", {
         method: "POST",
@@ -81,225 +86,182 @@ async function setup({
           forwardedProps: {
             conversationId: conv.id,
             parentId: null,
-            text: "What time is it?",
+            text: "What's new in TanStack AI?",
             attachmentIds: [],
             model: anthropicModel,
-            webSearch: false,
-            ...command,
+            webSearch,
           },
         }),
       }),
       user,
       deps,
     );
-  return { user, deps, fake, conv, send };
+  return { deps, conv, fakes, send };
 }
 
-async function repliesOf(deps: AppDeps, conversationId: string) {
-  const rows = await deps.db
-    .select()
-    .from(message)
-    .where(eq(message.conversationId, conversationId))
-    .orderBy(asc(message.createdAt));
-  return rows.filter((row) => row.role === "assistant");
+/** The rows of `chat.usage` for `userId`, oldest first. */
+function usageOf(userId: string) {
+  return getTestDb()
+    .select({
+      kind: usageRows.kind,
+      model: usageRows.model,
+      costMicros: usageRows.costMicros,
+      estimated: usageRows.estimated,
+      inputTokens: usageRows.inputTokens,
+      outputTokens: usageRows.outputTokens,
+    })
+    .from(usageRows)
+    .where(eq(usageRows.userId, userId))
+    .orderBy(asc(usageRows.createdAt));
 }
 
-const replyOf = async (deps: AppDeps, conversationId: string) =>
-  (await repliesOf(deps, conversationId)).at(-1)!;
+async function titleOf(conversationId: string) {
+  const [row] = await getTestDb()
+    .select({ title: conversation.title })
+    .from(conversation)
+    .where(eq(conversation.id, conversationId));
+  return row?.title;
+}
 
-const hostCall = (fields: Partial<Extract<StoredPart, { type: "tool_call" }>>) =>
-  ({
-    type: "tool_call",
-    toolCallId: "call-1",
-    name: "server_time",
-    source: "host",
-    args: { zone: "UTC" },
-    result: { now: "2026-10-10T12:00:00.000Z" },
-    state: "done",
-    ...fields,
-  }) as StoredPart;
+describe("Host Tool credentials for web search", () => {
+  it("searches on the Host's Tavily key when the user has no Tool credential, and records the fixed price", async () => {
+    const user = await insertUser();
+    const searchClient = createFakeSearchClient({ results: [] });
+    // The reply runs on the user's own Anthropic key, so only the search is on the Host's bill.
+    const { deps, fakes, send } = await setup({
+      user,
+      searchClient,
+      scripts: [searchingReply],
+      deps: { hostTools },
+    });
+    await saveCredentials(deps, user.id, {
+      service: "anthropic",
+      fields: { apiKey: "sk-ant-own-key" },
+      hint: "…-key",
+      verified: true,
+    });
 
-describe("a Host tool in a reply", () => {
-  it("is called with the user's id, the Conversation's id, the call id and the Run's signal", async () => {
-    const seen: Seen[] = [];
+    await (await send(true)).text();
+
+    expect(fakes[0]?.calls[0]?.tools?.map((tool) => tool.name)).toEqual(["web_search"]);
+    expect(searchClient.calls).toEqual([{ query: "tanstack ai", credentials: hostTavilyKey }]);
+    expect(await usageOf(user.id)).toEqual([
+      {
+        kind: "web_search",
+        model: "tavily",
+        costMicros: 8_000,
+        estimated: false,
+        inputTokens: 0,
+        outputTokens: 0,
+      },
+    ]);
+  });
+
+  it("searches on the user's own Tavily key over the Host's, and records no usage", async () => {
+    const user = await insertUser();
+    const searchClient = createFakeSearchClient({ results: [] });
+    const { deps, send } = await setup({
+      user,
+      searchClient,
+      scripts: [searchingReply],
+      deps: { hostTools },
+    });
+    await saveCredentials(deps, user.id, {
+      service: "anthropic",
+      fields: { apiKey: "sk-ant-own-key" },
+      hint: "…-key",
+      verified: true,
+    });
+    await saveCredentials(deps, user.id, {
+      service: "tavily",
+      fields: ownTavilyKey,
+      hint: "…-key",
+      verified: true,
+    });
+
+    await (await send(true)).text();
+
+    expect(searchClient.calls).toEqual([{ query: "tanstack ai", credentials: ownTavilyKey }]);
+    expect(await usageOf(user.id)).toEqual([]);
+  });
+
+  it("records no web_search usage when the Host's search fails", async () => {
+    const user = await insertUser();
+    const searchClient = createFakeSearchClient({ error: "failed" });
+    const { deps, send } = await setup({
+      user,
+      searchClient,
+      scripts: [searchingReply],
+      deps: { hostTools },
+    });
+    await saveCredentials(deps, user.id, {
+      service: "anthropic",
+      fields: { apiKey: "sk-ant-own-key" },
+      hint: "…-key",
+      verified: true,
+    });
+
+    await (await send(true)).text();
+
+    expect(searchClient.calls).toHaveLength(1);
+    expect(await usageOf(user.id)).toEqual([]);
+  });
+});
+
+describe("Host credentials for automatic titles", () => {
+  const titleUsage = { promptTokens: 100, completionTokens: 10, totalTokens: 110 };
+
+  it("writes a title usage row when the title is generated on Host credentials", async () => {
+    const user = await insertUser();
     const { conv, send } = await setup({
-      rounds: [round(timeCall("call-1")), round(text("It is noon."))],
-      tools: [serverTime(seen)],
-    });
-
-    await (await send()).text();
-
-    const [call] = seen;
-    expect(call?.args).toEqual({ zone: "UTC" });
-    expect(call?.toolCallId).toBe("call-1");
-    expect(call?.signal).toBeInstanceOf(AbortSignal);
-    expect(call?.context).toEqual({ userId: expect.any(String), conversationId: conv.id });
-  });
-
-  it("stores the call as a host tool_call part between the text around it", async () => {
-    const seen: Seen[] = [];
-    const { deps, conv, send } = await setup({
-      rounds: [round(text("Let me check. "), timeCall("call-1")), round(text("It is noon."))],
-      tools: [serverTime(seen)],
-    });
-
-    await (await send()).text();
-
-    expect(await replyOf(deps, conv.id)).toMatchObject({
-      status: "complete",
-      parts: storedParts([
-        { type: "text", text: "Let me check. " },
-        hostCall({}),
-        { type: "text", text: "It is noon." },
-      ]),
-    });
-  });
-
-  it("feeds the result back to the Model as the tool's answer", async () => {
-    const seen: Seen[] = [];
-    const { fake, send } = await setup({
-      rounds: [round(timeCall("call-1")), round(text("It is noon."))],
-      tools: [serverTime(seen)],
-    });
-
-    await (await send()).text();
-
-    expect(fake.calls[1]!.messages.at(-1)).toMatchObject({
-      role: "tool",
-      toolCallId: "call-1",
-      content: JSON.stringify({ now: "2026-10-10T12:00:00.000Z" }),
-    });
-  });
-
-  it("stores a tool that throws as an error part, and the reply still completes", async () => {
-    const boom = toolDefinition({
-      name: "server_time",
-      description: "Breaks.",
-      inputSchema: z.object({ zone: z.string().optional() }),
-    }).server(async () => {
-      throw new Error("clock is broken");
-    });
-    const { fake, deps, conv, send } = await setup({
-      rounds: [round(timeCall("call-1")), round(text("I could not check."))],
-      tools: [boom],
-    });
-
-    await (await send()).text();
-
-    expect(fake.calls[1]!.messages.at(-1)).toMatchObject({
-      role: "tool",
-      toolCallId: "call-1",
-      content: JSON.stringify({ error: "clock is broken" }),
-    });
-    expect(await replyOf(deps, conv.id)).toMatchObject({
-      status: "complete",
-      error: null,
-      parts: storedParts([
-        hostCall({ state: "error", result: { error: "clock is broken" } }),
-        { type: "text", text: "I could not check." },
-      ]),
-    });
-  });
-
-  it("caps Host tool calls at 10 per reply: the 11th runs nothing and gets an error", async () => {
-    const seen: Seen[] = [];
-    const calls = Array.from({ length: 11 }, (_, index) => timeCall(`call-${index + 1}`));
-    const { fake, deps, conv, send } = await setup({
-      rounds: [round(...calls), round(text("Done."))],
-      tools: [serverTime(seen)],
-    });
-
-    await (await send()).text();
-
-    expect(seen).toHaveLength(10);
-    expect(fake.calls[1]!.messages.at(-1)).toMatchObject({
-      role: "tool",
-      toolCallId: "call-11",
-      content: JSON.stringify({ error: "tool call limit reached" }),
-    });
-    const reply = await replyOf(deps, conv.id);
-    expect(reply.parts.parts.at(-2)).toEqual(
-      hostCall({
-        toolCallId: "call-11",
-        state: "error",
-        result: { error: "tool call limit reached" },
-      }),
-    );
-  });
-
-  it("cancels the call when the reply is stopped: fn's signal aborts and the part ends cancelled", async () => {
-    const started = deferred();
-    let aborted = false;
-    const hanging = toolDefinition({
-      name: "server_time",
-      description: "Waits for the user.",
-      inputSchema: z.object({ zone: z.string().optional() }),
-    }).server<HostToolContext>(
-      (_args, ctx) =>
-        new Promise((_resolve, reject) => {
-          started.resolve();
-          ctx?.abortSignal?.addEventListener("abort", () => {
-            aborted = true;
-            reject(new Error("aborted"));
-          });
-        }),
-    );
-    const { deps, conv, send } = await setup({
-      rounds: [round(timeCall("call-1"))],
-      tools: [hanging],
-    });
-
-    const response = send();
-    await started.promise;
-    const reply = await replyOf(deps, conv.id);
-    await stopRun(deps, reply.id);
-    await (await response).text();
-
-    expect(aborted).toBe(true);
-    expect(await replyOf(deps, conv.id)).toMatchObject({
-      status: "stopped",
-      parts: storedParts([
-        {
-          type: "tool_call",
-          toolCallId: "call-1",
-          name: "server_time",
-          source: "host",
-          args: { zone: "UTC" },
-          state: "cancelled",
-        },
-      ]),
-    });
-  });
-
-  it("replays a stored call and its result to the Model in a later turn", async () => {
-    const seen: Seen[] = [];
-    const { fake, deps, conv, send } = await setup({
-      rounds: [round(timeCall("call-1")), round(text("It is noon.")), round(text("Still noon."))],
-      tools: [serverTime(seen)],
-    });
-    await (await send()).text();
-    const first = await replyOf(deps, conv.id);
-
-    await (await send({ parentId: first.id, text: "And now?" })).text();
-
-    const history = fake.calls[2]!.messages;
-    expect(history).toContainEqual({
-      role: "assistant",
-      content: null,
-      toolCalls: [
-        {
-          id: "call-1",
-          type: "function",
-          function: { name: "server_time", arguments: JSON.stringify({ zone: "UTC" }) },
-        },
+      user,
+      titled: false,
+      scripts: [
+        [round(text("Paris is the capital."))],
+        [withUsage(round(text("Capital of France")), titleUsage)],
       ],
+      deps: { hostProviders },
     });
-    expect(history).toContainEqual(
-      expect.objectContaining({
-        role: "tool",
-        toolCallId: "call-1",
-        content: JSON.stringify({ now: "2026-10-10T12:00:00.000Z" }),
-      }),
+
+    await (await send(false)).text();
+
+    await vi.waitFor(async () => expect(await titleOf(conv.id)).toBe("Capital of France"));
+    await vi.waitFor(async () =>
+      expect((await usageOf(user.id)).map((r) => r.kind)).toEqual(["run", "title"]),
     );
+    const [, title] = await usageOf(user.id);
+    expect(title).toMatchObject({
+      kind: "title",
+      model: anthropicModel,
+      // 100 input tokens at $3 per 1M, plus 10 output tokens at $15 per 1M.
+      costMicros: 450,
+      estimated: false,
+      inputTokens: 100,
+      outputTokens: 10,
+    });
+  });
+
+  it("writes no title usage row when the title is generated on the user's own key", async () => {
+    const user = await insertUser();
+    const { deps, conv, send } = await setup({
+      user,
+      titled: false,
+      scripts: [
+        [round(text("Paris is the capital."))],
+        [withUsage(round(text("Capital of France")), titleUsage)],
+      ],
+      deps: { hostProviders },
+    });
+    await saveCredentials(deps, user.id, {
+      service: "anthropic",
+      fields: { apiKey: "sk-ant-own-key" },
+      hint: "…-key",
+      verified: true,
+    });
+
+    await (await send(false)).text();
+
+    await vi.waitFor(async () => expect(await titleOf(conv.id)).toBe("Capital of France"));
+    expect(await usageOf(user.id)).toEqual([]);
   });
 });

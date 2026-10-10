@@ -13,11 +13,16 @@ import { and, eq, isNull, lt, or } from "drizzle-orm";
 import type { AppDeps, Credentials } from "../deps";
 import { cancelRunningCalls, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
 import { titleConversation } from "./title";
-import { createHostTools, type HostTool, type HostToolContext } from "./host-tools";
+import { createHostTools, type HostServerTool, type HostToolContext } from "./host-tools";
 import { createWebSearchTool } from "./web-search-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
 import { addUsage, messageUsage, normalizeUsage, promptCharactersOf, type RunUsage } from "./usage";
-import { recordRunUsage, type UsageMeter } from "./host-usage";
+import {
+  recordHostUsage,
+  recordSearchUsage,
+  type SearchMeter,
+  type UsageMeter,
+} from "./host-usage";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -43,7 +48,9 @@ export async function startRun(
     hostTools = [],
     context,
     systemPrompts,
+    modelOptions,
     meter,
+    searchMeter,
   }: {
     messageId: string;
     /** The Provider of the Model, which decides how its usage is normalised. */
@@ -53,13 +60,17 @@ export async function startRun(
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
     webSearch?: Credentials;
     /** The Host tools this reply offers (none when its Model has no tools). */
-    hostTools?: HostTool[];
+    hostTools?: HostServerTool[];
     /** The user and Conversation the Host tools are called for, passed to them as their context. */
     context: HostToolContext;
     /** The reply's system prompts, from `systemPromptsFor` when the Run starts. */
     systemPrompts: string[];
+    /** The Provider's options for the Run, from `generationOptionsFor` (max output, reasoning). */
+    modelOptions?: Record<string, unknown>;
     /** Set on a Run on Host credentials: the Run is recorded in `chat.usage` (ADR 0007). */
     meter?: UsageMeter;
+    /** Set when the search runs on the Host's Tavily key: each search is recorded (ADR 0007). */
+    searchMeter?: SearchMeter;
   },
 ): Promise<void> {
   const abortController = new AbortController();
@@ -125,6 +136,12 @@ export async function startRun(
                 credentials: webSearch,
                 parts,
                 onChange: () => (changed = true),
+                recordSearch: searchMeter
+                  ? () =>
+                      recordSearchUsage(deps, searchMeter).catch((caught: unknown) =>
+                        console.error(`Recording a search of ${messageId} failed`, caught),
+                      )
+                  : undefined,
               }),
             ]
           : []),
@@ -137,6 +154,7 @@ export async function startRun(
         context,
         ...(tools.length > 0 && { tools }),
         ...(systemPrompts.length > 0 && { systemPrompts }),
+        modelOptions,
       });
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
@@ -189,8 +207,14 @@ export async function startRun(
       await write(withParts({ ...ending, usage }));
       // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
       if (meter) {
-        await recordRunUsage(deps, meter, usage, costComplete ? reportedCost : undefined).catch(
-          (caught: unknown) => console.error(`Recording usage of ${messageId} failed`, caught),
+        await recordHostUsage(
+          deps,
+          "run",
+          meter,
+          usage,
+          costComplete ? reportedCost : undefined,
+        ).catch((caught: unknown) =>
+          console.error(`Recording usage of ${messageId} failed`, caught),
         );
       }
       void unsubscribeStop().catch((error: unknown) =>

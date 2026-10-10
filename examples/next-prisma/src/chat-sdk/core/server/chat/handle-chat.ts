@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { attachmentsForSend } from "../attachments/send";
 import { linkAttachments, lockAttachments } from "../attachments/store";
 import { tavilyService, unusableModelMessage } from "../../shared/credentials/services";
-import { resolveCredentials, resolveModelCall } from "../credentials/resolve";
+import { resolveModelCall, resolveToolCall } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import type { ChatUser } from "../context";
 import { uuidv7 } from "../lib/uuidv7";
@@ -20,6 +20,7 @@ import { findConversation, loadPath } from "./store";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 import { quotaExceededCode, quotaRefusal } from "./quota";
+import { generationOptionsFor } from "./generation";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 
@@ -77,13 +78,14 @@ export async function handleChat(
       );
     }
   }
-  // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
-  const searchCredentials =
-    command.webSearch && model.tools ? await resolveCredentials(deps, userId, tavilyService) : null;
+  // `web_search` is offered only when asked for, the Model has tools and a Tavily key is usable: the
+  // user's own, else the Host's (ADR 0007).
+  const searchCall =
+    command.webSearch && model.tools ? await resolveToolCall(deps, userId, tavilyService) : null;
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({
-    webSearch: searchCredentials !== null,
+    webSearch: searchCall !== null,
     instructions,
   });
 
@@ -123,7 +125,7 @@ export async function handleChat(
     ],
     {
       provider: model.provider,
-      webSearch: searchCredentials !== null,
+      webSearch: searchCall !== null,
       reads: { images: model.images, pdfs: model.pdfs },
     },
   );
@@ -193,10 +195,16 @@ export async function handleChat(
     provider: model.provider,
     adapter,
     messages,
-    webSearch: searchCredentials ?? undefined,
+    webSearch: searchCall?.credentials,
     systemPrompts,
+    modelOptions: generationOptionsFor(model.id, { maxOutputTokens: model.maxOutputTokens }),
     // A Run on Host credentials is recorded against the user's Quota (ADR 0007).
     meter: call.hostModel ? { userId, model: model.id, price: call.hostModel } : undefined,
+    // Each search on the Host's Tavily key is recorded at its price (ADR 0007).
+    searchMeter:
+      searchCall?.pricePerSearchUsd === undefined
+        ? undefined
+        : { userId, pricePerSearchUsd: searchCall.pricePerSearchUsd },
   });
   // The response reads the Run's log from the start, like any joiner (ADR 0006).
   return resumeServerSentEventsResponse({

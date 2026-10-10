@@ -3,6 +3,7 @@ import { RPCLink } from "@orpc/client/fetch";
 import { createTanstackQueryUtils, type RouterUtils } from "@orpc/tanstack-query";
 
 import type { AppRouterClient } from "../server/routers/index";
+import { throwIfRateLimited } from "./rate-limit";
 
 /** The oRPC TanStack Query utils for the app router. */
 export type ChatOrpc = RouterUtils<AppRouterClient>;
@@ -32,7 +33,10 @@ export function createChatClient({
 }): ChatClient {
   const base = baseUrl.replace(/\/+$/, "");
   const rpc: AppRouterClient = createORPCClient(
-    new RPCLink({ url: `${base}/rpc`, fetch: (request) => fetch(request) }),
+    new RPCLink({
+      url: `${base}/rpc`,
+      fetch: async (request) => throwIfRateLimited(await fetch(request)),
+    }),
   );
   return {
     rpc,

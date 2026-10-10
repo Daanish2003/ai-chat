@@ -100,6 +100,9 @@ process.on("SIGTERM", () => void chat.stop().finally(() => process.exit(0)));
 // when your app deletes a user
 await chat.deleteUser(String(user.id));
 
+// when your app exports a user's data: one JSON-ready document (version 1), never credentials
+const copy = await chat.exportUser(String(user.id));
+
 // your own route for a Shared link page
 const data = await chat.getSharedConversation(token);
 ```
@@ -133,11 +136,11 @@ Redis holds each Run's chunk log while the Run is live and for an hour after it 
 
 ## Who pays for Runs
 
-- `hostProviders` are the Host's own credentials, from your environment (never stored): `[{ provider, credentials, models: [...] }]`. Each model is `{ modelId, label?, images?, pdfs?, tools?, maxOutputTokens, inputUsdPerMillion, outputUsdPerMillion }`. `maxOutputTokens` is required: the Host's output cap for a Run on that model, handed to `adapterFor` (the production adapters don't apply it yet). The prices are per 1M tokens and kept with the model. Capability flags default to off unless the model is curated, in which case its curated flags apply.
+- `hostProviders` are the Host's own credentials, from your environment (never stored): `[{ provider, credentials, models: [...] }]`. Each model is `{ modelId, label?, images?, pdfs?, tools?, maxOutputTokens, inputUsdPerMillion, outputUsdPerMillion }`. `maxOutputTokens` is required: the Host's output cap for a Run on that model, handed to `adapterFor` (the production adapters don't apply it yet). The prices are per 1M tokens and kept with the model. Capability flags default to off unless the model is curated, in which case its curated flags apply. A Tool goes in the same list as `{ tool: "tavily", credentials, pricePerSearchUsd }`: a Host Tavily key that searches for users with no Tavily key of their own, each search recorded at that fixed price.
 - `byok` (default `true`) lets users run on their own Provider credentials. Set it independently of `hostProviders`: `byok: false` with `hostProviders` is a company Host that runs only its own keys.
 - A user's own key for a Provider always wins over the Host's. The Model list marks the Models that run on Host credentials.
 - `start()` throws with neither `hostProviders` nor `byok`.
-- `getQuota` caps what each user may spend on Host credentials. It is a function `(userId) => { budgetUsd, window: 'day' | 'month' } | null`, or one fixed Quota for everyone. `null` (or leaving it out) is unlimited. Windows are fixed UTC days or calendar months. Spend is measured in money from each Run's cost (the Provider's reported cost, else tokens times the model's price). A Run on Host credentials is refused with HTTP 402 and `code: "quota_exceeded"`, plus `resetsAt`, once the window's spend reaches the budget. A Run that has started finishes, so it can go over the budget by one Run's cost. A user's own key is never checked. Users read their Quota as a percentage, the window and its reset time through the `quota.read` procedure, never as money.
+- `getQuota` caps what each user may spend on Host credentials. It is a function `(userId) => { budgetUsd, window: 'day' | 'month' } | null`, or one fixed Quota for everyone. `null` (or leaving it out) is unlimited. Windows are fixed UTC days or calendar months. Spend is measured in money from each Run's cost (the Provider's reported cost, else tokens times the model's price). A Run on Host credentials is refused with HTTP 402 and `code: "quota_exceeded"`, plus `resetsAt`, once the window's spend reaches the budget. A Run that has started finishes, so it can go over the budget by one Run's cost. A user's own key is never checked. Users read their Quota as a percentage, the window and its reset time through the `quota.read` procedure, never as money. The composer shows a meter from 80%, and at the limit the Host Models are disabled with the reset time. A Host can render its own content there with `<AppShell quotaExceeded={...}>`.
 
 ```ts
 const chat = createChat({

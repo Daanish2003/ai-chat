@@ -1,12 +1,14 @@
 import { conversation, message } from "../db/schema/chat";
-import { chat } from "@tanstack/ai";
+import { chat, type ModelMessage } from "@tanstack/ai";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { resolveModelCall } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import { loadSettings } from "../settings/store";
-import { isKnownModel } from "../../shared/chat/models";
+import { isKnownModel, parseModelId } from "../../shared/chat/models";
+import { recordHostUsage } from "./host-usage";
 import { loadPath } from "./store";
+import { messageUsage, promptCharactersOf, reportedUsageOf } from "./usage";
 
 const titlePrompt =
   "Write a short title (at most 6 words) for the conversation below. Reply with the title only: " +
@@ -70,18 +72,34 @@ async function generateTitle(
   const call = await resolveModelCall(deps, userId, model);
   if (!call) return "";
   try {
-    const { text } = await chat({
+    const messages: ModelMessage[] = [
+      {
+        role: "user",
+        content: `User: ${first.slice(0, promptChars)}\n\nAssistant: ${reply.slice(0, promptChars)}`,
+      },
+    ];
+    const result = await chat({
       adapter: deps.adapterFor(model, call.credentials, { maxOutputTokens: call.maxOutputTokens }),
       systemPrompts: [titlePrompt],
-      messages: [
-        {
-          role: "user",
-          content: `User: ${first.slice(0, promptChars)}\n\nAssistant: ${reply.slice(0, promptChars)}`,
-        },
-      ],
+      messages,
       stream: false,
     });
-    return cleanTitle(text);
+    // A title on Host credentials is recorded against the Quota, like a Run (ADR 0007).
+    if (call.hostModel) {
+      const reported = reportedUsageOf(parseModelId(model)?.provider ?? "", result.chunks);
+      const usage = messageUsage(reported.usage, {
+        promptCharacters: promptCharactersOf(messages),
+        parts: [{ type: "text", text: result.text }],
+      });
+      await recordHostUsage(
+        deps,
+        "title",
+        { userId, model, price: call.hostModel },
+        usage,
+        reported.cost,
+      ).catch((caught: unknown) => console.error(`Recording the title usage failed`, caught));
+    }
+    return cleanTitle(result.text);
   } catch (error) {
     console.error(`Generating a title with ${model} failed`, error);
     return "";

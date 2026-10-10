@@ -25,9 +25,10 @@ export function runCostMicros(
   );
 }
 
-/** Writes the `chat.usage` row of a Run on Host credentials (ADR 0007). */
-export async function recordRunUsage(
+/** Writes the `chat.usage` row of a call on Host credentials for a Run or a title (ADR 0007). */
+export async function recordHostUsage(
   deps: Pick<AppDeps, "db">,
+  kind: "run" | "title",
   meter: UsageMeter,
   usage: MessageUsage,
   reportedCost: number | undefined,
@@ -35,13 +36,34 @@ export async function recordRunUsage(
   await deps.db.insert(usageRows).values({
     id: uuidv7(),
     userId: meter.userId,
-    kind: "run",
+    kind,
     model: meter.model,
     inputTokens: usage.input,
     outputTokens: usage.output,
     costMicros: runCostMicros(usage, reportedCost, meter.price),
     estimated: usage.estimated,
     // Set in app code, like the window the Quota sums (chat/quota.ts), so a fake clock agrees.
+    createdAt: new Date(),
+  });
+}
+
+/** The Host's Tool a web search runs on, and what each search costs (ADR 0007). */
+export type SearchMeter = { userId: string; pricePerSearchUsd: number };
+
+/** Writes the `chat.usage` row of one web search on Host credentials, at its fixed price. */
+export async function recordSearchUsage(
+  deps: Pick<AppDeps, "db">,
+  meter: SearchMeter,
+): Promise<void> {
+  await deps.db.insert(usageRows).values({
+    id: uuidv7(),
+    userId: meter.userId,
+    kind: "web_search",
+    model: "tavily",
+    inputTokens: 0,
+    outputTokens: 0,
+    costMicros: Math.round(meter.pricePerSearchUsd * 1_000_000),
+    estimated: false,
     createdAt: new Date(),
   });
 }

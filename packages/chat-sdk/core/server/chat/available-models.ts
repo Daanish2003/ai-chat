@@ -2,6 +2,7 @@ import { conversation } from "../db/schema/chat";
 import { desc, eq } from "drizzle-orm";
 
 import { resolveCredentials, resolvedServices, hostModelList } from "../credentials/resolve";
+import { tavilyService } from "../../shared/credentials/services";
 import type { AppDeps } from "../deps";
 import { ollamaModels, openRouterModels } from "./live-models";
 import {
@@ -14,7 +15,10 @@ import {
   parseModelId,
 } from "../../shared/chat/models";
 
-type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets" | "fetch" | "hostProviders" | "byok">;
+type Deps = Pick<
+  AppDeps,
+  "db" | "keyEncryptionSecrets" | "fetch" | "hostProviders" | "hostTools" | "byok"
+>;
 
 /**
  * The Models the user can chat with: those of Providers they have their own credentials for (with
@@ -27,7 +31,7 @@ type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets" | "fetch" | "hostProvide
 export async function listAvailableModels(
   deps: Deps,
   userId: string,
-): Promise<{ models: ListedModel[]; defaultModel: string | null }> {
+): Promise<{ models: ListedModel[]; defaultModel: string | null; webSearchOnHost: boolean }> {
   const services = deps.byok ? await resolvedServices(deps, userId) : [];
   const own = [
     ...curatedModels.filter((model) => services.includes(model.provider)),
@@ -60,7 +64,12 @@ export async function listAvailableModels(
       models.find((model) => model.provider === firstProvider)
     )?.id;
 
-  return { models, defaultModel: recentModel ?? providerDefault ?? null };
+  return {
+    models,
+    defaultModel: recentModel ?? providerDefault ?? null,
+    // The Host's Tavily key, which search uses for a user with no Tool credential of their own (ADR 0007).
+    webSearchOnHost: deps.hostTools.some((tool) => tool.tool === tavilyService),
+  };
 }
 
 /**

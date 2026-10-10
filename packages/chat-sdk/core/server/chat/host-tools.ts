@@ -10,7 +10,7 @@ import type { createPartsBuilder } from "../../shared/chat/parts";
 export type HostToolContext = { userId: string; conversationId: string };
 
 /** A Host tool, as `createChat({ tools })` takes it. */
-export type HostTool = AnyServerTool;
+export type HostServerTool = AnyServerTool;
 
 /** Tool calls one reply may make across the Host's tools (and, later, MCP tools). */
 export const maxToolCallsPerReply = 10;
@@ -25,7 +25,7 @@ export const toolCallLimitError = "tool call limit reached";
  * stays running, and the run closes it as cancelled.
  */
 export function createHostTools(
-  tools: HostTool[],
+  tools: HostServerTool[],
   {
     parts,
     onChange,

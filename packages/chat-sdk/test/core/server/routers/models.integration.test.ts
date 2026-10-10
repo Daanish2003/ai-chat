@@ -50,7 +50,11 @@ describe("models.list", () => {
   it("returns no Models and no default without credentials", async () => {
     const { client } = await signedIn();
 
-    await expect(client.models.list()).resolves.toEqual({ models: [], defaultModel: null });
+    await expect(client.models.list()).resolves.toEqual({
+      models: [],
+      defaultModel: null,
+      webSearchOnHost: false,
+    });
   });
 
   it("defaults a new Conversation to the code default of the first Provider the user added", async () => {
@@ -257,6 +261,19 @@ describe("models.list with Host credentials", () => {
     });
     expect(models.find((model) => model.id === "openai:gpt-5.6")).toMatchObject({
       onHostCredentials: false,
+    });
+  });
+
+  it("says web search is on the Host when the Host offers a Tavily key", async () => {
+    const user = await insertUser();
+    const hosted = createTestDeps({
+      hostTools: [
+        { tool: "tavily", credentials: { apiKey: "tvly-host" }, pricePerSearchUsd: 0.008 },
+      ],
+    });
+
+    await expect(chatRpc({ user, deps: hosted }).models.list()).resolves.toMatchObject({
+      webSearchOnHost: true,
     });
   });
 });

@@ -18,6 +18,8 @@ import { modelGroups } from "../../core/client/models";
 
 import { useByok } from "../../core/client/react/byok";
 import { useChatAdapter } from "../../core/client/react/provider";
+import { useQuota } from "../../core/client/react/quota";
+import { quotaBlocksModel, quotaResetsAt } from "../../core/client/quota";
 
 /**
  * The top-bar Model picker: a popover with a search box, the available Models grouped by
@@ -40,6 +42,9 @@ export function ModelPicker({
 }) {
   const { Link } = useChatAdapter();
   const byok = useByok();
+  const quota = useQuota().data;
+  // A spent Quota turns the Host's Models off until it resets (ADR 0007).
+  const offTitle = quota ? `Host Models are off until ${quotaResetsAt(quota.resetsAt)}` : undefined;
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const selected = value
@@ -97,6 +102,8 @@ export function ModelPicker({
                 <button
                   key={model.id}
                   type="button"
+                  disabled={quotaBlocksModel(model, quota)}
+                  title={quotaBlocksModel(model, quota) ? offTitle : undefined}
                   aria-pressed={model.id === value}
                   onClick={() => {
                     setOpen(false);

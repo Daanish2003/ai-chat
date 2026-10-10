@@ -43,6 +43,7 @@ export function createTestDeps({
     },
     keyEncryptionSecrets: [testKeyEncryptionSecret],
     hostProviders: [],
+    hostTools: [],
     byok: true,
     getQuota: async () => null,
     lifecycle: { stopping: false, runs: new Map() },

@@ -1,4 +1,10 @@
-import type { ModelMessage, TokenUsage } from "@tanstack/ai";
+import {
+  EventType,
+  fromSpecTokenUsage,
+  type ModelMessage,
+  type StreamChunk,
+  type TokenUsage,
+} from "@tanstack/ai";
 
 import type { MessageUsage } from "../../shared/chat/message-record";
 import type { StoredPart } from "../../shared/message-parts";
@@ -31,6 +37,29 @@ export function addUsage(total: RunUsage | undefined, next: RunUsage): RunUsage 
     reasoning: total.reasoning + next.reasoning,
     cached: total.cached + next.cached,
   };
+}
+
+/**
+ * The usage and the Provider's reported cost of a call that returned its chunks whole (a title).
+ * Summed over its `RUN_FINISHED` chunks as a Run's are; the cost only when every one reports one.
+ */
+export function reportedUsageOf(
+  provider: string,
+  chunks: StreamChunk[],
+): { usage?: RunUsage; cost?: number } {
+  let usage: RunUsage | undefined;
+  let cost: number | undefined;
+  let costComplete = true;
+  for (const chunk of chunks) {
+    if (chunk.type !== EventType.RUN_FINISHED || !chunk.usage) continue;
+    // The AG-UI array form is converted back to TanStack's shape first.
+    const tokens = Array.isArray(chunk.usage) ? fromSpecTokenUsage(chunk.usage) : chunk.usage;
+    if (!tokens) continue;
+    usage = addUsage(usage, normalizeUsage(provider, tokens));
+    if (tokens.cost === undefined) costComplete = false;
+    else cost = (cost ?? 0) + tokens.cost;
+  }
+  return { usage, cost: costComplete ? cost : undefined };
 }
 
 /** Characters of text a Run sent the Model: string content and text parts. */
