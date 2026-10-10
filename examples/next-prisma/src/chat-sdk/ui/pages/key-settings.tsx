@@ -19,6 +19,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
+import { ConnectionsSection } from "../settings/connections-section";
 import { DeleteAllConversationsSection } from "../settings/delete-all-conversations";
 import { ExportDataButton } from "../settings/export-data-button";
 import { SharedLinksSection } from "../settings/shared-links";
@@ -75,6 +76,8 @@ export function KeySettingsPage() {
           ))}
         </ul>
       </section>
+
+      <ConnectionsSection />
 
       <SharedLinksSection />
 

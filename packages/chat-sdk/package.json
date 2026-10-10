@@ -30,6 +30,7 @@
     "@tanstack/ai-groq": "0.8.5",
     "@tanstack/ai-llmgateway": "0.2.5",
     "@tanstack/ai-lovable": "0.5.2",
+    "@tanstack/ai-mcp": "0.8.1",
     "@tanstack/ai-mistral": "0.6.15",
     "@tanstack/ai-ollama": "0.11.14",
     "@tanstack/ai-openai": "0.28.0",

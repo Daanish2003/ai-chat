@@ -405,16 +405,16 @@ importers:
         version: 0.20.0(@tanstack/ai@0.66.0(zod@4.6.5))(zod@4.6.5)
       '@tanstack/ai-bedrock':
         specifier: 0.4.5
-        version: 0.4.5(@aws-sdk/credential-provider-node@3.972.84)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.4.5(@aws-sdk/credential-provider-node@3.972.84)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-byteplus':
         specifier: 0.6.2
-        version: 0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-client':
         specifier: 0.39.0
         version: 0.39.0(zod@4.6.5)
       '@tanstack/ai-cloudflare':
         specifier: 0.2.5
-        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-compaction':
         specifier: 0.1.14
         version: 0.1.14(@tanstack/ai@0.66.0(zod@4.6.5))
@@ -423,16 +423,19 @@ importers:
         version: 0.37.0(@modelcontextprotocol/sdk@1.32.0(zod@4.6.5))(@tanstack/ai@0.66.0(zod@4.6.5))
       '@tanstack/ai-grok':
         specifier: 0.21.2
-        version: 0.21.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.21.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-groq':
         specifier: 0.8.5
-        version: 0.8.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.8.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-llmgateway':
         specifier: 0.2.5
-        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-lovable':
         specifier: 0.5.2
-        version: 0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      '@tanstack/ai-mcp':
+        specifier: 0.8.1
+        version: 0.8.1(zod@4.6.5)
       '@tanstack/ai-mistral':
         specifier: 0.6.15
         version: 0.6.15(patch_hash=cf4156ba04dfd503d39ce5bfa1f31f6635f307c14ba91617590c54701d6e85e5)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)
@@ -441,7 +444,7 @@ importers:
         version: 0.11.14(patch_hash=55a42053fc0982b52dd25c2197076e02facc760cab32fc83be1179d3eab2b3a2)(@tanstack/ai@0.66.0(zod@4.6.5))
       '@tanstack/ai-openai':
         specifier: 0.28.0
-        version: 0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-openrouter':
         specifier: 0.21.2
         version: 0.21.2(@tanstack/ai@0.66.0(zod@4.6.5))
@@ -450,7 +453,7 @@ importers:
         version: 0.30.1(@tanstack/ai@0.66.0(zod@4.6.5))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
       '@tanstack/ai-vercel-gateway':
         specifier: 0.3.7
-        version: 0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/react-query':
         specifier: ^5.104.1
         version: 5.104.1(react@19.3.0)
@@ -630,6 +633,9 @@ importers:
       '@tanstack/ai-lovable':
         specifier: 0.5.2
         version: 0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      '@tanstack/ai-mcp':
+        specifier: 0.8.1
+        version: 0.8.1(zod@4.6.5)
       '@tanstack/ai-mistral':
         specifier: 0.6.15
         version: 0.6.15(patch_hash=cf4156ba04dfd503d39ce5bfa1f31f6635f307c14ba91617590c54701d6e85e5)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)
@@ -1842,6 +1848,14 @@ packages:
   '@mistralai/mistralai@2.2.0':
     resolution: {integrity: sha512-JQUGIXjFWnw/J9LpTSf/ZXwVW3Sh8FBAcfTo5QvAHqkl4CfSiIwnjRJhMoAFcP6ncCe84YPU1ncDGX+p3OXnfg==}
 
+  '@modelcontextprotocol/client@2.3.1':
+    resolution: {integrity: sha512-mIGZXpHsjnZ6lD+gD/WCMpR5k8yVQQ8nNFH1N0Srf7AvnwTUMYD6pvTY8ng2+He5FfV7YMZLmrjL7cLa/cc3dQ==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/core@2.3.1':
+    resolution: {integrity: sha512-laVmIhPGpWi7rG9q+0UigblRN0Hws/Yjlb6qLFtVqryXVLkc4h+yN8z731POD2LnAGQlFe7/tXhUm7Bi0YB91g==}
+    engines: {node: '>=20'}
+
   '@modelcontextprotocol/sdk@1.32.0':
     resolution: {integrity: sha512-8BviX/hK4Gd2eL1KdTwm0gfl4d3wdoErW0Jd00h6nomUAtk6IJk5vwQJc6kfWtJTzN5OEV/lgIiJKI8fiDGAlA==}
     engines: {node: '>=18'}
@@ -1851,6 +1865,10 @@ packages:
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
+
+  '@modelcontextprotocol/server@2.3.1':
+    resolution: {integrity: sha512-e59MfWuSssj6DoQ96JCTqdW1AXT5/XtnTl0WWd6MU1Ka434fFUGGosCLJbGNySDhHGvxQWoRWK137FXYFkYNWw==}
+    engines: {node: '>=20'}
 
   '@next/env@16.4.0':
     resolution: {integrity: sha512-pyLlT5oafGlX8X7xjgGNXz5dNIDSxREm+qD6i9VLSZiZFopA/XWl8NM/KPmLx/8EG/++c49iid3gNWSQW1+2dQ==}
@@ -2973,6 +2991,10 @@ packages:
     resolution: {integrity: sha512-6jTZWj+RMCteaxo6zhS4IwPXMM/jkUoujyFEIkq06sMvvlFnxZIorJ9vbQek+2tiEt57K0u62K4bzFiIglqe+A==}
     peerDependencies:
       '@tanstack/ai': ^0.66.0
+
+  '@tanstack/ai-mcp@0.8.1':
+    resolution: {integrity: sha512-Y8zgpSYbrID3+ln6/RzdwjB3/JMkD1Z4a+ZkGfonijhdzVTNT0HA33SoVpRpCrbeX6+8DvlZI0ZHcrokTRvtwQ==}
+    hasBin: true
 
   '@tanstack/ai-mistral@0.6.15':
     resolution: {integrity: sha512-moaTR7dOx4mzJNOs092GGjC1964YkM4BVEdyAm29mbXbiSVlSo1UeiFhgJjM87AkyMahQzO/QsN+yCqEntNUQg==}
@@ -7421,6 +7443,20 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  '@modelcontextprotocol/client@2.3.1':
+    dependencies:
+      '@modelcontextprotocol/core': 2.3.1
+      cross-spawn: 7.0.6
+      eventsource: 3.0.7
+      eventsource-parser: 3.1.1
+      jose: 6.2.12
+      pkce-challenge: 5.0.1
+      zod: 4.6.5
+
+  '@modelcontextprotocol/core@2.3.1':
+    dependencies:
+      zod: 4.6.5
+
   '@modelcontextprotocol/sdk@1.32.0(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 2.1.3(hono@4.13.13)
@@ -7465,6 +7501,11 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
     optional: true
+
+  '@modelcontextprotocol/server@2.3.1':
+    dependencies:
+      '@modelcontextprotocol/core': 2.3.1
+      zod: 4.6.5
 
   '@next/env@16.4.0': {}
 
@@ -8342,43 +8383,12 @@ snapshots:
       - ws
       - zod
 
-  '@tanstack/ai-bedrock@0.4.5(@aws-sdk/credential-provider-node@3.972.84)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@aws-crypto/sha256-js': 5.2.0
-      '@aws-sdk/client-bedrock-runtime': 3.1146.0
-      '@aws-sdk/credential-providers': 3.1146.0
-      '@smithy/signature-v4': 5.7.4
-      '@smithy/types': 4.19.0
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - undici
-      - ws
-      - zod
-
   '@tanstack/ai-byteplus@0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
       '@tanstack/ai-utils': 0.4.1
       '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
-  '@tanstack/ai-byteplus@0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -8403,21 +8413,6 @@ snapshots:
       '@tanstack/ai-utils': 0.4.1
       '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
-  '@tanstack/ai-cloudflare@0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@cloudflare/workers-types': 4.20260702.1
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -8462,42 +8457,12 @@ snapshots:
       - ws
       - zod
 
-  '@tanstack/ai-grok@0.21.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-    optionalDependencies:
-      google-auth-library: 10.9.1
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
   '@tanstack/ai-groq@0.8.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
       '@tanstack/ai-utils': 0.4.1
       '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
-  '@tanstack/ai-groq@0.8.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -8520,20 +8485,6 @@ snapshots:
       - ws
       - zod
 
-  '@tanstack/ai-llmgateway@0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
   '@tanstack/ai-lovable@0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
@@ -8548,18 +8499,14 @@ snapshots:
       - ws
       - zod
 
-  '@tanstack/ai-lovable@0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
+  '@tanstack/ai-mcp@0.8.1(zod@4.6.5)':
     dependencies:
+      '@modelcontextprotocol/client': 2.3.1
+      '@modelcontextprotocol/server': 2.3.1
       '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+      jose: 6.2.12
     transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
+      - '@opentelemetry/api'
       - zod
 
   '@tanstack/ai-mistral@0.6.15(patch_hash=cf4156ba04dfd503d39ce5bfa1f31f6635f307c14ba91617590c54701d6e85e5)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)':
@@ -8585,20 +8532,6 @@ snapshots:
       '@tanstack/ai-utils': 0.4.1
       '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
-  '@tanstack/ai-openai@0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -8643,20 +8576,6 @@ snapshots:
       - ws
       - zod
 
-  '@tanstack/ai-vercel-gateway@0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
   '@tanstack/ai@0.66.0(zod@4.6.5)':
     dependencies:
       '@ag-ui/core': 1.0.0(zod@4.6.5)
@@ -8691,19 +8610,6 @@ snapshots:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
       '@tanstack/ai-utils': 0.4.1
       openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
-    transitivePeerDependencies:
-      - '@aws-sdk/credential-provider-node'
-      - '@smithy/hash-node'
-      - '@smithy/signature-v4'
-      - undici
-      - ws
-      - zod
-
-  '@tanstack/openai-base@0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
-    dependencies:
-      '@tanstack/ai': 0.66.0(zod@4.6.5)
-      '@tanstack/ai-utils': 0.4.1
-      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -11111,14 +11017,6 @@ snapshots:
       '@aws-sdk/credential-provider-node': 3.972.84
       '@smithy/signature-v4': 5.7.4
       undici: 7.30.0
-      ws: 8.22.0
-      zod: 4.6.5
-
-  openai@7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5):
-    optionalDependencies:
-      '@aws-sdk/credential-provider-node': 3.972.84
-      '@smithy/signature-v4': 5.7.4
-      undici: 8.11.2
       ws: 8.22.0
       zod: 4.6.5
 

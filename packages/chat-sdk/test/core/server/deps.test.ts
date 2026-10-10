@@ -21,6 +21,7 @@ function buildDeps() {
     byok: true,
     getQuota: async () => null,
     rateLimits: resolveRateLimits(),
+    mcpServers: [],
   });
 }
 

@@ -3,6 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { stopUserRuns } from "./chat/run";
 import { attachment, attachmentBlob } from "./db/schema/attachment";
 import { conversation, project } from "./db/schema/chat";
+import { mcpConnection } from "./db/schema/connection";
 import { userCredentials } from "./db/schema/credentials";
 import { userSettings } from "./db/schema/settings";
 import { usage } from "./db/schema/usage";
@@ -39,6 +40,7 @@ export async function deleteUserData(deps: AppDeps, userId: string): Promise<voi
 
     // 4. Credentials and settings.
     await tx.delete(userCredentials).where(eq(userCredentials.userId, userId));
+    await tx.delete(mcpConnection).where(eq(mcpConnection.userId, userId));
     await tx.delete(userSettings).where(eq(userSettings.userId, userId));
     // 5. Usage rows, which no Conversation cascades to: a deleted account keeps no Quota history.
     await tx.delete(usage).where(eq(usage.userId, userId));

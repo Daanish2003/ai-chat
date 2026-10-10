@@ -12,6 +12,7 @@ import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search"
 import type { ResolvedRateLimits } from "./rate-limits";
 import type { ChatRuntime } from "./runtime";
 import type { ProviderId } from "../shared/credentials/services";
+import type { McpServerConfig } from "./mcp/servers";
 
 export type { SearchErrorReason, SearchResult };
 
@@ -141,6 +142,8 @@ export type AppDeps = {
   ollamaFetch: typeof fetch;
   /** The keyring (ADR 0010): the first secret encrypts Provider and Tool credentials, every entry decrypts. */
   keyEncryptionSecrets: string[];
+  /** The remote MCP servers the Host offers (`createChat({ mcpServers })`, spec #91). */
+  mcpServers: McpServerConfig[];
 };
 
 export const defaultLimits: Limits = {
@@ -164,6 +167,7 @@ export function createAppDeps({
   rateLimits,
   tools,
   fetchAllowHosts,
+  mcpServers,
 }: {
   db: Database;
   keyEncryptionSecrets: string[];
@@ -175,6 +179,7 @@ export function createAppDeps({
   rateLimits: ResolvedRateLimits;
   tools: HostServerTool[];
   fetchAllowHosts?: string[];
+  mcpServers: McpServerConfig[];
 }): AppDeps {
   return {
     db,
@@ -194,5 +199,6 @@ export function createAppDeps({
     fetch: createGuardedFetch({ schemes: "http-and-https", allowHosts: fetchAllowHosts }),
     ollamaFetch: globalThis.fetch,
     keyEncryptionSecrets,
+    mcpServers,
   };
 }
