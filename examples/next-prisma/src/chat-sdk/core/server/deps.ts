@@ -129,7 +129,14 @@ export type AppDeps = {
    * live Runs by Message id, so `stop()` can drain them; Stop itself goes through `pubsub`.
    */
   lifecycle: { stopping: boolean; runs: Map<string, AbortController> };
+  /** The SSRF-guarded `fetch` for every outside call except the user's Ollama host. */
   fetch: typeof fetch;
+  /**
+   * `fetch` for the user's own Ollama host (its credential check and live Model list). Not
+   * guarded: Ollama runs on the user's machine or LAN on purpose, and the Ollama chat adapter
+   * already calls that host unguarded, so the guard would add nothing here.
+   */
+  ollamaFetch: typeof fetch;
   /** The keyring (ADR 0010): the first secret encrypts Provider and Tool credentials, every entry decrypts. */
   keyEncryptionSecrets: string[];
 };
@@ -180,6 +187,7 @@ export function createAppDeps({
     limits: defaultLimits,
     lifecycle: { stopping: false, runs: new Map() },
     fetch: createGuardedFetch({ schemes: "http-and-https" }),
+    ollamaFetch: globalThis.fetch,
     keyEncryptionSecrets,
   };
 }

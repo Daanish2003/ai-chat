@@ -17,7 +17,7 @@ import {
 
 type Deps = Pick<
   AppDeps,
-  "db" | "keyEncryptionSecrets" | "fetch" | "hostProviders" | "hostTools" | "byok"
+  "db" | "keyEncryptionSecrets" | "fetch" | "ollamaFetch" | "hostProviders" | "hostTools" | "byok"
 >;
 
 /**
@@ -95,5 +95,5 @@ async function liveModels(deps: Deps, userId: string, provider: string) {
   if (provider === "openrouter") return openRouterModels(deps.fetch);
   if (provider !== "ollama") return [];
   const host = (await resolveCredentials(deps, userId, "ollama"))?.host;
-  return host ? ollamaModels(deps.fetch, host) : [];
+  return host ? ollamaModels(deps.ollamaFetch, host) : [];
 }
