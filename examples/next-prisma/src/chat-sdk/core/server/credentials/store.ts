@@ -1,10 +1,16 @@
 import { userCredentials } from "../db/schema/credentials";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, gt, or } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
 import type { CredentialSummary } from "../../shared/credentials/services";
 import { tavilyService } from "../../shared/credentials/services";
-import { decryptCredentials, encryptCredentials, type CredentialKind } from "./encryption";
+import {
+  decryptCredentials,
+  encryptCredentials,
+  encryptionKid,
+  kidOf,
+  type CredentialKind,
+} from "./encryption";
 
 type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets">;
 
@@ -65,6 +71,71 @@ export async function countUnreadableCredentials(deps: Deps) {
     else counts.corrupt += 1;
   }
   return counts;
+}
+
+export type RotationResult = {
+  reencrypted: number;
+  unreadable: { unknownKey: number; corrupt: number };
+};
+
+/**
+ * Re-encrypts every stored credential whose key isn't the keyring's first (ADR 0010), in batches
+ * ordered by row key. A row no key can read stays in place and is counted. A row a concurrent save
+ * changed is left for the next run, so a re-run finishes whatever an earlier one missed.
+ */
+export async function rotateCredentialKeys(
+  deps: Deps,
+  { batchSize = 100 }: { batchSize?: number } = {},
+): Promise<RotationResult> {
+  const result: RotationResult = { reencrypted: 0, unreadable: { unknownKey: 0, corrupt: 0 } };
+  let after: { userId: string; service: string } | undefined;
+  for (;;) {
+    const rows = await deps.db
+      .select({
+        userId: userCredentials.userId,
+        service: userCredentials.service,
+        encrypted: userCredentials.encrypted,
+      })
+      .from(userCredentials)
+      .where(
+        after &&
+          or(
+            gt(userCredentials.userId, after.userId),
+            and(
+              eq(userCredentials.userId, after.userId),
+              gt(userCredentials.service, after.service),
+            ),
+          ),
+      )
+      .orderBy(asc(userCredentials.userId), asc(userCredentials.service))
+      .limit(batchSize);
+    for (const row of rows) {
+      const options = encryptionOptions(deps, row.userId, row.service);
+      const decrypted = decryptCredentials(row.encrypted, options);
+      if (!decrypted.ok) {
+        if (decrypted.reason === "unknown-key") result.unreadable.unknownKey += 1;
+        else result.unreadable.corrupt += 1;
+        continue;
+      }
+      if (kidOf(row.encrypted) === encryptionKid(options.secrets, options.kind)) continue;
+      const encrypted = encryptCredentials(decrypted.credentials, options);
+      const updated = await deps.db
+        .update(userCredentials)
+        .set({ encrypted })
+        .where(
+          and(
+            eq(userCredentials.userId, row.userId),
+            eq(userCredentials.service, row.service),
+            eq(userCredentials.encrypted, row.encrypted),
+          ),
+        )
+        .returning({ service: userCredentials.service });
+      result.reencrypted += updated.length;
+    }
+    const last = rows.at(-1);
+    if (!last || rows.length < batchSize) return result;
+    after = { userId: last.userId, service: last.service };
+  }
 }
 
 /** Inserts or replaces the user's credentials for `service`. */

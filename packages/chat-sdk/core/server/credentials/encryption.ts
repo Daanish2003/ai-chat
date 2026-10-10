@@ -59,6 +59,19 @@ export function encryptCredentials(
     .join(".");
 }
 
+/** The `kid` of the key `kind` encrypts under now: the first secret's. */
+export function encryptionKid(secrets: readonly string[], kind: CredentialKind): string {
+  const [first] = secrets;
+  if (first === undefined) throw new Error("The keyring holds no secret");
+  return deriveKey(first, kind).kid;
+}
+
+/** The `kid` a `v2` ciphertext names, or `undefined` for anything else. */
+export function kidOf(encrypted: string): string | undefined {
+  const [version, kid] = encrypted.split(".");
+  return version === VERSION ? kid : undefined;
+}
+
 /** Decrypts `encryptCredentials` output with the keyring, trying only the key the `kid` names. */
 export function decryptCredentials(
   encrypted: string,
