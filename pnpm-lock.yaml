@@ -463,6 +463,9 @@ importers:
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5)
+      html-to-text:
+        specifier: 10.0.1
+        version: 10.0.1
       ipaddr.js:
         specifier: 2.5.0
         version: 2.5.0
@@ -599,16 +602,16 @@ importers:
         version: 0.20.0(@tanstack/ai@0.66.0(zod@4.6.5))(zod@4.6.5)
       '@tanstack/ai-bedrock':
         specifier: 0.4.5
-        version: 0.4.5(@aws-sdk/credential-provider-node@3.972.84)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.4.5(@aws-sdk/credential-provider-node@3.972.84)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-byteplus':
         specifier: 0.6.2
-        version: 0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-client':
         specifier: 0.39.0
         version: 0.39.0(zod@4.6.5)
       '@tanstack/ai-cloudflare':
         specifier: 0.2.5
-        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-compaction':
         specifier: 0.1.14
         version: 0.1.14(@tanstack/ai@0.66.0(zod@4.6.5))
@@ -617,16 +620,16 @@ importers:
         version: 0.37.0(@modelcontextprotocol/sdk@1.32.0(zod@4.6.5))(@tanstack/ai@0.66.0(zod@4.6.5))
       '@tanstack/ai-grok':
         specifier: 0.21.2
-        version: 0.21.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.21.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-groq':
         specifier: 0.8.5
-        version: 0.8.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.8.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-llmgateway':
         specifier: 0.2.5
-        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-lovable':
         specifier: 0.5.2
-        version: 0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-mistral':
         specifier: 0.6.15
         version: 0.6.15(patch_hash=cf4156ba04dfd503d39ce5bfa1f31f6635f307c14ba91617590c54701d6e85e5)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)
@@ -635,7 +638,7 @@ importers:
         version: 0.11.14(patch_hash=55a42053fc0982b52dd25c2197076e02facc760cab32fc83be1179d3eab2b3a2)(@tanstack/ai@0.66.0(zod@4.6.5))
       '@tanstack/ai-openai':
         specifier: 0.28.0
-        version: 0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/ai-openrouter':
         specifier: 0.21.2
         version: 0.21.2(@tanstack/ai@0.66.0(zod@4.6.5))
@@ -644,13 +647,16 @@ importers:
         version: 0.30.1(@tanstack/ai@0.66.0(zod@4.6.5))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(zod@4.6.5)
       '@tanstack/ai-vercel-gateway':
         specifier: 0.3.7
-        version: 0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+        version: 0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
       '@tanstack/react-query':
         specifier: ^5.102.8
         version: 5.104.1(react@19.3.0)
       drizzle-orm:
         specifier: 'catalog:'
         version: 1.0.0-rc.4(@cloudflare/workers-types@4.20260702.1)(@types/pg@8.23.1)(pg@8.23.1)(zod@4.6.5)
+      html-to-text:
+        specifier: 10.0.1
+        version: 10.0.1
       ipaddr.js:
         specifier: 2.5.0
         version: 2.5.0
@@ -2633,6 +2639,11 @@ packages:
   '@selderee/plugin-htmlparser2@0.11.0':
     resolution: {integrity: sha512-P33hHGdldxGabLFjPPpaTxVolMrzrcegejx+0GxjrIb9Zv48D8yAIA/QTDR2dFl7Uz7urX8aX6+5bCZslr+gWQ==}
 
+  '@selderee/plugin-htmlparser2@0.12.0':
+    resolution: {integrity: sha512-oELmoyA6ML9jDRMV3kgcMQFKxUfBU0yFVn6yTctVaLT5ygXnxH52I3TZEgV9EhXJC68/uFvE5Daj1/25c0Xa/A==}
+    peerDependencies:
+      selderee: ~0.12.0
+
   '@shadcn/react@0.3.1':
     resolution: {integrity: sha512-2gOR0HDMtWeRsCZfNDaU0YDFdgH3zsDQ6lz67Fv/y/qjY9y+R8kJqAn6q56phqv7/zHi0wqURjntrNO9zL7vnQ==}
     peerDependencies:
@@ -3828,6 +3839,10 @@ packages:
     resolution: {integrity: sha512-HOJkrhaYsweh+W+e74Yn7YStZOilkoPb6fycpwNLKzSPtruFs48nYis0zy5yJz1+ktUhHxoRDJ27RQAWLIJVJw==}
     engines: {node: '>=16.0.0'}
 
+  deepmerge-ts@8.0.2:
+    resolution: {integrity: sha512-uqbvqLUMrc6p0MO+WBRtTxY55hmyh94WRwI5a++PZe54X+bfVh59FSN7uWCBCW1CCVjzjnrwzfI8zidE2obMMw==}
+    engines: {node: '>=16.9.0'}
+
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
@@ -4088,6 +4103,10 @@ packages:
 
   entities@4.5.0:
     resolution: {integrity: sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==}
+    engines: {node: '>=0.12'}
+
+  entities@7.0.1:
+    resolution: {integrity: sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==}
     engines: {node: '>=0.12'}
 
   entities@8.1.0:
@@ -4453,6 +4472,10 @@ packages:
     resolution: {integrity: sha512-UikN5yr7xsCDAq87Or5or0PAlD3HJJOKVzM05az588WnpDJ4Ux7a2A53Qi6gofGg2/EtvF/H4hCi/TXfCW4Y6w==}
     engines: {node: ^22.13.0 || >=24.0.0}
 
+  html-to-text@10.0.1:
+    resolution: {integrity: sha512-GiVhRI1BatGARSCmlXWNCjDT0cWrwBWoeduLoV0WSKAgaV/wa+hUWy5LiQLUs4UwiUrE52ZCMfBGiKD87TDPrg==}
+    engines: {node: '>=20.19.0'}
+
   html-to-text@9.0.5:
     resolution: {integrity: sha512-qY60FjREgVZL03vJU6IfMV4GDjGBIoOyvuFdpBDIX9yTlDw0TjxVBQp+P8NvpdIXNJvfWBTNul7fsAQJq2FNpg==}
     engines: {node: '>=14'}
@@ -4462,6 +4485,9 @@ packages:
 
   html-void-elements@3.0.0:
     resolution: {integrity: sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==}
+
+  htmlparser2@10.1.0:
+    resolution: {integrity: sha512-VTZkM9GWRAtEpveh7MSF6SjjrpNVNNVJfFup7xTY3UpFtm67foy9HDVXneLtFVt4pMz5kZtgNcvCniNFb1hlEQ==}
 
   htmlparser2@8.0.2:
     resolution: {integrity: sha512-GYdjWKDkbRLkZ5geuHs5NY1puJ+PXwP7+fHPRz06Eirsb9ugf6d8kkXav6ADhcODhFFPMIXyxkxSuMf3D6NCFA==}
@@ -4705,6 +4731,9 @@ packages:
 
   leac@0.6.0:
     resolution: {integrity: sha512-y+SqErxb8h7nE/fiEX07jsbuhrpO9lL8eca7/Y1nuWV2moNlXhyd59iDGcRf6moVyDMbmTNzL40SUyrFU/yDpg==}
+
+  leac@0.7.0:
+    resolution: {integrity: sha512-qMrZeyEekgdRQ9o6a4NAB2EQZrv827GJdn1vnapwSJ90hWRB4TzUSunvacPkxQ2TnNqHNI1/zSt0hlo0crG8Jw==}
 
   lefthook-darwin-arm64@2.1.17:
     resolution: {integrity: sha512-BHF3rD0qmwBulLLe5EdPYQVGvPibZZqHnSPpWT+LgPyYk2+GxtScLJvSD/NgCOFU49Fzs6XgOHg/zlfXcdKFfQ==}
@@ -5404,6 +5433,9 @@ packages:
   parseley@0.12.1:
     resolution: {integrity: sha512-e6qHKe3a9HWr0oMRVDTRhKce+bRO8VGQR3NyVwcjwrbhMmFCX9KszEV35+rn4AdilFAq9VPxP/Fe1wC9Qjd2lw==}
 
+  parseley@0.13.1:
+    resolution: {integrity: sha512-uNBJZzmb60l6p6VWLTmevizNAGnE0xoSf1n0B4q3ntegDNzcS68NRCcBDZTcyXHxt2XhBChsCuqj4M+nChvE/A==}
+
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
@@ -5431,6 +5463,9 @@ packages:
 
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
+
+  peberminta@0.10.0:
+    resolution: {integrity: sha512-80B2AsU+I4Qdb0ZAPSfe9UwvGzwkM37IKIFEvdS3D/3Ndgv2bsuJ0bfG1+iEYO+l7Gfd4EUJmuRyq7efLgRMzQ==}
 
   peberminta@0.9.0:
     resolution: {integrity: sha512-XIxfHpEuSJbITd1H3EeQwpcZbTLHc+VVr8ANI9t5sit565tsI4/xK3KWTUFE2e6QiangUkh3B0jihzmGnNrRsQ==}
@@ -5759,6 +5794,9 @@ packages:
 
   selderee@0.11.0:
     resolution: {integrity: sha512-5TF+l7p4+OsnP8BCCvSyZiSPc4x4//p5uPwK8TCnVPJYRmU2aYKMpOXvw8zM5a5JvuuCGN1jmsMwuU2W02ukfA==}
+
+  selderee@0.12.0:
+    resolution: {integrity: sha512-b1YMh3+DHZp59DLna3qVwQ5iOla/nrI6mLBNW02XxU77M3046Df6VLkoaJyFz20VsGIG5kkp+FK0kg4K4HnUFw==}
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
@@ -7964,6 +8002,12 @@ snapshots:
       domhandler: 5.0.3
       selderee: 0.11.0
 
+  '@selderee/plugin-htmlparser2@0.12.0(selderee@0.12.0)':
+    dependencies:
+      domelementtype: 2.3.0
+      domhandler: 5.0.3
+      selderee: 0.12.0
+
   '@shadcn/react@0.3.1(@types/react@19.3.0)(react@19.3.0)':
     optionalDependencies:
       '@types/react': 19.3.0
@@ -8281,6 +8325,23 @@ snapshots:
     transitivePeerDependencies:
       - zod
 
+  '@tanstack/ai-bedrock@0.4.5(@aws-sdk/credential-provider-node@3.972.84)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@aws-crypto/sha256-js': 5.2.0
+      '@aws-sdk/client-bedrock-runtime': 3.1146.0
+      '@aws-sdk/credential-providers': 3.1146.0
+      '@smithy/signature-v4': 5.7.4
+      '@smithy/types': 4.19.0
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - undici
+      - ws
+      - zod
+
   '@tanstack/ai-bedrock@0.4.5(@aws-sdk/credential-provider-node@3.972.84)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@aws-crypto/sha256-js': 5.2.0
@@ -8294,6 +8355,20 @@ snapshots:
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
+      - undici
+      - ws
+      - zod
+
+  '@tanstack/ai-byteplus@0.6.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
       - undici
       - ws
       - zod
@@ -8319,6 +8394,21 @@ snapshots:
       '@tanstack/ai-utils': 0.4.1
     transitivePeerDependencies:
       - '@opentelemetry/api'
+      - zod
+
+  '@tanstack/ai-cloudflare@0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@cloudflare/workers-types': 4.20260702.1
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
       - zod
 
   '@tanstack/ai-cloudflare@0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
@@ -8356,6 +8446,22 @@ snapshots:
       - supports-color
       - utf-8-validate
 
+  '@tanstack/ai-grok@0.21.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    optionalDependencies:
+      google-auth-library: 10.9.1
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
+
   '@tanstack/ai-grok@0.21.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(google-auth-library@10.9.1)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
@@ -8364,6 +8470,20 @@ snapshots:
       openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
     optionalDependencies:
       google-auth-library: 10.9.1
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
+
+  '@tanstack/ai-groq@0.8.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -8386,12 +8506,40 @@ snapshots:
       - ws
       - zod
 
+  '@tanstack/ai-llmgateway@0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
+
   '@tanstack/ai-llmgateway@0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
       '@tanstack/ai-utils': 0.4.1
       '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
       openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
+
+  '@tanstack/ai-lovable@0.5.2(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
     transitivePeerDependencies:
       - '@aws-sdk/credential-provider-node'
       - '@smithy/hash-node'
@@ -8431,6 +8579,20 @@ snapshots:
       '@tanstack/ai-utils': 0.4.1
       ollama: 0.6.4
 
+  '@tanstack/ai-openai@0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
+
   '@tanstack/ai-openai@0.28.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
       '@tanstack/ai': 0.66.0(zod@4.6.5)
@@ -8466,6 +8628,20 @@ snapshots:
       - zod
 
   '@tanstack/ai-utils@0.4.1': {}
+
+  '@tanstack/ai-vercel-gateway@0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      '@tanstack/openai-base': 0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
 
   '@tanstack/ai-vercel-gateway@0.3.7(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
@@ -8509,6 +8685,19 @@ snapshots:
   '@tanstack/match-sorter-utils@9.2.6':
     dependencies:
       remove-accents: 0.5.0
+
+  '@tanstack/openai-base@0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
+      '@tanstack/ai-utils': 0.4.1
+      openai: 7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5)
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
+      - zod
 
   '@tanstack/openai-base@0.12.6(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)':
     dependencies:
@@ -9417,6 +9606,8 @@ snapshots:
 
   deepmerge-ts@7.1.5: {}
 
+  deepmerge-ts@8.0.2: {}
+
   deepmerge@4.3.1: {}
 
   default-browser-id@5.0.1: {}
@@ -9525,6 +9716,8 @@ snapshots:
       strip-ansi: 6.0.1
 
   entities@4.5.0: {}
+
+  entities@7.0.1: {}
 
   entities@8.1.0: {}
 
@@ -9949,6 +10142,14 @@ snapshots:
     transitivePeerDependencies:
       - '@noble/hashes'
 
+  html-to-text@10.0.1:
+    dependencies:
+      '@selderee/plugin-htmlparser2': 0.12.0(selderee@0.12.0)
+      deepmerge-ts: 8.0.2
+      dom-serializer: 2.0.0
+      htmlparser2: 10.1.0
+      selderee: 0.12.0
+
   html-to-text@9.0.5:
     dependencies:
       '@selderee/plugin-htmlparser2': 0.11.0
@@ -9960,6 +10161,13 @@ snapshots:
   html-url-attributes@3.0.1: {}
 
   html-void-elements@3.0.0: {}
+
+  htmlparser2@10.1.0:
+    dependencies:
+      domelementtype: 2.3.0
+      domhandler: 5.0.3
+      domutils: 3.2.2
+      entities: 7.0.1
 
   htmlparser2@8.0.2:
     dependencies:
@@ -10161,6 +10369,8 @@ snapshots:
   kysely@0.29.6: {}
 
   leac@0.6.0: {}
+
+  leac@0.7.0: {}
 
   lefthook-darwin-arm64@2.1.17:
     optional: true
@@ -10896,6 +11106,14 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
+  openai@7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.5):
+    optionalDependencies:
+      '@aws-sdk/credential-provider-node': 3.972.84
+      '@smithy/signature-v4': 5.7.4
+      undici: 7.30.0
+      ws: 8.22.0
+      zod: 4.6.5
+
   openai@7.30.0(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(undici@8.11.2)(ws@8.22.0)(zod@4.6.5):
     optionalDependencies:
       '@aws-sdk/credential-provider-node': 3.972.84
@@ -11011,6 +11229,11 @@ snapshots:
       leac: 0.6.0
       peberminta: 0.9.0
 
+  parseley@0.13.1:
+    dependencies:
+      leac: 0.7.0
+      peberminta: 0.10.0
+
   parseurl@1.3.3: {}
 
   partial-json@0.1.7: {}
@@ -11026,6 +11249,8 @@ snapshots:
   path-to-regexp@8.4.2: {}
 
   pathe@2.0.3: {}
+
+  peberminta@0.10.0: {}
 
   peberminta@0.9.0: {}
 
@@ -11390,6 +11615,10 @@ snapshots:
   selderee@0.11.0:
     dependencies:
       parseley: 0.12.1
+
+  selderee@0.12.0:
+    dependencies:
+      parseley: 0.13.1
 
   semver@6.3.1: {}
 

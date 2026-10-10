@@ -17,11 +17,12 @@ import {
   useNewConversationEffort,
 } from "../../core/client/react/new-conversation-effort";
 import { useNewConversationModel } from "../../core/client/react/new-conversation-model";
-import { useChatAdapter } from "../../core/client/react/provider";
+import { useChatAdapter, useChatLocation } from "../../core/client/react/provider";
 
 /**
  * A new Conversation: type the first Message; it's created with the picked Model (the location's
- * `newConversationModel`, else `models.list`'s default) when sent.
+ * `newConversationModel`, else `models.list`'s default) when sent, inside the location's Project
+ * when it has one.
  */
 export function NewConversationPage() {
   const { orpc, navigate } = useChatAdapter();
@@ -29,6 +30,7 @@ export function NewConversationPage() {
   const models = useQuery(orpc.models.list.queryOptions());
   const byok = useByok();
   const { model } = useNewConversationModel();
+  const { projectId } = useChatLocation();
   const { effort } = useNewConversationEffort();
   // A pick belongs to this new Conversation: leaving the page without sending drops it.
   useEffect(() => () => setNewConversationEffort(null), []);
@@ -43,7 +45,7 @@ export function NewConversationPage() {
     if (!model) return;
     const attachments = draft.uploaded;
     try {
-      const { id } = await create.mutateAsync({ model, reasoningEffort: effort });
+      const { id } = await create.mutateAsync({ model, reasoningEffort: effort, projectId });
       // The choice is stored on the Conversation now; the next new one starts at the Model's default.
       setNewConversationEffort(null);
       void invalidateConversationList(queryClient, orpc);

@@ -16,6 +16,7 @@ import { cancelRunningCalls, createPartsBuilder, searchTextOf } from "../../shar
 import { titleConversation } from "./title";
 import { createHostTools, type HostServerTool, type HostToolContext } from "./host-tools";
 import { createWebSearchTool } from "./web-search-tool";
+import { createFetchUrlTool } from "./fetch-url-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
 import { addUsage, messageUsage, normalizeUsage, promptCharactersOf, type RunUsage } from "./usage";
 import {
@@ -46,6 +47,7 @@ export async function startRun(
     adapter,
     messages,
     webSearch,
+    fetchUrl = false,
     hostTools = [],
     context,
     systemPrompts,
@@ -61,6 +63,8 @@ export async function startRun(
     messages: ModelMessage[];
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
     webSearch?: Credentials;
+    /** Whether this reply offers the `fetch_url` tool, which needs no credential. */
+    fetchUrl?: boolean;
     /** The Host tools this reply offers (none when its Model has no tools). */
     hostTools?: HostServerTool[];
     /** The user and Conversation the Host tools are called for, passed to them as their context. */
@@ -149,6 +153,16 @@ export async function startRun(
                         console.error(`Recording a search of ${messageId} failed`, caught),
                       )
                   : undefined,
+              }),
+            ]
+          : []),
+        ...(fetchUrl
+          ? [
+              createFetchUrlTool({
+                fetch: deps.fetch,
+                timeoutMs: deps.limits.fetchTimeoutMs,
+                parts,
+                onChange: () => (changed = true),
               }),
             ]
           : []),

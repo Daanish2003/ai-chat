@@ -80,16 +80,16 @@ export async function handleChat(
       );
     }
   }
-  // `web_search` is offered only when asked for, the Model has tools and a Tavily key is usable: the
-  // user's own, else the Host's (ADR 0007).
-  const searchCall =
-    command.webSearch && model.tools ? await resolveToolCall(deps, userId, tavilyService) : null;
+  // The Web tools are offered only when asked for and the Model has tools. `web_search` also needs a
+  // usable Tavily key: the user's own, else the Host's (ADR 0007). `fetch_url` needs none.
+  const web = command.webSearch && model.tools;
+  const searchCall = web ? await resolveToolCall(deps, userId, tavilyService) : null;
   // The Host's tools are offered to a Model that has tools (`createChat({ tools })`).
   const hostTools = model.tools ? deps.tools : [];
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({
-    webSearch: searchCall !== null,
+    web,
     instructions,
   });
 
@@ -141,6 +141,7 @@ export async function handleChat(
     messages: toModelMessages([stored], {
       provider: model.provider,
       webSearch: searchCall !== null,
+      fetchUrl: web,
       hostTools: hostTools.length > 0,
       reads: { images: model.images, pdfs: model.pdfs },
     }),
@@ -230,6 +231,7 @@ export async function handleChat(
     adapter,
     messages,
     webSearch: searchCall?.credentials,
+    fetchUrl: web,
     hostTools,
     context: { userId, conversationId: owned.id },
     systemPrompts,

@@ -215,6 +215,64 @@ describe("forgotten password", () => {
   });
 });
 
+describe("change password", () => {
+  async function signedInCookie(
+    auth: ReturnType<typeof createAuth>,
+    email: string,
+    password: string,
+  ) {
+    await signUp(auth, email, password);
+    await database.update(user).set({ emailVerified: true }).where(eq(user.email, email));
+    const signIn = await post(auth, "/sign-in/email", { email, password });
+    return signIn.headers
+      .getSetCookie()
+      .map((value) => value.split(";")[0])
+      .join("; ");
+  }
+
+  function changePassword(
+    auth: ReturnType<typeof createAuth>,
+    cookie: string,
+    currentPassword: string,
+    newPassword: string,
+  ) {
+    return auth.handler(
+      new Request(`${BASE}/api/auth/change-password`, {
+        method: "POST",
+        headers: { "content-type": "application/json", origin: BASE, cookie },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      }),
+    );
+  }
+
+  it("mails the password-changed notice once the password is changed", async () => {
+    const sender = createMemorySender();
+    const auth = createAuth(env, database, sender, makeLogger());
+    const cookie = await signedInCookie(auth, "changer@example.com", "old-password-1");
+
+    const changed = await changePassword(auth, cookie, "old-password-1", "new-password-1");
+
+    expect(changed.status).toBe(200);
+    await vi.waitFor(() =>
+      expect(sender.messages).toContainEqual(
+        expect.objectContaining({ to: "changer@example.com", template: "password-changed" }),
+      ),
+    );
+  });
+
+  it("refuses a wrong current password and mails no notice", async () => {
+    const sender = createMemorySender();
+    const auth = createAuth(env, database, sender, makeLogger());
+    const cookie = await signedInCookie(auth, "guesser@example.com", "old-password-1");
+
+    const refused = await changePassword(auth, cookie, "not-the-password-1", "new-password-1");
+
+    expect(refused.status).toBe(400);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(sender.messages.map((message) => message.template)).not.toContain("password-changed");
+  });
+});
+
 describe("change email", () => {
   // The database persists between runs, so every run uses its own addresses.
   const run = randomUUID().slice(0, 8);

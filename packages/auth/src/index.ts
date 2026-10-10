@@ -3,6 +3,7 @@ import * as schema from "@ai-chat/db/schema/auth";
 import { type EmailMessage, type EmailSender, renderTemplate } from "@ai-chat/email";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter/relations-v2";
 import { betterAuth } from "better-auth";
+import { createAuthMiddleware, isAPIError } from "better-auth/api";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 
 export type AuthConfig = {
@@ -98,6 +99,20 @@ export function createAuth(
           newAddress ? "new email verification" : "verification",
         );
       },
+    },
+    hooks: {
+      // Changing a password while signed in (`/change-password`) doesn't run `onPasswordReset`,
+      // so its notice is sent from here. Only a successful change has a `user` in its response.
+      after: createAuthMiddleware(async (ctx) => {
+        const returned = ctx.context.returned;
+        if (ctx.path !== "/change-password" || isAPIError(returned)) return;
+        const user = (returned as { user?: { email: string } } | undefined)?.user;
+        if (!user) return;
+        sendInBackground(
+          renderTemplate("password-changed", user.email, { appName: env.APP_NAME }),
+          "password changed",
+        );
+      }),
     },
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,

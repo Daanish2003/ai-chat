@@ -18,6 +18,12 @@ export function createTestDeps({
   limits,
   ...overrides
 }: Partial<Omit<AppDeps, "limits">> & { limits?: Partial<Limits> } = {}): AppDeps {
+  // Ollama's host shares the test fake unless a test gives it one (see `AppDeps.ollamaFetch`).
+  const fetch: AppDeps["fetch"] =
+    overrides.fetch ??
+    (async (input) => {
+      throw new Error(`Unexpected network call in a test: ${String(input)}`);
+    });
   return {
     db: getTestDb(),
     adapterFor: (model) => {
@@ -36,10 +42,8 @@ export function createTestDeps({
       leaseMs: 30_000,
       reapIntervalMs: 30_000,
       drainMs: 250_000,
+      fetchTimeoutMs: 10_000,
       ...limits,
-    },
-    fetch: async (input) => {
-      throw new Error(`Unexpected network call in a test: ${String(input)}`);
     },
     keyEncryptionSecrets: [testKeyEncryptionSecret],
     hostProviders: [],
@@ -48,6 +52,8 @@ export function createTestDeps({
     getQuota: async () => null,
     lifecycle: { stopping: false, runs: new Map() },
     ...overrides,
+    fetch,
+    ollamaFetch: overrides.ollamaFetch ?? fetch,
   };
 }
 

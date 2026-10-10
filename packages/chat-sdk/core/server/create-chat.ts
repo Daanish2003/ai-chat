@@ -4,6 +4,7 @@ import { RPCHandler } from "@orpc/server/fetch";
 import { handleChat } from "./chat/handle-chat";
 import type { HostServerTool } from "./chat/host-tools";
 import { webSearchToolName } from "../shared/chat/web-search";
+import { fetchUrlToolName } from "../shared/chat/fetch-url";
 import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
@@ -84,6 +85,7 @@ export function createChatHandler(
   const prefix = basePath.replace(/\/+$/, "");
   const rpcPrefix = `${prefix}/rpc` as `/${string}`;
   const runPath = `${prefix}/run`;
+  const exportPath = `${prefix}/export`;
   const sharedReadPath = `${rpcPrefix}/share/get`;
   const rpc = new RPCHandler(appRouter, {
     interceptors: [onError((error) => logger.error(error))],
@@ -108,6 +110,9 @@ export function createChatHandler(
         return deps.lifecycle.stopping ? shuttingDown() : handleChat(request, user, deps);
       }
       if (request.method === "GET") return handleJoin(request, user, deps);
+    }
+    if (user && pathname === exportPath && request.method === "GET") {
+      return exportResponse(deps, user.id);
     }
     return notFound();
   };
@@ -147,10 +152,10 @@ export function createChat(options: CreateChatOptions): {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
   }
-  if (options.tools?.some((tool) => tool.name === webSearchToolName)) {
-    throw new Error(
-      `A Host tool can't be named "${webSearchToolName}": the SDK's search tool has it`,
-    );
+  for (const builtIn of [webSearchToolName, fetchUrlToolName]) {
+    if (options.tools?.some((tool) => tool.name === builtIn)) {
+      throw new Error(`A Host tool can't be named "${builtIn}": the SDK's tool has it`);
+    }
   }
   let deps: AppDeps | undefined;
   const getDeps = () => {
@@ -232,6 +237,15 @@ async function rpcRateLimitRefusal(
     { message: "Too many requests; try again in a moment" },
     { status: 429, headers: { "Retry-After": String(retryAfter) } },
   );
+}
+
+/** The user's export as a JSON download; the file is named by the date the export was taken. */
+async function exportResponse(deps: AppDeps, userId: string) {
+  const document = await exportUserData(deps, userId);
+  const date = document.exportedAt.toISOString().slice(0, 10);
+  return Response.json(document, {
+    headers: { "Content-Disposition": `attachment; filename="chat-export-${date}.json"` },
+  });
 }
 
 function unauthorized() {

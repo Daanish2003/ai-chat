@@ -1,7 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 import { slowMarker } from "./fake-ollama";
-import { messageRows, send, signInAsSeededUser, signInAsSeededUserWithModel } from "./helpers";
+import {
+  messageRows,
+  send,
+  signInAsSeededUser,
+  signInAsSeededUserWithModel,
+  signInOnForm,
+} from "./helpers";
 
 test("the home page sends a signed-out visitor to log in", async ({ page }) => {
   await page.goto("/");
@@ -14,11 +20,7 @@ test("a seeded user is signed in, and its password signs in on the form", async 
   await expect(page.getByRole("heading", { name: "Keys & settings" })).toBeVisible();
 
   await page.context().clearCookies();
-  await page.goto("/login");
-  await page.getByRole("button", { name: "Already have an account? Sign In" }).click();
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByLabel("Password").fill(user.password);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await signInOnForm(page, user.email, user.password);
   await expect(page).toHaveURL(/\/c$/);
 });
 

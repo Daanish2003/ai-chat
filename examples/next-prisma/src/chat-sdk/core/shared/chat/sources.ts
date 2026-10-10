@@ -1,8 +1,9 @@
 import type { WebSearchPart } from "../message-parts";
 import type { MessagePart } from "@tanstack/ai";
 
+import { fetchedSourceOf, pageSourceOf } from "./fetch-url";
 import { toolCallOf, type ToolCallView } from "./tool-call";
-import { webSearchOf } from "./web-search";
+import { type SearchResult, webSearchOf } from "./web-search";
 
 /**
  * A reply's Sources and how its parts group for display. Computed by the renderer from the
@@ -35,11 +36,11 @@ export function sourceKey(url: string): string {
   }
 }
 
-/** The Sources of the given searches, numbered by first appearance and deduped by URL. */
-export function numberSources(searches: WebSearchPart[]): Source[] {
+/** Sources numbered by first appearance and deduped by URL: search results and fetched pages alike. */
+export function numberSources(found: SearchResult[]): Source[] {
   const seen = new Set<string>();
   const sources: Source[] = [];
-  for (const result of searches.flatMap((search) => search.results)) {
+  for (const result of found) {
     const key = sourceKey(result.url);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -53,9 +54,21 @@ export function numberSources(searches: WebSearchPart[]): Source[] {
   return sources;
 }
 
-/** Every Source of a Message's parts, numbered across all its searches. */
+/** The Source a tool call's page is, among the Message's `sources`, for its chip under the call row; none for other calls. */
+export function pageSourcesOf(call: ToolCallView, sources: Source[]): Source[] {
+  const page = pageSourceOf(call.name, call.result);
+  if (!page) return [];
+  return sources.filter((source) => sourceKey(source.url) === sourceKey(page.url));
+}
+
+/** Every Source of a Message's parts, numbered in stream order across its searches and fetched pages. */
 export function sourcesOf(parts: MessagePart[]): Source[] {
-  return numberSources(parts.map(webSearchOf).filter((search) => search !== null));
+  return numberSources(
+    parts.flatMap((part): SearchResult[] => {
+      const page = fetchedSourceOf(part);
+      return page ? [page] : (webSearchOf(part)?.results ?? []);
+    }),
+  );
 }
 
 /**

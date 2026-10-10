@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 import { baseURL } from "./env";
-import { mailboxFor, verificationLink, waitForMail } from "./helpers";
+import { mailboxFor, signInOnForm, verificationLink, waitForMail } from "./helpers";
 import { seedUser } from "./seed-user";
 
 test("a change of email is confirmed from the current address, then verified at the new one", async ({
@@ -38,14 +38,10 @@ test("a change of email is confirmed from the current address, then verified at 
   // The new address signs in, and the old one no longer does.
   await page.getByRole("menuitem", { name: "Sign Out" }).click();
   await expect(page).toHaveURL(/\/login$/);
-  await page.getByRole("button", { name: "Already have an account? Sign In" }).click();
-  await page.getByLabel("Email").fill(seeded.email);
-  await page.getByLabel("Password").fill(seeded.password);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await signInOnForm(page, seeded.email, seeded.password);
   await expect(page.getByText("Invalid email or password")).toBeVisible();
 
-  await page.getByLabel("Email").fill(newEmail);
-  await page.getByRole("button", { name: "Sign In" }).click();
+  await signInOnForm(page, newEmail, seeded.password);
   await expect(page).toHaveURL(/\/c$/);
 });
 

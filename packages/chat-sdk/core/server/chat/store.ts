@@ -103,13 +103,19 @@ export function decodeConversationCursor(cursor: string): ConversationCursor | u
 }
 
 /**
- * One page of the user's Conversations that are in no Project, for the Conversation panel: newest
- * Message first, ties broken by id, `conversationPageSize` at a time. Each row has a one-line
- * preview of its Active Branch's last Message and whether that Message ended in an error. A reply
- * that hasn't written any text yet previews the Message it answers. `shared` says whether the
- * Conversation has a Shared link. Pass the previous page's `nextCursor` for the next one.
+ * One page of the user's Conversations for the Conversation panel: the ones in no Project, or the
+ * ones in `projectId`. Newest Message first, ties broken by id, `conversationPageSize` at a time.
+ * Each row has a one-line preview of its Active Branch's last Message and whether that Message
+ * ended in an error. A reply that hasn't written any text yet previews the Message it answers.
+ * `shared` says whether the Conversation has a Shared link. Pass the previous page's `nextCursor`
+ * for the next one.
  */
-export async function listConversations(deps: Deps, userId: string, cursor?: ConversationCursor) {
+export async function listConversations(
+  deps: Deps,
+  userId: string,
+  cursor?: ConversationCursor,
+  projectId?: string,
+) {
   const lastMessageAtText = sql<string>`${conversation.lastMessageAt}::text`;
   const rows = await deps.db
     .select({
@@ -133,7 +139,7 @@ export async function listConversations(deps: Deps, userId: string, cursor?: Con
     .where(
       and(
         eq(conversation.userId, userId),
-        isNull(conversation.projectId),
+        projectId ? eq(conversation.projectId, projectId) : isNull(conversation.projectId),
         cursor &&
           sql`(${conversation.lastMessageAt}, ${conversation.id}) < (${cursor.lastMessageAt}::timestamp, ${cursor.id}::uuid)`,
       ),

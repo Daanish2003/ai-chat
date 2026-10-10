@@ -12,7 +12,7 @@ import { Welcome } from "../chat/welcome";
 import { invalidateConversationList } from "../../core/client/react/conversation-list";
 import { useByok } from "../../core/client/react/byok";
 import { useNewConversationModel } from "../../core/client/react/new-conversation-model";
-import { useChatAdapter } from "../../core/client/react/provider";
+import { useChatAdapter, useChatLocation } from "../../core/client/react/provider";
 
 /**
  * A new Conversation: type the first Message; it's created with the picked Model (the location's
@@ -24,6 +24,7 @@ export function NewConversationPage() {
   const models = useQuery(orpc.models.list.queryOptions());
   const byok = useByok();
   const { model } = useNewConversationModel();
+  const { projectId } = useChatLocation();
   const create = useMutation(orpc.conversation.create.mutationOptions());
   const blocked =
     models.data && model ? missingCredentialsMessage(model, models.data.models, byok) : null;
@@ -35,7 +36,7 @@ export function NewConversationPage() {
     if (!model) return;
     const attachments = draft.uploaded;
     try {
-      const { id } = await create.mutateAsync({ model });
+      const { id } = await create.mutateAsync({ model, projectId });
       void invalidateConversationList(queryClient, orpc);
       setPendingFirstMessage(id, { text, attachments });
       await navigate({ to: "conversation", id });

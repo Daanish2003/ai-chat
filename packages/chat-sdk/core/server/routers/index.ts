@@ -6,6 +6,7 @@ import { chatRouter } from "./chat";
 import { conversationRouter } from "./conversation";
 import { credentialsRouter } from "./credentials";
 import { modelsRouter } from "./models";
+import { projectRouter } from "./project";
 import { quotaRouter } from "./quota";
 import { settingsRouter } from "./settings";
 import { searchRouter } from "./search";
@@ -17,6 +18,7 @@ export const appRouter = {
   conversation: conversationRouter,
   credentials: credentialsRouter,
   models: modelsRouter,
+  project: projectRouter,
   quota: quotaRouter,
   settings: settingsRouter,
   search: searchRouter,

@@ -16,6 +16,7 @@ import {
 } from "@tanstack/ai";
 
 import { attachmentKind, kindLabel, kindLabelPlural } from "../attachments/kinds";
+import { fetchUrlToolName } from "./fetch-url";
 import { providerOf } from "./models";
 import {
   searchErrorMessages,
@@ -208,11 +209,14 @@ function placeholderOf(part: WebSearchPart | ToolCallPart) {
 }
 
 /** The tools a request offers: a finished search or tool call of a kind not offered is text. */
-type OfferedTools = { webSearch: boolean; hostTools: boolean };
+type OfferedTools = { webSearch: boolean; fetchUrl: boolean; hostTools: boolean };
 
 /** A finished call a request offers its tool for, as the Model replays it. */
-const offeredCall = (part: WebSearchPart | ToolCallPart, offered: OfferedTools) =>
-  part.type === "web_search" ? offered.webSearch : offered.hostTools;
+const offeredCall = (part: WebSearchPart | ToolCallPart, offered: OfferedTools) => {
+  if (part.type === "web_search") return offered.webSearch;
+  if (part.name === fetchUrlToolName) return offered.fetchUrl;
+  return offered.hostTools;
+};
 
 /**
  * A Message as the Model sees it when some tools are offered: finished searches and tool calls
@@ -296,19 +300,22 @@ function withPlaceholders({ role, parts }: StoredMessage): ModelMessage[] {
  * Provider history for `provider`, oldest first. Messages without any text are left out.
  * Thinking goes back only to the Provider that wrote it (on the Message's first turn); another
  * Provider can't read it. Stored searches and tool calls replay as tool calls when this request
- * offers their tool (`webSearch`, `hostTools`), else as short text placeholders. Stored history is
- * never rewritten.
+ * offers their tool (`webSearch`, `fetchUrl`, `hostTools`), else as short text placeholders. Stored
+ * history is never rewritten.
  */
 export function toModelMessages(
   history: StoredMessage[],
   {
     provider,
     webSearch = false,
+    fetchUrl = false,
     hostTools = false,
     reads = { images: false, pdfs: false },
   }: {
     provider?: string;
     webSearch?: boolean;
+    /** Whether this request offers the `fetch_url` tool. */
+    fetchUrl?: boolean;
     /** Whether this request offers the Host's tools. */
     hostTools?: boolean;
     /** Attachments the Model can't read become text placeholders. */
@@ -317,8 +324,8 @@ export function toModelMessages(
 ): ModelMessage[] {
   return history.flatMap((stored) => {
     const messages =
-      webSearch || hostTools
-        ? withToolCalls(stored, { webSearch, hostTools })
+      webSearch || fetchUrl || hostTools
+        ? withToolCalls(stored, { webSearch, fetchUrl, hostTools })
         : withPlaceholders(stored);
     const [first] = messages;
     if (!first) return [];
