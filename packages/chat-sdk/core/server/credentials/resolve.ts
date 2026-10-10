@@ -1,4 +1,9 @@
-import { findModel, parseModelId, type CuratedModel } from "../../shared/chat/models";
+import {
+  findModel,
+  parseModelId,
+  type CuratedModel,
+  unknownReasoning,
+} from "../../shared/chat/models";
 import type { AppDeps, Credentials, HostModel, HostProvider } from "../deps";
 import { listCredentials, loadCredentials } from "./store";
 
@@ -73,6 +78,10 @@ export function hostModelList(deps: Pick<AppDeps, "hostProviders">): CuratedMode
         images: model.images ?? curated?.images ?? false,
         pdfs: model.pdfs ?? curated?.pdfs ?? false,
         tools: model.tools ?? curated?.tools ?? false,
+        contextWindow: curated?.contextWindow ?? null,
+        // The Host's cap is the output bound of every Run on it (ADR 0007), so it is this Model's.
+        maxOutputTokens: model.maxOutputTokens,
+        reasoning: curated?.reasoning ?? unknownReasoning(),
       };
     }),
   );
