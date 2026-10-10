@@ -8,9 +8,9 @@ export const contextMarginTokens = 2_000;
 export const attachmentTokens = 1_600;
 
 /**
- * The tokens a Run may send to a Model: its window, less the reply's max output and a margin, and
- * never less than half the window. Null when the window is unknown, so nothing is compacted and the
- * Run sends everything.
+ * The tokens a Run may send to a Model: its window, less the reply's max output and a margin. When
+ * the max output leaves no room at all, half the window instead. Null when the window is unknown, so
+ * nothing is compacted and the Run sends everything.
  */
 export function contextBudgetOf({
   contextWindow,
@@ -22,8 +22,8 @@ export function contextBudgetOf({
   if (contextWindow === null) return null;
   const reserved = contextWindow - (maxOutputTokens ?? 0) - contextMarginTokens;
   // A max output as big as the window would leave the input nothing, and every Run would be refused.
-  // The input keeps at least half the window; the Provider caps the output itself.
-  return Math.max(reserved, Math.floor(contextWindow / 2));
+  // Only then does the input keep half the window; otherwise the spec's formula stands unchanged.
+  return reserved > 0 ? reserved : Math.floor(contextWindow / 2);
 }
 
 const isAttachment = (part: unknown) =>

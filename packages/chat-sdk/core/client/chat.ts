@@ -60,7 +60,7 @@ export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
  * The Message a reply's context starts at, when the Model's window dropped older Messages for it
  * (issue #122); null otherwise, and always null on a Shared link.
  */
-export function messageContextStart(message: UIMessage): string | null {
+function messageContextStart(message: UIMessage): string | null {
   const info = message.metadata as { contextStartId?: string | null } | undefined;
   return info?.contextStartId ?? null;
 }

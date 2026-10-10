@@ -35,6 +35,11 @@ describe("contextBudgetOf", () => {
     );
   });
 
+  it("leaves the spec's formula alone when the max output leaves room for input", () => {
+    // 128k window and 64k output: the input keeps the rest, margin included.
+    expect(contextBudgetOf({ contextWindow: 128_000, maxOutputTokens: 64_000 })).toBe(62_000);
+  });
+
   it("keeps at least half the window when the max output would take all of it", () => {
     // Mistral Medium's max output equals its window: the input still gets half, so "hi" is not refused.
     expect(contextBudgetOf({ contextWindow: 262_144, maxOutputTokens: 262_144 })).toBe(131_072);
