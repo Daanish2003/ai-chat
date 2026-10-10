@@ -9,7 +9,10 @@ import {
   SignInError,
 } from "./oauth";
 
-type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets" | "mcpServers" | "fetch">;
+type Deps = Pick<
+  AppDeps,
+  "db" | "keyEncryptionSecrets" | "mcpServers" | "fetch" | "fetchAllowHosts"
+>;
 
 const text = (message: string, status: number) =>
   new Response(message, { status, headers: { "content-type": "text/plain; charset=utf-8" } });
@@ -38,7 +41,7 @@ export async function connectRoute(
   if (!server) return text("Unknown MCP server", 404);
   let endpoints;
   try {
-    endpoints = await discoverEndpoints(server, deps.fetch);
+    endpoints = await discoverEndpoints(server, deps.fetch, deps.fetchAllowHosts);
   } catch (caught) {
     const message =
       caught instanceof SignInError ? caught.message : "Couldn't reach the server to sign in";

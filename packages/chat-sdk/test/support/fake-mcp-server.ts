@@ -25,16 +25,18 @@ export type FakeMcpServer = {
   failCalls: boolean;
 };
 
-const mcpOrigin = new URL(fakeMcpResource).origin;
-const mcpPath = new URL(fakeMcpResource).pathname;
-
 export function createFakeMcpServer({
   auth,
   tools,
+  resource = fakeMcpResource,
 }: {
   auth: FakeMcpAuth;
   tools: FakeMcpTool[];
+  /** The endpoint's URL: the unit tests' default, or a localhost one for the end-to-end tests. */
+  resource?: string;
 }): FakeMcpServer {
+  const mcpOrigin = new URL(resource).origin;
+  const mcpPath = new URL(resource).pathname;
   const server: FakeMcpServer = {
     fetch: async (input, init) => {
       const request = new Request(input, init);

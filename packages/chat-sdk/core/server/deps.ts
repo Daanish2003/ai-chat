@@ -134,6 +134,8 @@ export type AppDeps = {
   lifecycle: { stopping: boolean; runs: Map<string, AbortController> };
   /** The SSRF-guarded `fetch` for every outside call except the user's Ollama host. */
   fetch: typeof fetch;
+  /** The hosts the test allowance lists (`createChat({ fetchAllowHosts })`); empty in production. */
+  fetchAllowHosts: string[];
   /**
    * `fetch` for the user's own Ollama host (its credential check and live Model list). Not
    * guarded: Ollama runs on the user's machine or LAN on purpose, and the Ollama chat adapter
@@ -197,6 +199,7 @@ export function createAppDeps({
     limits: defaultLimits,
     lifecycle: { stopping: false, runs: new Map() },
     fetch: createGuardedFetch({ schemes: "http-and-https", allowHosts: fetchAllowHosts }),
+    fetchAllowHosts: fetchAllowHosts ?? [],
     ollamaFetch: globalThis.fetch,
     keyEncryptionSecrets,
     mcpServers,
