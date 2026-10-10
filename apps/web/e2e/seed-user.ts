@@ -1,0 +1,73 @@
+import { randomBytes, randomUUID } from "node:crypto";
+
+import { createDb } from "@ai-chat/db";
+import { account, session, user } from "@ai-chat/db/schema/auth";
+import type { Page } from "@playwright/test";
+import { hashPassword, makeSignature } from "better-auth/crypto";
+
+import { e2eDatabaseUrl } from "./database.ts";
+import { serverEnv } from "./env.ts";
+
+/** Better Auth's session cookie name, with its defaults (no `__Secure-` prefix over http). */
+const sessionCookieName = "better-auth.session_token";
+const sessionLifetimeMs = 7 * 24 * 60 * 60 * 1000;
+
+export type SeededUser = { id: string; name: string; email: string; password: string };
+
+/**
+ * Writes a verified user with a password, and a session for it, straight into the e2e database,
+ * then sets the session cookie on `page` the way Better Auth signs it. Every call is a new user,
+ * so no test waits on email or on the sign-up rate limit.
+ */
+export async function seedUser(page: Page): Promise<SeededUser> {
+  const seeded: SeededUser = {
+    id: randomUUID(),
+    name: "E2E User",
+    email: `e2e-${randomUUID()}@example.com`,
+    password: "password1234",
+  };
+  const token = randomBytes(24).toString("base64url");
+  const now = new Date();
+  const db = createDb({ DATABASE_URL: e2eDatabaseUrl() });
+  try {
+    await db.insert(user).values({
+      id: seeded.id,
+      name: seeded.name,
+      email: seeded.email,
+      emailVerified: true,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(account).values({
+      id: randomUUID(),
+      accountId: seeded.id,
+      providerId: "credential",
+      userId: seeded.id,
+      password: await hashPassword(seeded.password),
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.insert(session).values({
+      id: randomUUID(),
+      token,
+      userId: seeded.id,
+      expiresAt: new Date(now.getTime() + sessionLifetimeMs),
+      createdAt: now,
+      updatedAt: now,
+    });
+  } finally {
+    await db.$client.end();
+  }
+
+  const signedToken = `${token}.${await makeSignature(token, serverEnv.BETTER_AUTH_SECRET)}`;
+  await page.context().addCookies([
+    {
+      name: sessionCookieName,
+      value: signedToken,
+      url: serverEnv.BETTER_AUTH_URL,
+      httpOnly: true,
+      sameSite: "Lax",
+    },
+  ]);
+  return seeded;
+}

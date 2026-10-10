@@ -10,7 +10,7 @@ import { baseURL, serverEnv } from "./e2e/env";
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
-  // Sign-ups may wait out Better Auth's rate limit.
+  // The form sign-up test may wait out Better Auth's rate limit (until it moves to a seeded user).
   timeout: 90_000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

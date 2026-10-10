@@ -1,6 +1,6 @@
 import { expect, type Page, test } from "@playwright/test";
 
-import { messageRows, send, signUp, signUpWithModel } from "./helpers";
+import { messageRows, send, signInAsSeededUser, signInAsSeededUserWithModel } from "./helpers";
 
 async function expectNoSidewaysScroll(page: Page) {
   const overflow = await page.evaluate(
@@ -10,7 +10,7 @@ async function expectNoSidewaysScroll(page: Page) {
 }
 
 test("the Conversation panel is a drawer, closed until the menu opens it", async ({ page }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await send(page, "A phone Conversation");
   const panel = page.getByRole("complementary", { name: "Conversations" });
   await expect(panel).toBeHidden();
@@ -29,7 +29,7 @@ test("the Conversation panel is a drawer, closed until the menu opens it", async
 test("a Conversation fits the screen, with its title and Message actions showing", async ({
   page,
 }) => {
-  await signUpWithModel(page);
+  await signInAsSeededUserWithModel(page);
   await send(page, "Does this fit on a phone?");
 
   await expect(page.getByRole("banner").getByTitle("Rename")).toBeVisible();
@@ -51,7 +51,7 @@ test("a Conversation fits the screen, with its title and Message actions showing
 test("the login, Keys and new Conversation pages fit the screen", async ({ page }) => {
   await page.goto("/login");
   await expectNoSidewaysScroll(page);
-  await signUp(page);
+  await signInAsSeededUser(page);
   await expectNoSidewaysScroll(page);
   await page.goto("/settings/keys");
   await expect(page.getByRole("heading", { name: "Keys & settings" })).toBeVisible();
