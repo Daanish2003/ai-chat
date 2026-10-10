@@ -24,7 +24,8 @@ const statusLabels: Record<ToolCallStatus, string> = {
 /**
  * One tool call of a reply other than a search (a Host tool, later an MCP tool): a slim line with
  * its name and state, which expands to the arguments and result. A call waiting for Approval shows
- * its full arguments and, when `onDecide` is given, Approve and Deny. A call redacted for a Shared
+ * its full arguments and, when `onDecide` is given, Approve and Deny, plus Allow for this
+ * Conversation (`onDecide(true, true)`, #159). A call redacted for a Shared
  * link shows only that it was used (or that it waits). To give one tool its own look, edit this
  * file in the Host's `ui/`; the SDK copy never overwrites it.
  */
@@ -33,8 +34,11 @@ export function ToolCallRow({
   onDecide,
 }: {
   call: ToolCallView;
-  /** Answers a call waiting for Approval: `true` approves it, `false` denies it (ADR 0008). */
-  onDecide?: (approved: boolean) => void;
+  /**
+   * Answers a call waiting for Approval: `true` approves it, `false` denies it (ADR 0008). An
+   * approval with `allowForConversation` also allows the tool for the rest of the Conversation.
+   */
+  onDecide?: (approved: boolean, allowForConversation?: boolean) => void;
 }) {
   const waiting = call.status === "awaiting_approval";
   const [open, setOpen] = useState(waiting);
@@ -76,9 +80,12 @@ export function ToolCallRow({
         </div>
       )}
       {waiting && onDecide && (
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => onDecide(true)}>
             Approve
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onDecide(true, true)}>
+            Allow for this Conversation
           </Button>
           <Button size="sm" variant="outline" onClick={() => onDecide(false)}>
             Deny
