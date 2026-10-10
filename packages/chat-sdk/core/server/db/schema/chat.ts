@@ -3,6 +3,24 @@ import { type AnyPgColumn, index, jsonb, text, timestamp, uuid } from "drizzle-o
 import type { StoredParts } from "../../../shared/message-parts";
 import { chatSchema } from "./chat-schema";
 
+/** How hard a reasoning Model thinks. Null means the Model's own default. */
+export const reasoningEffort = chatSchema.enum("reasoning_effort", [
+  "off",
+  "low",
+  "medium",
+  "high",
+]);
+
+/** Tokens a Run used, summed over its model iterations (input includes cached tokens). */
+export type MessageUsage = {
+  input: number;
+  output: number;
+  reasoning: number;
+  cached: number;
+  /** True when the Provider reported no usage (a stopped or failed reply) and this is an estimate. */
+  estimated: boolean;
+};
+
 /** A Conversation, owned by one user. Its Messages form a tree (ADR 0001). */
 export const conversation = chatSchema.table(
   "conversation",
@@ -14,6 +32,8 @@ export const conversation = chatSchema.table(
     title: text("title"),
     /** The selected Model, `"provider:model"`; checked in code, not an enum. */
     model: text("model").notNull(),
+    /** The effort the Conversation asks for; null means the Model's default. */
+    reasoningEffort: reasoningEffort("reasoning_effort"),
     /** The newest Message of the Active Branch. */
     activeLeafId: uuid("active_leaf_id").references((): AnyPgColumn => message.id, {
       onDelete: "set null",
@@ -64,6 +84,17 @@ export const message = chatSchema.table(
     status: messageStatus("status").notNull(),
     error: text("error"),
     errorReason: messageErrorReason("error_reason"),
+    /** The effort an assistant Message ran with; null when the Model's default was used. */
+    reasoningEffort: reasoningEffort("reasoning_effort"),
+    /** Tokens the Run used, for display only; null on user Messages and on older Runs. */
+    usage: jsonb("usage").$type<MessageUsage>(),
+    /**
+     * The first Message sent to the Model on this Run, when older Messages were dropped to fit the
+     * window. Null means all of them were sent. Cleared, not cascaded, if that Message is deleted.
+     */
+    contextStartId: uuid("context_start_id").references((): AnyPgColumn => message.id, {
+      onDelete: "set null",
+    }),
     /** Plain text of the text parts, written by the app, for searching history. */
     searchText: text("search_text").default("").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
