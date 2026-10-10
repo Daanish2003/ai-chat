@@ -8,7 +8,14 @@ import { webSearchToolName } from "./web-search";
  * so the browser and the Shared link redaction both read it.
  */
 
-export type ToolCallStatus = "running" | "done" | "error" | "cancelled";
+/** `awaiting_approval` until the user decides; `denied` when they refused the call (ADR 0008). */
+export type ToolCallStatus =
+  | "running"
+  | "done"
+  | "error"
+  | "cancelled"
+  | "awaiting_approval"
+  | "denied";
 
 export type ToolCallView = {
   id: string;

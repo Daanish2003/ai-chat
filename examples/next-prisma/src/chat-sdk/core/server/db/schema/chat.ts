@@ -1,5 +1,13 @@
 import { sql } from "drizzle-orm";
-import { type AnyPgColumn, index, jsonb, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  type AnyPgColumn,
+  index,
+  integer,
+  jsonb,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 import type { MessageUsage } from "../../../shared/chat/message-record";
 import type { StoredParts } from "../../../shared/message-parts";
@@ -91,6 +99,7 @@ export const messageStatus = chatSchema.enum("message_status", [
   "complete",
   "stopped",
   "error",
+  "awaiting_approval",
 ]);
 export const messageErrorReason = chatSchema.enum("message_error_reason", [
   "invalid_key",
@@ -135,6 +144,12 @@ export const message = chatSchema.table(
     cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }),
     /** Last sign of life from the process running a `streaming` Message (ADR 0006). */
     heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+    /** The Run this Message is on: 1 for its first, one more for each decision on a waiting call (ADR 0008). */
+    runNumber: integer("run_number").default(1).notNull(),
+    /** The TanStack AI thread of a Message waiting for Approval; the decision resumes it (ADR 0008). */
+    threadId: text("thread_id"),
+    /** The Run that ended waiting for Approval; the decision resumes it as its parent Run (ADR 0008). */
+    interruptedRunId: text("interrupted_run_id"),
   },
   (table) => [
     index("message_conversation_id_parent_id_idx").on(table.conversationId, table.parentId),

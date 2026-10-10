@@ -76,6 +76,8 @@ type MessageActions = {
   onRegenerate: () => void;
   /** Shows the Branch through this sibling. */
   onSwitchBranch: (messageId: string) => void;
+  /** Answers the call this reply waits on: approve (`true`) or deny (ADR 0008). */
+  onDecide?: (approved: boolean) => void;
 };
 
 /**
@@ -205,7 +207,7 @@ export function MessageRow({
               {thinking && (
                 <Thinking text={thinking} inProgress={info.status === "streaming" && !text} />
               )}
-              <AssistantParts parts={message.parts} />
+              <AssistantParts parts={message.parts} onDecide={actions?.onDecide} />
               {info.status === "streaming" && !thinking && waitingForText(message.parts) && (
                 <Loader variant="typing" size="sm" />
               )}
@@ -359,7 +361,13 @@ function EditBox({
  * A reply's text and web searches, in stream order. Back-to-back searches share one row; links
  * to the reply's Sources render as their numbered citation chips.
  */
-function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
+function AssistantParts({
+  parts,
+  onDecide,
+}: {
+  parts: UIMessage["parts"];
+  onDecide?: (approved: boolean) => void;
+}) {
   const sources = sourcesOf(parts);
   return (
     <ReplySources value={sources}>
@@ -375,7 +383,7 @@ function AssistantParts({ parts }: { parts: UIMessage["parts"] }) {
         ) : segment.type === "searches" ? (
           <SearchRow key={segment.key} searches={segment.searches} sources={sources} />
         ) : (
-          <ToolCallRow key={segment.key} call={segment.call} />
+          <ToolCallRow key={segment.key} call={segment.call} onDecide={onDecide} />
         ),
       )}
     </ReplySources>

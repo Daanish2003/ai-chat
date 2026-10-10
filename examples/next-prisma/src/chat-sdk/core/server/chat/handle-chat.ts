@@ -100,6 +100,11 @@ export async function handleChat(
   if (command.text === undefined && history.at(-1)?.role !== "user") {
     return refuse(400, "Only a reply to your Message can be regenerated");
   }
+  // A reply waiting for Approval can't be continued past its call; an edit or regenerate beside it
+  // starts a new Branch and stays allowed (ADR 0008).
+  if (history.at(-1)?.status === "awaiting_approval") {
+    return refuse(409, "Approve or deny the tool call first");
+  }
   const attachments = await attachmentsForSend(deps, {
     userId,
     model,

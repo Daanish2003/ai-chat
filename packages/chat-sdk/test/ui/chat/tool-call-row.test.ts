@@ -84,4 +84,54 @@ describe("a tool call row", () => {
     expect(html).not.toContain("zone");
     expect(html).not.toContain("noon");
   });
+
+  const waitingPart = part({
+    state: "input-complete",
+    output: undefined,
+    metadata: { source: "host", status: "awaiting_approval" },
+  });
+
+  it("shows a call waiting for Approval with its name, its full arguments and Approve and Deny", () => {
+    const call = toolCallOf(waitingPart);
+    if (!call) throw new Error("Expected a tool call");
+
+    const html = renderToStaticMarkup(createElement(ToolCallRow, { call, onDecide: () => {} }));
+
+    expect(html).toContain("Waiting for approval");
+    expect(html).toContain("server_time");
+    expect(html).toContain("{&quot;zone&quot;:&quot;UTC&quot;}");
+    expect(html).toContain(">Approve<");
+    expect(html).toContain(">Deny<");
+  });
+
+  it("shows a waiting call, distinct from a streaming one, with no controls without a decision handler", () => {
+    const waiting = render(waitingPart);
+    const streaming = render(
+      part({
+        state: "input-complete",
+        output: undefined,
+        metadata: { source: "host", status: "running" },
+      }),
+    );
+
+    expect(waiting).toContain("Waiting for approval");
+    expect(waiting).not.toContain("Running");
+    expect(streaming).not.toContain("Waiting for approval");
+    expect(waiting).not.toContain(">Approve<");
+  });
+
+  it("shows a waiting call on a Shared link as waiting, without its arguments or controls", () => {
+    const html = render(
+      part({
+        arguments: "",
+        input: undefined,
+        output: undefined,
+        metadata: { source: "host", status: "awaiting_approval", redacted: true },
+      }),
+    );
+
+    expect(html).toContain("Waiting for approval to use server_time");
+    expect(html).not.toContain("zone");
+    expect(html).not.toContain(">Approve<");
+  });
 });

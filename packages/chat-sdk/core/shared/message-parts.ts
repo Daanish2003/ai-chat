@@ -41,7 +41,8 @@ export const toolSourceSchema = z.enum(["builtin", "host", "mcp"]);
 /**
  * One tool call of a reply other than `web_search` (ADR 0008): a Host tool or, later, an MCP tool.
  * `args` and `result` are what the tool was called with and returned, as JSON. A failed call has a
- * `result` of `{ error }`; a call cut off before it finished stays without one.
+ * `result` of `{ error }`; a call cut off before it finished stays without one. A call that needs
+ * Approval is `awaiting_approval` until the user decides: `denied` when refused, else it runs.
  */
 export const toolCallPartSchema = z.object({
   type: z.literal("tool_call"),
@@ -50,7 +51,7 @@ export const toolCallPartSchema = z.object({
   source: toolSourceSchema,
   args: z.unknown(),
   result: z.unknown().optional(),
-  state: z.enum(["running", "done", "error", "cancelled"]),
+  state: z.enum(["running", "done", "error", "cancelled", "awaiting_approval", "denied"]),
 });
 
 export const storedPartSchema = z.discriminatedUnion("type", [
