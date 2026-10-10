@@ -238,7 +238,18 @@ const chat = createChat({
 });
 ```
 
-Only Run starts are limited so far. Sign-up, sign-in and password reset stay with your own auth.
+Shared link views are limited per client IP: 60 a minute by default, answering 429 with `Retry-After`. The SDK does not read forwarded headers itself. Your Host gives the IP through the `getClientIp(request)` option, returning the address your own proxy sets (in a header your proxy overwrites, so a client can't send it). Without the option there are no per-IP limits, only the per-user ones:
+
+```ts
+const chat = createChat({
+  // ...
+  getClientIp: (request) => request.headers.get("x-real-ip"), // only if your proxy sets it
+});
+```
+
+The server-side `chat.getSharedConversation(token)` is not limited: it is your own server-rendered page, and it has no request.
+
+The other limits are per user: Run starts, Attachment uploads, credential saves and checks, and Conversation search. Sign-up, sign-in and password reset stay with your own auth.
 
 Browser side: create a headless client and wrap your chat pages in the provider.
 
