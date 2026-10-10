@@ -5,7 +5,7 @@ export type RateLimit = { limit: number; windowSeconds: number };
 
 /**
  * What `createChat` takes: each limited action may be overridden, and `false` turns that limit off.
- * Every limit so far is per user.
+ * Every limit is per user, except `sharedLinkView`, which is per client IP.
  */
 export type RateLimits = {
   /** Run starts, per user. */
@@ -16,6 +16,8 @@ export type RateLimits = {
   credentialSave?: RateLimit | false;
   /** Conversation searches, per user. */
   conversationSearch?: RateLimit | false;
+  /** Shared link views (the handler's read, not `getSharedConversation`), per client IP. */
+  sharedLinkView?: RateLimit | false;
 };
 
 export type ResolvedRateLimits = {
@@ -23,6 +25,7 @@ export type ResolvedRateLimits = {
   attachmentUpload: RateLimit | false;
   credentialSave: RateLimit | false;
   conversationSearch: RateLimit | false;
+  sharedLinkView: RateLimit | false;
 };
 
 export const defaultRateLimits: ResolvedRateLimits = {
@@ -30,6 +33,7 @@ export const defaultRateLimits: ResolvedRateLimits = {
   attachmentUpload: { limit: 30, windowSeconds: 600 },
   credentialSave: { limit: 10, windowSeconds: 60 },
   conversationSearch: { limit: 60, windowSeconds: 60 },
+  sharedLinkView: { limit: 60, windowSeconds: 60 },
 };
 
 /** The defaults, with each override in place. An override of `undefined` keeps the default. */
@@ -39,6 +43,7 @@ export function resolveRateLimits(overrides: RateLimits = {}): ResolvedRateLimit
     attachmentUpload: overrides.attachmentUpload ?? defaultRateLimits.attachmentUpload,
     credentialSave: overrides.credentialSave ?? defaultRateLimits.credentialSave,
     conversationSearch: overrides.conversationSearch ?? defaultRateLimits.conversationSearch,
+    sharedLinkView: overrides.sharedLinkView ?? defaultRateLimits.sharedLinkView,
   };
 }
 

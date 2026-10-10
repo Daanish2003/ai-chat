@@ -47,6 +47,12 @@ export type CreateChatOptions = {
   runtime?: ChatRuntime;
   /** Overrides for the default rate limits (spec 87). Each action is optional; `false` turns it off. */
   rateLimits?: RateLimits;
+  /**
+   * The client's IP, for the per-IP limit on Shared link views. The Host reads it from its own
+   * request (for example, a header its proxy sets). The SDK trusts no forwarded header by default,
+   * so without this option there are no per-IP limits.
+   */
+  getClientIp?: (request: Request) => string | null | Promise<string | null>;
   logger?: Logger;
   /**
    * The Host's own credentials (ADR 0007). A Provider entry carries its Models; a Tool entry (`tool:
@@ -77,8 +83,9 @@ export function createChatHandler(
   {
     basePath,
     getUser,
+    getClientIp,
     logger = console,
-  }: Pick<CreateChatOptions, "basePath" | "getUser" | "logger">,
+  }: Pick<CreateChatOptions, "basePath" | "getUser" | "getClientIp" | "logger">,
 ): ChatHandler {
   if (!basePath.startsWith("/")) throw new Error(`basePath must start with "/": ${basePath}`);
   const prefix = basePath.replace(/\/+$/, "");
@@ -96,6 +103,10 @@ export function createChatHandler(
     if (!user && pathname !== sharedReadPath) return unauthorized();
 
     if (pathname === rpcPrefix || pathname.startsWith(`${rpcPrefix}/`)) {
+      if (pathname === sharedReadPath && getClientIp) {
+        const refused = await sharedLinkRefusal(deps, await getClientIp(request));
+        if (refused) return refused;
+      }
       if (user) {
         const refused = await rpcRateLimitRefusal(deps, user.id, pathname.slice(rpcPrefix.length));
         if (refused) return refused;
@@ -230,6 +241,24 @@ async function rpcRateLimitRefusal(
     deps.counters,
     deps.rateLimits[rule],
     `${rule}:${userId}`,
+  );
+  if (retryAfter === null) return null;
+  return Response.json(
+    { message: "Too many requests; try again in a moment" },
+    { status: 429, headers: { "Retry-After": String(retryAfter) } },
+  );
+}
+
+/**
+ * Counts a Shared link view against its client IP and answers 429 with `Retry-After` once that IP
+ * is over its limit. With no IP (the Host gave none), nothing is counted.
+ */
+async function sharedLinkRefusal(deps: AppDeps, ip: string | null): Promise<Response | null> {
+  if (!ip) return null;
+  const retryAfter = await rateLimitedFor(
+    deps.counters,
+    deps.rateLimits.sharedLinkView,
+    `sharedLinkView:${ip}`,
   );
   if (retryAfter === null) return null;
   return Response.json(

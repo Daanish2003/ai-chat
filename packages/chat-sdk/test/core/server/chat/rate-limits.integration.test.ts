@@ -171,3 +171,77 @@ it("surfaces the limit to the typed client as a RateLimitedError with the retry 
   expect(caught).toBeInstanceOf(RateLimitedError);
   expect((caught as RateLimitedError).retryAfterSeconds).toBeGreaterThanOrEqual(1);
 });
+
+describe("Shared link view rate limits, per client IP", () => {
+  /** A Shared link read from `ip`, as the client sends it: the empty body is never read, since the limit comes first. */
+  const sharedRead = (ip: string) =>
+    new Request("http://localhost/api/chat/rpc/share/get", {
+      method: "POST",
+      headers: { "x-test-ip": ip },
+      body: "{}",
+    });
+
+  const chatWith = (options: { rateLimits?: RateLimits; withIp?: boolean }) =>
+    createChat({
+      databaseUrl: testDatabaseUrl,
+      getUser: () => null,
+      keyEncryptionSecrets: ["test-key-encryption-secret-not-for-production"],
+      basePath: "/api/chat",
+      runtime: memoryRuntime(),
+      rateLimits: options.rateLimits,
+      getClientIp:
+        options.withIp === false ? undefined : (request) => request.headers.get("x-test-ip"),
+    });
+
+  it("answers 429 with Retry-After for the IP over its limit, and another IP is unaffected", async () => {
+    const chat = chatWith({ rateLimits: { sharedLinkView: { limit: 1, windowSeconds: 60 } } });
+
+    const first = await chat.handler(sharedRead("203.0.113.1"));
+    const limited = await chat.handler(sharedRead("203.0.113.1"));
+    const other = await chat.handler(sharedRead("203.0.113.2"));
+
+    expect(first.status).not.toBe(429);
+    expect(limited.status).toBe(429);
+    const retryAfter = Number(limited.headers.get("Retry-After"));
+    expect(retryAfter).toBeGreaterThanOrEqual(1);
+    expect(retryAfter).toBeLessThanOrEqual(60);
+    expect(other.status).not.toBe(429);
+  });
+
+  it("is not limited without getClientIp, since there is no IP to count", async () => {
+    const chat = chatWith({
+      rateLimits: { sharedLinkView: { limit: 0, windowSeconds: 60 } },
+      withIp: false,
+    });
+
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 3; attempt++) {
+      statuses.push((await chat.handler(sharedRead("203.0.113.1"))).status);
+    }
+
+    expect(statuses.every((status) => status !== 429)).toBe(true);
+  });
+
+  it("never refuses when its limit is turned off with false", async () => {
+    const chat = chatWith({ rateLimits: { sharedLinkView: false } });
+
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 5; attempt++) {
+      statuses.push((await chat.handler(sharedRead("203.0.113.1"))).status);
+    }
+
+    expect(statuses.every((status) => status !== 429)).toBe(true);
+  });
+
+  it("does not limit the server-side getSharedConversation, which is the Host's own page", async () => {
+    const chat = chatWith({ rateLimits: { sharedLinkView: { limit: 0, windowSeconds: 60 } } });
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      expect(await chat.getSharedConversation("no-such-token")).toBeNull();
+    }
+  });
+
+  it("defaults to 60 views a minute per IP", () => {
+    expect(resolveRateLimits().sharedLinkView).toEqual({ limit: 60, windowSeconds: 60 });
+  });
+});
