@@ -25,6 +25,7 @@
     "@tanstack/ai-byteplus": "0.6.2",
     "@tanstack/ai-client": "0.39.0",
     "@tanstack/ai-cloudflare": "0.2.5",
+    "@tanstack/ai-compaction": "0.1.14",
     "@tanstack/ai-gemini": "0.37.0",
     "@tanstack/ai-grok": "0.21.2",
     "@tanstack/ai-groq": "0.8.5",
