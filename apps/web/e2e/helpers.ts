@@ -1,7 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { baseURL, fakeOllamaHost } from "./env";
-import { type SeededUser, seedUser } from "./seed-user";
+import { chatPage } from "../../../packages/chat-sdk/test/e2e/chat-page";
+
+import { baseURL } from "./env";
+import { appWebHost } from "./host";
+import { type SeededUser } from "./seed-user";
 
 /** Retries after a 429 from Better Auth's per-IP limit on sign-in and password change. */
 const MAX_RATE_LIMIT_RETRIES = 3;
@@ -38,13 +41,20 @@ export async function signInOnForm(page: Page, email: string, password: string) 
   );
 }
 
+const chat = chatPage(expect, appWebHost);
+
+export const { messageRows, send, addFakeOllama } = chat;
+
 /** Signs in as a new seeded, verified user (so tests don't share data) on the new Conversation page. */
 export async function signInAsSeededUser(page: Page): Promise<SeededUser> {
-  const seeded = await seedUser(page);
+  const seeded = await appWebHost.signIn(page);
   await page.goto("/c");
   await expect(page).toHaveURL(/\/c$/);
   return seeded;
 }
+
+/** A seeded user with the fake Ollama, on the new Conversation page. */
+export const signInAsSeededUserWithModel = chat.signInWithModel;
 
 export type CapturedMail = { template: string; subject: string; text: string };
 
@@ -69,37 +79,4 @@ export function verificationLink(mail: CapturedMail): string {
   const match = /https?:\/\/\S*verify-email\?token=\S+/.exec(mail.text);
   if (!match) throw new Error(`no verification link in "${mail.subject}"`);
   return match[0];
-}
-
-/** Saves Ollama credentials pointing at the fake Ollama host, so its Model can be picked. */
-export async function addFakeOllama(page: Page) {
-  await page.goto("/settings/keys");
-  const row = page.getByRole("listitem").filter({ hasText: "Ollama" });
-  await row.getByRole("button", { name: "Add" }).click();
-  await page.getByLabel("Host").fill(fakeOllamaHost);
-  await page.getByRole("button", { name: "Check & save" }).click();
-  await expect(row.getByText("Verified")).toBeVisible();
-}
-
-/** A seeded user with the fake Ollama, on the new Conversation page. */
-export async function signInAsSeededUserWithModel(page: Page) {
-  await signInAsSeededUser(page);
-  await addFakeOllama(page);
-  await page.goto("/c");
-  await expect(page.getByRole("button", { name: "Model" })).toContainText("e2e-model");
-}
-
-export function messageRows(page: Page) {
-  return page.locator("[data-message-id]");
-}
-
-/** Sends `text` from the composer and waits for the whole reply. */
-export async function send(page: Page, text: string) {
-  // The composer ignores Enter while a reply streams; its button reads "Send" only once it is done.
-  const sendButton = page.getByRole("button", { name: "Send", exact: true });
-  await expect(sendButton).toBeVisible();
-  await page.getByLabel("Message", { exact: true }).fill(text);
-  await page.keyboard.press("Enter");
-  await expect(messageRows(page).last()).toContainText("That's all.");
-  await expect(sendButton).toBeVisible();
 }

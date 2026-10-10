@@ -1,7 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { fakeOllamaHost } from "./env";
-import { fetchedPagePath, fetchedPageText, fetchMarker } from "./fake-ollama";
+import {
+  fetchedPagePath,
+  fetchedPageText,
+  fetchMarker,
+} from "../../../packages/chat-sdk/test/e2e/fake-ollama";
 import { messageRows, signInAsSeededUserWithModel } from "./helpers";
 
 test("a linked page is read with the Web toggle on, and the reply cites it", async ({ page }) => {

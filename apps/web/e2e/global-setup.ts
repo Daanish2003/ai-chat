@@ -1,5 +1,5 @@
 import { fakeOllamaPort } from "./env";
-import { startFakeOllama } from "./fake-ollama";
+import { startFakeOllama } from "../../../packages/chat-sdk/test/e2e/fake-ollama";
 
 /** Starts the fake Ollama host every test's Ollama credentials point at; stops it after. */
 export default async function globalSetup() {
