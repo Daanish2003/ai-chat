@@ -16,6 +16,16 @@ export type AuthLogger = {
   error(entry: { action: string; message: string; error: unknown }): void;
 };
 
+// The step a Better Auth verification token was minted for. The token is signed by Better Auth
+// a moment before it reaches the callback, so its payload is read without checking the signature.
+function verificationPurpose(token: string): string | undefined {
+  const [, body = ""] = token.split(".");
+  const payload = JSON.parse(Buffer.from(body, "base64url").toString()) as {
+    requestType?: string;
+  };
+  return payload.requestType;
+}
+
 export function createAuth(
   env: AuthConfig,
   database: Database,
@@ -60,14 +70,32 @@ export function createAuth(
         );
       },
     },
+    user: {
+      changeEmail: {
+        enabled: true,
+        // The confirmation goes to the current address; only its link sends the verification
+        // on to the new one.
+        sendChangeEmailConfirmation: async ({ user, url }) => {
+          sendInBackground(
+            renderTemplate("change-email-confirm", user.email, { appName: env.APP_NAME, url }),
+            "change email confirmation",
+          );
+        },
+      },
+    },
     emailVerification: {
       sendOnSignUp: true,
       sendOnSignIn: true,
       autoSignInAfterVerification: true,
-      sendVerificationEmail: async ({ user, url }) => {
+      // The same callback sends the sign-up link and, after the confirmation, the link to the new
+      // address; the token tells them apart.
+      sendVerificationEmail: async ({ user, url, token }) => {
+        const newAddress = verificationPurpose(token) === "change-email-verification";
         sendInBackground(
-          renderTemplate("verify-email", user.email, { appName: env.APP_NAME, url }),
-          "verification",
+          newAddress
+            ? renderTemplate("verify-new-email", user.email, { appName: env.APP_NAME, url })
+            : renderTemplate("verify-email", user.email, { appName: env.APP_NAME, url }),
+          newAddress ? "new email verification" : "verification",
         );
       },
     },
