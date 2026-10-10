@@ -76,8 +76,8 @@ type MessageActions = {
   onRegenerate: () => void;
   /** Shows the Branch through this sibling. */
   onSwitchBranch: (messageId: string) => void;
-  /** Answers the call this reply waits on: approve (`true`) or deny (ADR 0008). */
-  onDecide?: (approved: boolean) => void;
+  /** Answers the call this reply waits on: approve (`true`) or deny (ADR 0008); see #159 for the allowance. */
+  onDecide?: (approved: boolean, allowForConversation?: boolean) => void;
 };
 
 /**
@@ -376,7 +376,7 @@ function AssistantParts({
   onDecide,
 }: {
   parts: UIMessage["parts"];
-  onDecide?: (approved: boolean) => void;
+  onDecide?: (approved: boolean, allowForConversation?: boolean) => void;
 }) {
   const sources = sourcesOf(parts);
   return (

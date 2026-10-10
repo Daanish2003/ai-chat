@@ -1,6 +1,8 @@
 import type { AnyServerTool } from "@tanstack/ai";
 import { createMCPClient } from "@tanstack/ai-mcp";
 
+import type { ConversationTools } from "../../shared/chat/conversation-tools";
+import { allowTools } from "../chat/host-tools";
 import type { AppDeps } from "../deps";
 import { isExpired, readTokens, saveTokens } from "./connections";
 import { discoverEndpoints, refreshAccess } from "./oauth";
@@ -89,14 +91,18 @@ export async function openMcpTools(deps: Deps, userId: string, keys: string[]): 
 /**
  * The MCP tools for the Conversation's switched-on `connections`, opened before a reply's history is
  * built, since the history depends on which tools the reply offers. `undefined` when none is
- * switched on, so no client is opened (spec #91). The caller closes what it opens.
+ * switched on, so no client is opened (spec #91). The caller closes what it opens. A tool the
+ * Conversation allows runs without Approval (#159).
  */
 export async function mcpToolsFor(
   deps: Deps,
   userId: string,
-  connections: string[],
+  settings: ConversationTools,
 ): Promise<McpTools | undefined> {
-  const keys = connections.filter((key) => deps.mcpServers.some((server) => server.key === key));
+  const keys = settings.connections.filter((key) =>
+    deps.mcpServers.some((server) => server.key === key),
+  );
   if (keys.length === 0) return undefined;
-  return openMcpTools(deps, userId, keys);
+  const opened = await openMcpTools(deps, userId, keys);
+  return { ...opened, tools: allowTools(opened.tools, settings.allowedTools) };
 }
