@@ -84,6 +84,7 @@ export function createChatHandler(
   const prefix = basePath.replace(/\/+$/, "");
   const rpcPrefix = `${prefix}/rpc` as `/${string}`;
   const runPath = `${prefix}/run`;
+  const exportPath = `${prefix}/export`;
   const sharedReadPath = `${rpcPrefix}/share/get`;
   const rpc = new RPCHandler(appRouter, {
     interceptors: [onError((error) => logger.error(error))],
@@ -108,6 +109,9 @@ export function createChatHandler(
         return deps.lifecycle.stopping ? shuttingDown() : handleChat(request, user, deps);
       }
       if (request.method === "GET") return handleJoin(request, user, deps);
+    }
+    if (user && pathname === exportPath && request.method === "GET") {
+      return exportResponse(deps, user.id);
     }
     return notFound();
   };
@@ -232,6 +236,15 @@ async function rpcRateLimitRefusal(
     { message: "Too many requests; try again in a moment" },
     { status: 429, headers: { "Retry-After": String(retryAfter) } },
   );
+}
+
+/** The user's export as a JSON download; the file is named by the date the export was taken. */
+async function exportResponse(deps: AppDeps, userId: string) {
+  const document = await exportUserData(deps, userId);
+  const date = document.exportedAt.toISOString().slice(0, 10);
+  return Response.json(document, {
+    headers: { "Content-Disposition": `attachment; filename="chat-export-${date}.json"` },
+  });
 }
 
 function unauthorized() {

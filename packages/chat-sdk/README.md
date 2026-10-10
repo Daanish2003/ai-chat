@@ -109,6 +109,7 @@ const data = await chat.getSharedConversation(token);
 ```
 
 - `getUser(request)` returns `{ id } | null`. The handler answers 401 when it returns `null`.
+- `GET <basePath>/export` answers the signed-in user's export as a JSON download (`chat-export-<date>.json`), the same document as `exportUser`. The `ExportDataButton` in `ui/` calls it.
 - `start()` refuses to run while the `chat` schema is behind the bundled migrations.
 - `stop()` refuses new Runs with 503 while it drains, then closes the runtime's connections.
 

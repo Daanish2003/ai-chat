@@ -51,7 +51,7 @@ export type ChatRouter = {
   shareUrl: (token: string) => string;
 };
 
-export type ChatAdapter = Pick<ChatClient, "orpc" | "chatUrl"> & ChatRouter;
+export type ChatAdapter = Pick<ChatClient, "orpc" | "chatUrl" | "exportUrl"> & ChatRouter;
 
 const ChatContext = createContext<ChatAdapter | null>(null);
 
@@ -70,7 +70,7 @@ export function ChatProvider({
 }) {
   const [ownQueryClient] = useState(() => new QueryClient());
   const adapter = useMemo<ChatAdapter>(
-    () => ({ ...router, orpc: client.orpc, chatUrl: client.chatUrl }),
+    () => ({ ...router, orpc: client.orpc, chatUrl: client.chatUrl, exportUrl: client.exportUrl }),
     [client, router],
   );
   return (
