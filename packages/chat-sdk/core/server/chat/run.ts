@@ -10,7 +10,6 @@ import {
 import { and, eq, isNull, lt, or } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
-import { citationPrompt } from "../../shared/chat/citations";
 import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
 import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
@@ -36,12 +35,15 @@ export async function startRun(
     adapter,
     messages,
     webSearch,
+    systemPrompts,
   }: {
     messageId: string;
     adapter: AnyTextAdapter;
     messages: ModelMessage[];
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
     webSearch?: Credentials;
+    /** The reply's system prompts, from `systemPromptsFor` when the Run starts. */
+    systemPrompts: string[];
   },
 ): Promise<void> {
   const abortController = new AbortController();
@@ -101,12 +103,12 @@ export async function startRun(
           onChange: () => (changed = true),
         }),
       ];
-      // A reply that may search is asked to cite its Sources with markdown links.
       const stream = chat({
         adapter,
         messages,
         abortController,
-        ...(tools && { tools, systemPrompts: [citationPrompt] }),
+        ...(tools && { tools }),
+        ...(systemPrompts.length > 0 && { systemPrompts }),
       });
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);

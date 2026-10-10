@@ -19,9 +19,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
+import { InstructionsField } from "../settings/instructions-field";
 import { TitleModelSelect } from "../settings/title-model-select";
 
-/** Keys & settings: the user's Provider and Tool credentials, and the Title Model. */
+/** Keys & settings: the user's Provider and Tool credentials, the Title Model and the Instructions. */
 export function KeySettingsPage() {
   const orpc = useOrpc();
   const credentials = useQuery(orpc.credentials.list.queryOptions());
@@ -72,6 +73,8 @@ export function KeySettingsPage() {
           ))}
         </ul>
       </section>
+
+      <InstructionsField />
 
       <TitleModelSelect />
     </main>

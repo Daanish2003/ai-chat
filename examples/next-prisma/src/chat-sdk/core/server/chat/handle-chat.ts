@@ -17,6 +17,8 @@ import { chatCommandSchema } from "../../shared/chat/command";
 import { runStreamDurability, START } from "./run-streams";
 import { startRun } from "./run";
 import { findConversation, loadPath } from "./store";
+import { loadSettings } from "../settings/store";
+import { systemPromptsFor } from "./system-prompts";
 
 const refuse = (status: number, message: string) => Response.json({ message }, { status });
 
@@ -61,6 +63,12 @@ export async function handleChat(
   // `web_search` is offered only when asked for, the Model has tools and the user has a Tavily key.
   const searchCredentials =
     command.webSearch && model.tools ? await resolveCredentials(deps, userId, tavilyService) : null;
+  // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
+  const { instructions } = await loadSettings(deps, userId);
+  const systemPrompts = systemPromptsFor({
+    webSearch: searchCredentials !== null,
+    instructions,
+  });
 
   const history = await loadPath(deps, owned.id, command.parentId);
   if (command.parentId && history.length === 0) {
@@ -168,6 +176,7 @@ export async function handleChat(
     adapter,
     messages,
     webSearch: searchCredentials ?? undefined,
+    systemPrompts,
   });
   // The response reads the Run's log from the start, like any joiner (ADR 0006).
   return resumeServerSentEventsResponse({

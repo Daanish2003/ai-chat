@@ -51,6 +51,26 @@ describe("chat.getSharedConversation", () => {
     expect(shared?.messages.map(({ role }) => role)).toEqual(["user", "assistant"]);
   });
 
+  it("never carries the owner's Instructions", async () => {
+    const owner = await insertUser();
+    const conv = await insertConversation(owner, { title: "Private" });
+    const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
+    await insertMessage({
+      conversationId: conv.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Hello.",
+      active: true,
+    });
+    const { client } = chatFor(owner);
+    await client.rpc.settings.setInstructions({ instructions: "Always mention my cat." });
+    const link = await client.rpc.share.upsert({ conversationId: conv.id });
+
+    const shared = await chatFor(null).chat.getSharedConversation(link.token);
+
+    expect(JSON.stringify(shared)).not.toContain("Always mention my cat.");
+  });
+
   it("moves a re-shared link to the current Active Branch under the same token", async () => {
     const owner = await insertUser();
     const conv = await insertConversation(owner, { title: "Branches" });
