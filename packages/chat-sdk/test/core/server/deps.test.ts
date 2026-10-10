@@ -14,6 +14,7 @@ describe("createAppDeps", () => {
       runtime: memoryRuntime(),
       hostProviders: [],
       hostTools: [],
+      tools: [],
       byok: true,
       getQuota: async () => null,
       rateLimits: resolveRateLimits(),
