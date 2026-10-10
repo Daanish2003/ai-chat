@@ -92,7 +92,7 @@ describe("redisRuntime without Redis", () => {
       createChat({
         databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/unreachable",
         getUser: () => null,
-        keyEncryptionSecret: "test-key-encryption-secret-not-for-production",
+        keyEncryptionSecrets: ["test-key-encryption-secret-not-for-production"],
         basePath: "/api/chat",
         runtime,
       });
@@ -111,7 +111,7 @@ describe("redisRuntime without Redis", () => {
       const chat = createChat({
         databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/unreachable",
         getUser: () => null,
-        keyEncryptionSecret: "test-key-encryption-secret-not-for-production",
+        keyEncryptionSecrets: ["test-key-encryption-secret-not-for-production"],
         basePath: "/api/chat",
         runtime,
       });
