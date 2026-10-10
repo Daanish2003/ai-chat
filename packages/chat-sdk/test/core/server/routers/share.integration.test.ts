@@ -37,6 +37,7 @@ describe("share.upsert", () => {
     expect(link.token).toMatch(/^[\w-]{22}$/);
     const shared = await chatRpc().share.get({ token: link.token });
     expect(shared).toEqual({
+      token: link.token,
       title: "Recursive CTEs",
       sharedAt: link.updatedAt,
       messages: [

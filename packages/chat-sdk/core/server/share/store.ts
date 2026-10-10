@@ -4,9 +4,13 @@ import { conversation, message } from "../db/schema/chat";
 import { sharedLink } from "../db/schema/share";
 import { and, desc, eq } from "drizzle-orm";
 
+import { listAvailableModels, resolveModel } from "../chat/available-models";
 import { loadPath } from "../chat/store";
 import { attachmentsOfMessages } from "../attachments/store";
+import { resolveModelCall } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
+import { uuidv7 } from "../lib/uuidv7";
+import { storedParts } from "../../shared/message-parts";
 import { toSharedConversation } from "../../shared/share/conversation";
 
 type Deps = Pick<AppDeps, "db">;
@@ -147,4 +151,53 @@ export async function loadSharedConversation(deps: Deps, token: string) {
     path.map((row) => row.id),
   );
   return toSharedConversation(link, path, attachments);
+}
+
+/**
+ * Copies a Shared link's Branch into a new Conversation of `userId` (spec 90, ticket 144): new ids
+ * with the same parent chain, thinking parts stripped, no Attachments, no Project, not pinned, and
+ * the copy's title frozen from the link. Its Model is the Model of the shared Branch's last reply
+ * when `userId` can still use it, else their default. `not_found` for an unknown or revoked token,
+ * `no_model` when there is no Model to start on.
+ */
+export async function continueSharedConversation(
+  deps: AppDeps,
+  userId: string,
+  token: string,
+): Promise<{ id: string } | "not_found" | "no_model"> {
+  const [link] = await deps.db.select().from(sharedLink).where(eq(sharedLink.token, token));
+  if (!link) return "not_found";
+  const path = await loadPath(deps, link.conversationId, link.leafMessageId);
+  const lastModel = path.filter((row) => row.role === "assistant").at(-1)?.model;
+  const usable = lastModel ? await resolveModel(deps, userId, lastModel) : undefined;
+  const model =
+    usable && (await resolveModelCall(deps, userId, usable.id))
+      ? usable.id
+      : (await listAvailableModels(deps, userId)).defaultModel;
+  if (!model) return "no_model";
+
+  const id = uuidv7();
+  const newIds = new Map(path.map((row) => [row.id, uuidv7()]));
+  await deps.db.transaction(async (tx) => {
+    await tx.insert(conversation).values({ id, userId, title: link.title, model });
+    // Parents come before their children in `path`, so one insert satisfies the parent foreign keys.
+    await tx.insert(message).values(
+      path.map((row) => ({
+        id: newIds.get(row.id)!,
+        conversationId: id,
+        parentId: row.parentId ? newIds.get(row.parentId) : null,
+        role: row.role,
+        parts: storedParts(row.parts.parts.filter((part) => part.type !== "thinking")),
+        model: row.model,
+        status: row.status,
+        searchText: row.searchText,
+        createdAt: row.createdAt,
+      })),
+    );
+    await tx
+      .update(conversation)
+      .set({ activeLeafId: newIds.get(path.at(-1)!.id) })
+      .where(eq(conversation.id, id));
+  });
+  return { id };
 }

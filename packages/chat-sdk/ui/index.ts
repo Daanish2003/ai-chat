@@ -4,4 +4,8 @@ export { AppShell } from "./shell/app-shell";
 export { KeySettingsPage } from "./pages/key-settings";
 export { DeleteAllConversationsSection } from "./settings/delete-all-conversations";
 export { NewConversationPage } from "./pages/new-conversation";
-export { SharedConversationPage, SharedLinkNotFound } from "./pages/shared-conversation";
+export {
+  SharedConversationPage,
+  SharedLinkNotFound,
+  type SharedViewer,
+} from "./pages/shared-conversation";
