@@ -1,3 +1,7 @@
+// Every Host compiles this file, not only the SDK's own tsconfig, so it carries the declaration:
+// `html-to-text` ships no types, and an ambient declaration can't be imported.
+// oxlint-disable-next-line typescript/triple-slash-reference
+/// <reference path="../../types/html-to-text.d.ts" />
 import { toolDefinition } from "@tanstack/ai";
 import { convert } from "html-to-text";
 import { z } from "zod";
