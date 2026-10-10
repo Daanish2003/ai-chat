@@ -5,7 +5,8 @@ import { handleChat } from "./chat/handle-chat";
 import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
-import { createAppDeps, type AppDeps, type HostProvider } from "./deps";
+import { quotaLookup } from "./chat/quota";
+import { createAppDeps, type AppDeps, type HostProvider, type QuotaSetting } from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
 import { countUnreadableCredentials } from "./credentials/store";
@@ -42,6 +43,11 @@ export type CreateChatOptions = {
   hostProviders?: HostProvider[];
   /** Whether users may use their own Provider credentials. Defaults to `true` (ADR 0007). */
   byok?: boolean;
+  /**
+   * A user's Quota on Host credentials, or one fixed Quota for everyone; `null` or unset is
+   * unlimited (ADR 0007).
+   */
+  getQuota?: QuotaSetting;
 };
 
 /**
@@ -119,6 +125,7 @@ export function createChat(options: CreateChatOptions): {
       runtime: options.runtime ?? memoryRuntime(),
       hostProviders: options.hostProviders ?? [],
       byok: options.byok ?? true,
+      getQuota: quotaLookup(options.getQuota),
       rateLimits: resolveRateLimits(options.rateLimits),
     });
     return deps;

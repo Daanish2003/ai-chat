@@ -64,6 +64,15 @@ export type HostModel = {
   outputUsdPerMillion: number;
 };
 
+/** A user's Quota on Host credentials (ADR 0007): a budget in USD over a fixed UTC day or calendar month. */
+export type Quota = { budgetUsd: number; window: "day" | "month" };
+
+/** `getQuota` as a Host passes it: a function of the user, or one fixed Quota for everyone. */
+export type QuotaSetting =
+  | Quota
+  | null
+  | ((userId: string) => Quota | null | Promise<Quota | null>);
+
 /** The Host's own credentials for a Provider, and the Models they pay for. */
 export type HostProvider = {
   provider: ProviderId;
@@ -87,6 +96,8 @@ export type AppDeps = {
   hostProviders: HostProvider[];
   /** Whether users may use their own Provider credentials (`byok`, ADR 0007). */
   byok: boolean;
+  /** A user's Quota on Host credentials, `null` when unlimited (ADR 0007). */
+  getQuota: (userId: string) => Promise<Quota | null>;
   searchClient: SearchClient;
   /** Every Run's chunk log, which its POST response and any joiner read (ADR 0006). */
   runStreams: RunStreams;
@@ -122,6 +133,7 @@ export function createAppDeps({
   runtime,
   hostProviders,
   byok,
+  getQuota,
   rateLimits,
 }: {
   db: Database;
@@ -129,6 +141,7 @@ export function createAppDeps({
   runtime: ChatRuntime;
   hostProviders: HostProvider[];
   byok: boolean;
+  getQuota: AppDeps["getQuota"];
   rateLimits: ResolvedRateLimits;
 }): AppDeps {
   return {
@@ -136,6 +149,7 @@ export function createAppDeps({
     adapterFor,
     hostProviders,
     byok,
+    getQuota,
     searchClient: createTavilyClient(globalThis.fetch),
     runStreams: runtime.runStreams,
     pubsub: runtime.pubsub,
