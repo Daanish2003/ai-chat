@@ -6,6 +6,7 @@ import type { CounterStore } from "./chat/counters";
 import type { PubSub } from "./chat/pubsub";
 import type { RunStreams } from "./chat/run-streams";
 import { createTavilyClient } from "./chat/tavily";
+import { createGuardedFetch } from "./lib/guarded-fetch";
 import type { SearchErrorReason, SearchResult } from "../shared/chat/web-search";
 import type { ResolvedRateLimits } from "./rate-limits";
 import type { ChatRuntime } from "./runtime";
@@ -157,7 +158,7 @@ export function createAppDeps({
     rateLimits,
     limits: defaultLimits,
     lifecycle: { stopping: false, runs: new Map() },
-    fetch: globalThis.fetch,
+    fetch: createGuardedFetch({ schemes: "http-and-https" }),
     keyEncryptionSecrets,
   };
 }

@@ -24,6 +24,7 @@
     "@tanstack/ai-byteplus": "0.6.2",
     "@tanstack/ai-client": "0.39.0",
     "@tanstack/ai-cloudflare": "0.2.5",
+    "@tanstack/ai-compaction": "0.1.14",
     "@tanstack/ai-gemini": "0.37.0",
     "@tanstack/ai-grok": "0.21.2",
     "@tanstack/ai-groq": "0.8.5",
@@ -37,12 +38,14 @@
     "@tanstack/ai-vercel-gateway": "0.3.7",
     "@tanstack/react-query": "^5.102.8",
     "drizzle-orm": "catalog:",
+    "ipaddr.js": "2.5.0",
     "lucide-react": "catalog:",
     "pg": "^8.23.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "redis": "^6.3.0",
     "sonner": "catalog:",
+    "undici": "7.30.0",
     "zod": "catalog:"
   },
   "devDependencies": {
