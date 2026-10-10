@@ -3,7 +3,7 @@ import { relativeTime } from "../../core/client/relative-time";
 import { recentConversations, type SearchHit, splitSnippet } from "../../core/client/search";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRoundIcon,
   MessageSquareIcon,
@@ -105,8 +105,15 @@ function PaletteBody({
   const [active, setActive] = useState(0);
   const [renaming, setRenaming] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const conversations = useQuery(orpc.conversation.list.queryOptions());
-  const current = conversations.data?.find((c) => c.id === conversationId);
+  const conversations = useInfiniteQuery(
+    orpc.conversation.list.infiniteOptions({
+      input: (cursor: string | undefined) => ({ cursor }),
+      initialPageParam: undefined,
+      getNextPageParam: (page) => page.nextCursor ?? undefined,
+    }),
+  );
+  const loaded = conversations.data?.pages.flatMap((page) => page.items) ?? [];
+  const current = loaded.find((c) => c.id === conversationId);
   const remove = useDeleteConversation();
   const searched = useDebounced(q.trim(), searchDebounceMs);
   const search = useInfiniteQuery(
@@ -122,7 +129,8 @@ function PaletteBody({
       ? (search.data?.pages.flatMap((page) => page.hits) ?? [])
       : [];
 
-  const recent: Item[] = recentConversations(conversations.data ?? [], q).map((c) => ({
+  const firstPage = conversations.data?.pages[0]?.items ?? [];
+  const recent: Item[] = recentConversations(firstPage, q).map((c) => ({
     key: `conversation:${c.id}`,
     group: q.trim() ? "Conversations" : "Recent",
     icon: <MessageSquareIcon />,
