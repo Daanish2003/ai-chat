@@ -409,3 +409,40 @@ describe("MCP tools in a Run", () => {
     expect(await replyOf(deps, conv.id)).toMatchObject({ status: "stopped" });
   });
 });
+
+describe("Allow for this Conversation on an MCP tool", () => {
+  it("runs a waiting MCP call on allow, and later calls to that tool in the Conversation run without asking", async () => {
+    const { user, deps, mcp, send } = await setup({
+      rounds: [
+        round(toolCall({ id: "call-1", name: "linear_create_issue", input: { title: "Bug" } })),
+        round(text("Created.")),
+        round(toolCall({ id: "call-2", name: "linear_create_issue", input: { title: "Second" } })),
+        round(text("Created again.")),
+      ],
+    });
+    const conv = await insertConversation(user, { title: "Allow" });
+    const tools = { connections: ["linear"], allowedTools: [] };
+    await (await send(conv.id, { tools })).text();
+    const reply = await replyOf(deps, conv.id);
+
+    await chatRpc({ user, deps }).chat.decide({
+      messageId: reply.id,
+      approved: true,
+      allowForConversation: true,
+    });
+    await join(reply.id, user, deps);
+
+    expect(mcp.calls).toEqual([{ name: "create_issue", arguments: { title: "Bug" } }]);
+
+    await (await send(conv.id, { text: "Again" })).text();
+
+    expect(mcp.calls).toHaveLength(2);
+    expect(await replyOf(deps, conv.id)).toMatchObject({
+      status: "complete",
+      parts: storedParts([
+        expect.objectContaining({ toolCallId: "call-2", state: "done" }),
+        { type: "text", text: "Created again." },
+      ]),
+    });
+  });
+});

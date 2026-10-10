@@ -38,14 +38,28 @@ export const chatRouter = {
       await stopRun(context.deps, owned.id);
     }),
   /**
-   * Answers the call a reply is waiting on (ADR 0008): approve runs it, deny refuses it. The reply
-   * continues in a new Run on the same Message; join it from its log to follow it.
+   * Answers the call a reply is waiting on (ADR 0008): approve runs it, deny refuses it. With
+   * `allowForConversation` (approve only) the call's tool also runs without Approval for the rest
+   * of the Conversation (#159). The reply continues in a new Run on the same Message; join it from
+   * its log to follow it.
    */
   decide: protectedProcedure
-    .input(z.object({ messageId: z.uuid(), approved: z.boolean() }))
+    .input(
+      z.object({
+        messageId: z.uuid(),
+        approved: z.boolean(),
+        allowForConversation: z.boolean().optional(),
+      }),
+    )
     .handler(async ({ context, input }) => {
       refuseDecision(
-        await decideApproval(context.deps, context.user.id, input.messageId, input.approved),
+        await decideApproval(
+          context.deps,
+          context.user.id,
+          input.messageId,
+          input.approved,
+          input.allowForConversation,
+        ),
       );
     }),
 };

@@ -16,6 +16,7 @@ import { parseStoredParts, searchTextOf, toModelMessages } from "../../shared/ch
 import { chatCommandSchema } from "../../shared/chat/command";
 import { runStreamDurability, START } from "./run-streams";
 import { startRun } from "./run";
+import { allowTools } from "./host-tools";
 import { mcpToolsFor } from "../mcp/tools";
 import { findConversation, loadPath } from "./store";
 import { loadSettings } from "../settings/store";
@@ -85,12 +86,13 @@ export async function handleChat(
   // usable Tavily key: the user's own, else the Host's (ADR 0007). `fetch_url` needs none.
   const web = command.webSearch && model.tools;
   const searchCall = web ? await resolveToolCall(deps, userId, tavilyService) : null;
-  // The Host's tools are offered to a Model that has tools (`createChat({ tools })`).
-  const hostTools = model.tools ? deps.tools : [];
   // The MCP tools switched on here (spec #91). The first Message takes the composer's choice; any
   // later one reads the stored choice.
   const takesComposerTools = command.tools !== undefined && owned.activeLeafId === null;
   const toolSettings = takesComposerTools ? command.tools! : owned.toolSettings;
+  // The Host's tools are offered to a Model that has tools (`createChat({ tools })`). A tool the
+  // Conversation allows runs without Approval (#159).
+  const hostTools = model.tools ? allowTools(deps.tools, toolSettings.allowedTools) : [];
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({
@@ -121,7 +123,7 @@ export async function handleChat(
 
   // The MCP tools this reply offers, opened before its history is built: a finished call of a tool
   // not offered is sent as text (spec #91). Every refusal below closes them, and so does the Run.
-  const mcp = model.tools ? await mcpToolsFor(deps, userId, toolSettings.connections) : undefined;
+  const mcp = model.tools ? await mcpToolsFor(deps, userId, toolSettings) : undefined;
 
   // Everything that can fail runs before the Messages are written.
   const adapter = deps.adapterFor(model.id, call.credentials, {

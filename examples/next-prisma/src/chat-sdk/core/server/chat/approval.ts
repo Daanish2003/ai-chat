@@ -15,8 +15,10 @@ import { resolveModel } from "./available-models";
 import { generationOptionsFor } from "./generation";
 import { quotaRefusal } from "./quota";
 import { approvalPrefix, startRun } from "./run";
+import { allowTools } from "./host-tools";
 import { findConversation, findMessage, loadPath } from "./store";
 import { mcpToolsFor } from "../mcp/tools";
+import { noConversationTools, type ConversationTools } from "../../shared/chat/conversation-tools";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 
@@ -29,6 +31,11 @@ export type DecideResult =
   | "unavailable"
   | "quota";
 
+/** The Conversation's settings with `toolName` allowed for the rest of it (#159). */
+function allowing(settings: ConversationTools, toolName: string): ConversationTools {
+  return { ...settings, allowedTools: [...new Set([...settings.allowedTools, toolName])] };
+}
+
 /** What a refused call's result says to the Model and the stored part (`denied`). */
 export const declinedResult = { error: "User declined tool execution" };
 
@@ -36,13 +43,16 @@ export const declinedResult = { error: "User declined tool execution" };
  * Answers the call a reply is waiting on (ADR 0008): starts a new Run on the same Message. The
  * history is rebuilt from the Message tree, with the call stored without a result, so the resumed
  * Run supplies the result: the tool runs when approved, and the Model gets `declinedResult` when not.
- * The Run is the Message's next Run (`runNumber`), with the same Run rules as any other.
+ * The Run is the Message's next Run (`runNumber`), with the same Run rules as any other. With
+ * `allowForConversation` (an approval only), the call's tool is also allowed for the rest of the
+ * Conversation, so its later calls run without Approval (#159).
  */
 export async function decideApproval(
   deps: AppDeps,
   userId: string,
   messageId: string,
   approved: boolean,
+  allowForConversation = false,
 ): Promise<DecideResult> {
   const owned = await findMessage(deps, userId, messageId);
   if (!owned) return "not_found";
@@ -70,13 +80,13 @@ export async function decideApproval(
     history,
   });
   if (attachments.error) return "unavailable";
-  const hostTools = model.tools ? deps.tools : [];
-  // The resumed Run offers the same MCP tools as the Run that asked, so the approved call can run.
+  // The resumed Run offers the same tools as the Run that asked, so the approved call can run. Its
+  // Approval still applies to this call: the resume answers that interrupt, and a call that no
+  // longer asks has none to answer. An allowance (#159) is stored with the claim, for later Runs.
   const asked = await findConversation(deps, userId, owned.conversationId);
-  const mcp =
-    model.tools && asked
-      ? await mcpToolsFor(deps, userId, asked.toolSettings.connections)
-      : undefined;
+  const askedSettings = asked?.toolSettings ?? noConversationTools;
+  const hostTools = model.tools ? allowTools(deps.tools, askedSettings.allowedTools) : [];
+  const mcp = model.tools && asked ? await mcpToolsFor(deps, userId, askedSettings) : undefined;
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({ web: false, instructions });
   const messages = toModelMessages(
@@ -110,8 +120,8 @@ export async function decideApproval(
   const claimed = await deps.db
     .transaction(async (tx) => {
       // The same lock a send takes: one Run per Conversation (ADR 0002).
-      await tx
-        .select({ id: conversation.id })
+      const [locked] = await tx
+        .select({ toolSettings: conversation.toolSettings })
         .from(conversation)
         .where(eq(conversation.id, owned.conversationId))
         .for("update");
@@ -134,7 +144,16 @@ export async function decideApproval(
         })
         .where(and(eq(message.id, owned.id), eq(message.status, "awaiting_approval")))
         .returning({ id: message.id });
-      return row ? "claimed" : "not_waiting";
+      if (!row) return "not_waiting";
+      // The allowance is stored with the claim, on the settings read under the lock, so a refused
+      // decision stores nothing and a concurrent change to the Connections is kept.
+      if (allowForConversation && approved && locked) {
+        await tx
+          .update(conversation)
+          .set({ toolSettings: allowing(locked.toolSettings, waiting.name) })
+          .where(eq(conversation.id, owned.conversationId));
+      }
+      return "claimed";
     })
     .catch(async (caught: unknown) => {
       await mcp?.close();

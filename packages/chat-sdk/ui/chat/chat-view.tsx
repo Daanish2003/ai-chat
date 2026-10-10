@@ -151,11 +151,11 @@ function ChatThread({
   const waiting =
     messages.length > 0 &&
     messageInfo(messages[messages.length - 1]!).status === "awaiting_approval";
-  const decide = async (messageId: string, approved: boolean) => {
+  const decide = async (messageId: string, approved: boolean, allowForConversation?: boolean) => {
     // A second click while the first decision is in flight would be refused as stale.
     if (decideCall.isPending) return;
     try {
-      await decideCall.mutateAsync({ messageId, approved });
+      await decideCall.mutateAsync({ messageId, approved, allowForConversation });
     } catch (caught) {
       toast.error(`Deciding failed: ${(caught as Error).message}`);
       return;
@@ -301,7 +301,8 @@ function ChatThread({
                 onEdit: (text, attachments) => startBranch(message.id, text, attachments),
                 onRegenerate: () => startBranch(message.id),
                 onSwitchBranch: (messageId) => switchBranch.mutate({ messageId }),
-                onDecide: (approved) => void decide(message.id, approved),
+                onDecide: (approved, allowForConversation) =>
+                  void decide(message.id, approved, allowForConversation),
               }}
             />
           ))}

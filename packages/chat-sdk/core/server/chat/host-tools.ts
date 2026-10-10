@@ -19,6 +19,18 @@ export const maxToolCallsPerReply = 10;
 export const toolCallLimitError = "tool call limit reached";
 
 /**
+ * The tools with Approval lifted for the names a Conversation allows (its `allowedTools`, #159).
+ * Any other tool comes back as it was, so its Approval still applies. The names are the ones the
+ * Model sees: a Host tool's name, an MCP tool's `<serverKey>_<tool>`.
+ */
+export function allowTools<T extends AnyServerTool>(tools: T[], allowedTools: string[]): T[] {
+  if (allowedTools.length === 0) return tools;
+  return tools.map((tool) =>
+    allowedTools.includes(tool.name) ? { ...tool, needsApproval: false } : tool,
+  );
+}
+
+/**
  * The calls a reply has left. One budget is shared by every tool of the reply, across its Runs
  * (ADR 0008), so a resumed Run starts with the calls its earlier Runs made.
  */
