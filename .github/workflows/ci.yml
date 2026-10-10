@@ -73,3 +73,14 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The image carries its own build-time placeholders (apps/web/Dockerfile), so nothing is passed here.
+      - name: Build the apps/web image
+        run: docker build -f apps/web/Dockerfile -t ai-chat-web:ci .
