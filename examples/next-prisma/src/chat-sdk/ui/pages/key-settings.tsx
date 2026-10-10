@@ -20,6 +20,7 @@ import { toast } from "sonner";
 
 import { type ChatOrpc, useOrpc } from "../../core/client/react/provider";
 import { DeleteAllConversationsSection } from "../settings/delete-all-conversations";
+import { ExportDataButton } from "../settings/export-data-button";
 import { SharedLinksSection } from "../settings/shared-links";
 import { TitleModelSelect } from "../settings/title-model-select";
 
@@ -78,6 +79,15 @@ export function KeySettingsPage() {
       <SharedLinksSection />
 
       <TitleModelSelect />
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-medium">Your data</h2>
+        <p className="text-xs text-muted-foreground">
+          Download your Projects, Conversations, Messages, settings and Shared links as one JSON
+          file. Keys are never included.
+        </p>
+        <ExportDataButton />
+      </section>
 
       <DeleteAllConversationsSection />
     </main>

@@ -19,6 +19,8 @@ export type ChatClient = {
   orpc: ChatOrpc;
   /** Where a Run is posted (`POST`) and joined (`GET ?runId=`). */
   chatUrl: string;
+  /** The signed-in user's export, a JSON download (`GET`). */
+  exportUrl: string;
   /** The transport every RPC call goes through. */
   fetch: ChatFetch;
 };
@@ -42,6 +44,7 @@ export function createChatClient({
     rpc,
     orpc: createTanstackQueryUtils(rpc),
     chatUrl: `${base}/run`,
+    exportUrl: `${base}/export`,
     fetch,
   };
 }
