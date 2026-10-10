@@ -1,94 +1,42 @@
-import { fromSpecTokenUsage, type ModelMessage, type TokenUsage } from "@tanstack/ai";
+import type { ModelMessage, TokenUsage } from "@tanstack/ai";
 
-import { usage } from "../db/schema/usage";
-import type { AppDeps, HostModel } from "../deps";
-import { uuidv7 } from "../lib/uuidv7";
+import type { MessageUsage } from "../../shared/chat/message-record";
+import type { StoredPart } from "../../shared/message-parts";
 
-/** A Host Model's price, per 1M tokens (ADR 0007). */
-export type HostPrice = Pick<HostModel, "inputUsdPerMillion" | "outputUsdPerMillion">;
+/** Providers that report input without its cache reads and writes, so those are added back. */
+const cacheApartProviders = new Set(["anthropic", "bedrock"]);
 
-/** A Run on Host credentials: whose Quota it counts against, and what the Model costs. */
-export type UsageMeter = { userId: string; model: string; price: HostPrice };
+/** A Run's usage so far, with input including cached tokens. */
+export type RunUsage = Omit<MessageUsage, "estimated">;
 
-/** A Run's usage summed over its RUN_FINISHED chunks; `cost` only when a Provider reported one. */
-export type RunTotals = { promptTokens: number; completionTokens: number; cost?: number };
-
-/** Adds one RUN_FINISHED chunk's usage to a Run's running total. */
-export function addRunUsage(
-  total: RunTotals | undefined,
-  chunkUsage: unknown,
-): RunTotals | undefined {
-  const next = Array.isArray(chunkUsage)
-    ? fromSpecTokenUsage(chunkUsage)
-    : (chunkUsage as TokenUsage | undefined);
-  if (!next) return total;
-  const cost =
-    next.cost === undefined && total?.cost === undefined
-      ? undefined
-      : (total?.cost ?? 0) + (next.cost ?? 0);
+/** One model iteration's usage as `RUN_FINISHED` reports it, normalised across Providers. */
+export function normalizeUsage(provider: string, usage: TokenUsage): RunUsage {
+  const cached = usage.promptTokensDetails?.cachedTokens ?? 0;
+  const cacheWritten = usage.promptTokensDetails?.cacheWriteTokens ?? 0;
+  const cacheApart = cacheApartProviders.has(provider);
   return {
-    promptTokens: (total?.promptTokens ?? 0) + next.promptTokens,
-    completionTokens: (total?.completionTokens ?? 0) + next.completionTokens,
-    cost,
+    input: usage.promptTokens + (cacheApart ? cached + cacheWritten : 0),
+    output: usage.completionTokens,
+    reasoning: usage.completionTokensDetails?.reasoningTokens ?? 0,
+    cached,
   };
 }
 
-/** A usage row's numbers, as the cost of a call on Host credentials (ADR 0007). */
-export type RunCost = {
-  inputTokens: number;
-  outputTokens: number;
-  costMicros: number;
-  estimated: boolean;
-};
-
-/**
- * The cost of a Run on Host credentials. A Run that completed with usage costs what the Provider
- * reported, else its tokens times the Model's price. Anything else (a stopped or failed Run, or one
- * with no usage) is estimated from characters ÷ 4 and priced the same way.
- */
-export function runCost({
-  totals,
-  completed,
-  inputChars,
-  outputChars,
-  price,
-}: {
-  totals: RunTotals | undefined;
-  completed: boolean;
-  inputChars: number;
-  outputChars: number;
-  price: HostPrice;
-}): RunCost {
-  if (completed && totals) {
-    const costMicros =
-      totals.cost !== undefined
-        ? Math.round(totals.cost * 1_000_000)
-        : Math.round(
-            totals.promptTokens * price.inputUsdPerMillion +
-              totals.completionTokens * price.outputUsdPerMillion,
-          );
-    return {
-      inputTokens: totals.promptTokens,
-      outputTokens: totals.completionTokens,
-      costMicros,
-      estimated: false,
-    };
-  }
-  const inputTokens = Math.ceil(inputChars / 4);
-  const outputTokens = Math.ceil(outputChars / 4);
+/** Adds one model iteration's usage to the Run's total. */
+export function addUsage(total: RunUsage | undefined, next: RunUsage): RunUsage {
+  if (!total) return next;
   return {
-    inputTokens,
-    outputTokens,
-    costMicros: Math.round(
-      inputTokens * price.inputUsdPerMillion + outputTokens * price.outputUsdPerMillion,
-    ),
-    estimated: true,
+    input: total.input + next.input,
+    output: total.output + next.output,
+    reasoning: total.reasoning + next.reasoning,
+    cached: total.cached + next.cached,
   };
 }
 
-/** The characters of the text the Model was sent: string contents and text parts. */
-export function inputCharsOf(messages: ModelMessage[]): number {
-  return messages.reduce((total, { content }) => {
+/** Characters of text a Run sent the Model: string content and text parts. */
+export function promptCharactersOf(messages: ModelMessage[]): number {
+  return messages.reduce((total, message) => {
+    const { content } = message;
     if (typeof content === "string") return total + content.length;
     if (!Array.isArray(content)) return total;
     return (
@@ -98,29 +46,30 @@ export function inputCharsOf(messages: ModelMessage[]): number {
   }, 0);
 }
 
-/** Writes the usage row of a Run on Host credentials (ADR 0007). */
-export async function recordRunUsage(
-  deps: Pick<AppDeps, "db">,
-  meter: UsageMeter,
-  run: {
-    totals: RunTotals | undefined;
-    completed: boolean;
-    messages: ModelMessage[];
-    outputText: string;
-  },
-): Promise<void> {
-  const cost = runCost({
-    totals: run.totals,
-    completed: run.completed,
-    inputChars: inputCharsOf(run.messages),
-    outputChars: run.outputText.length,
-    price: meter.price,
-  });
-  await deps.db.insert(usage).values({
-    id: uuidv7(),
-    userId: meter.userId,
-    kind: "run",
-    model: meter.model,
-    ...cost,
-  });
+/**
+ * The usage a Run stores when it ends: what the Provider reported for a Run that completed, or,
+ * when it didn't (stopped, failed or no usage reported), a characters ÷ 4 estimate of the prompt
+ * and the reply's streamed text and thinking, flagged `estimated`.
+ */
+export function messageUsage(
+  reported: RunUsage | undefined,
+  { promptCharacters, parts }: { promptCharacters: number; parts: StoredPart[] },
+): MessageUsage {
+  if (reported) return { ...reported, estimated: false };
+  let thinking = 0;
+  let text = 0;
+  for (const part of parts) {
+    if (part.type === "text") text += part.text.length;
+    if (part.type === "thinking") thinking += part.text.length;
+  }
+  return {
+    input: tokensOf(promptCharacters),
+    output: tokensOf(text + thinking),
+    reasoning: tokensOf(thinking),
+    cached: 0,
+    estimated: true,
+  };
 }
+
+/** A quarter of a token per character, rounded up. */
+const tokensOf = (characters: number) => Math.ceil(characters / 4);

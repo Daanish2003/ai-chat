@@ -27,6 +27,7 @@ describe("toUIMessages", () => {
         status: "complete",
         error: null,
         errorReason: null,
+        usage: null,
         createdAt,
         siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
@@ -40,6 +41,7 @@ describe("toUIMessages", () => {
         status: "streaming",
         error: null,
         errorReason: null,
+        usage: null,
         createdAt,
         siblings: { index: 1, count: 2, previousId: "a0", nextId: null },
       },
@@ -56,6 +58,7 @@ describe("toUIMessages", () => {
           status: "complete",
           error: null,
           errorReason: null,
+          usage: null,
           siblings: { index: 0, count: 1, previousId: null, nextId: null },
           attachments: [{ id: "f1", filename: "cat.png", mediaType: "image/png", size: 10 }],
         },
@@ -70,6 +73,7 @@ describe("toUIMessages", () => {
           status: "streaming",
           error: null,
           errorReason: null,
+          usage: null,
           siblings: { index: 1, count: 2, previousId: "a0", nextId: null },
           attachments: [],
         },
@@ -80,6 +84,7 @@ describe("toUIMessages", () => {
       status: "streaming",
       error: null,
       errorReason: null,
+      usage: null,
     });
   });
 
@@ -89,6 +94,7 @@ describe("toUIMessages", () => {
       status: "streaming",
       error: null,
       errorReason: null,
+      usage: null,
     });
   });
 });
@@ -106,6 +112,7 @@ describe("messageAttachments", () => {
         status: "complete",
         error: null,
         errorReason: null,
+        usage: null,
         createdAt,
         siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
@@ -133,6 +140,7 @@ describe("messageSiblings", () => {
         status: "complete",
         error: null,
         errorReason: null,
+        usage: null,
         createdAt,
         siblings: { index: 0, count: 1, previousId: null, nextId: null },
       },
@@ -146,6 +154,7 @@ describe("messageSiblings", () => {
         status: "complete",
         error: null,
         errorReason: null,
+        usage: null,
         createdAt,
         siblings: { index: 0, count: 3, previousId: null, nextId: "a2" },
       },
@@ -190,6 +199,7 @@ describe("describeError", () => {
     status: "error",
     error: null,
     errorReason: null,
+    usage: null,
     ...fields,
   });
 

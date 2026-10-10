@@ -165,6 +165,7 @@ export async function handleChat(
 
   await startRun(deps, {
     messageId: assistantMessageId,
+    provider: model.provider,
     adapter,
     messages,
     webSearch: searchCredentials ?? undefined,

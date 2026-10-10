@@ -4,6 +4,7 @@ import {
   type AnyTextAdapter,
   chat,
   EventType,
+  fromSpecTokenUsage,
   type ModelMessage,
   type StreamChunk,
 } from "@tanstack/ai";
@@ -15,7 +16,8 @@ import { cancelRunningSearches, createPartsBuilder, searchTextOf } from "../../s
 import { titleConversation } from "./title";
 import { createWebSearchTool } from "./web-search-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
-import { addRunUsage, recordRunUsage, type RunTotals, type UsageMeter } from "./usage";
+import { addUsage, messageUsage, normalizeUsage, promptCharactersOf, type RunUsage } from "./usage";
+import { recordRunUsage, type UsageMeter } from "./host-usage";
 
 type MessageUpdate = Partial<typeof message.$inferInsert>;
 type MessageErrorReason = NonNullable<MessageUpdate["errorReason"]>;
@@ -34,12 +36,15 @@ export async function startRun(
   deps: AppDeps,
   {
     messageId,
+    provider,
     adapter,
     messages,
     webSearch,
     meter,
   }: {
     messageId: string;
+    /** The Provider of the Model, which decides how its usage is normalised. */
+    provider: string;
     adapter: AnyTextAdapter;
     messages: ModelMessage[];
     /** The user's Tavily Tool credential, when this reply offers the `web_search` tool. */
@@ -54,6 +59,11 @@ export async function startRun(
   // Registered once nothing before the Run's own `finally` can throw, so it always leaves again.
   deps.lifecycle.runs.set(messageId, abortController);
   const parts = createPartsBuilder();
+  // The Run's usage, summed over its model iterations as the stream is read (issue #117).
+  let total: RunUsage | undefined;
+  /** The Provider-reported cost in USD, summed over the Run's iterations, when it reports one. */
+  let reportedCost: number | undefined;
+  const promptCharacters = promptCharactersOf(messages);
 
   let writes = Promise.resolve();
   const write = (fields: MessageUpdate) => {
@@ -85,8 +95,6 @@ export async function startRun(
 
   /** Whether the log already holds its own RUN_FINISHED or RUN_ERROR. */
   let logEnded = false;
-  /** The Run's usage, summed over its RUN_FINISHED chunks (ADR 0007). */
-  let totals: RunTotals | undefined;
   let ids: { threadId: string; runId: string } | undefined;
   let timedOut = false;
   const capTimer = setTimeout(() => {
@@ -117,13 +125,19 @@ export async function startRun(
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
         changed = true;
+        if (chunk.type === EventType.RUN_FINISHED && chunk.usage) {
+          // The AG-UI array form is converted back to TanStack's shape first.
+          const tokens = Array.isArray(chunk.usage) ? fromSpecTokenUsage(chunk.usage) : chunk.usage;
+          if (tokens) total = addUsage(total, normalizeUsage(provider, tokens));
+          // A Provider that reports a cost (OpenRouter) prices a Host Run exactly (ADR 0007).
+          if (tokens?.cost !== undefined) reportedCost = (reportedCost ?? 0) + tokens.cost;
+        }
         if (chunk.type === EventType.RUN_ERROR) {
           error = { message: chunk.message, code: chunk.code ?? chunk.error?.code };
         }
         if (chunk.type === EventType.RUN_FINISHED || chunk.type === EventType.RUN_ERROR) {
           logEnded = true;
         }
-        if (chunk.type === EventType.RUN_FINISHED) totals = addRunUsage(totals, chunk.usage);
         ids ??= runIdsOf(chunk);
         void deps.runStreams
           .append(messageId, chunk)
@@ -136,23 +150,31 @@ export async function startRun(
       clearTimeout(capTimer);
       parts.cancelRunningSearches();
       const interrupted = abortController.signal.reason === shutdownAbort;
-      await write(
-        withParts(
-          timedOut
-            ? { status: "error", error: "timed out" }
-            : interrupted
-              ? { status: "error", error: "interrupted" }
-              : abortController.signal.aborted
-                ? { status: "stopped" }
-                : error !== undefined
-                  ? {
-                      status: "error",
-                      error: error.message,
-                      errorReason: errorReasonOf(error.code),
-                    }
-                  : { status: "complete" },
-        ),
-      );
+      const ending: MessageUpdate = timedOut
+        ? { status: "error", error: "timed out" }
+        : interrupted
+          ? { status: "error", error: "interrupted" }
+          : abortController.signal.aborted
+            ? { status: "stopped" }
+            : error !== undefined
+              ? {
+                  status: "error",
+                  error: error.message,
+                  errorReason: errorReasonOf(error.code),
+                }
+              : { status: "complete" };
+      // Stored whatever the ending: the Provider's usage for a complete Run, else an estimate.
+      const usage = messageUsage(ending.status === "complete" ? total : undefined, {
+        promptCharacters,
+        parts: parts.parts().parts,
+      });
+      await write(withParts({ ...ending, usage }));
+      // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
+      if (meter) {
+        await recordRunUsage(deps, meter, usage, reportedCost).catch((caught: unknown) =>
+          console.error(`Recording usage of ${messageId} failed`, caught),
+        );
+      }
       void unsubscribeStop().catch((error: unknown) =>
         console.error(`Unsubscribing Stop of ${messageId} failed`, error),
       );
@@ -169,17 +191,6 @@ export async function startRun(
             ),
           )
           .catch((caught: unknown) => console.error(`Logging Message ${messageId} failed`, caught));
-      }
-      // Recorded before the log closes, so a reader that has seen the end also sees the usage row.
-      if (meter) {
-        await recordRunUsage(deps, meter, {
-          totals,
-          completed: !timedOut && !abortController.signal.aborted && error === undefined,
-          messages,
-          outputText: searchTextOf(parts.parts()),
-        }).catch((caught: unknown) =>
-          console.error(`Recording usage of ${messageId} failed`, caught),
-        );
       }
       await deps.runStreams.close(messageId);
       deps.lifecycle.runs.delete(messageId);
