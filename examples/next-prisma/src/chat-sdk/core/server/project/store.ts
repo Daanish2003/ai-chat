@@ -64,7 +64,10 @@ export async function deleteProject(deps: AppDeps, userId: string, id: string) {
     const [owned] = await tx
       .select({ id: project.id })
       .from(project)
-      .where(and(eq(project.id, id), eq(project.userId, userId)));
+      .where(and(eq(project.id, id), eq(project.userId, userId)))
+      // Locks the Project row: a Conversation inserted into it waits for this commit (its foreign
+      // key takes a shared lock), so the count below and the cascade see the same rows.
+      .for("update");
     if (!owned) return undefined;
     await stopProjectRuns(deps, id, tx);
     const [row] = await tx

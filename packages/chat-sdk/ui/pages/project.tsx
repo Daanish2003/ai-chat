@@ -107,9 +107,11 @@ function DeleteProjectButton({ projectId }: { projectId: string }) {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete this Project?</AlertDialogTitle>
           <AlertDialogDescription>
-            {total === undefined
-              ? "Checking how many Conversations it holds…"
-              : `This deletes the Project and its ${conversationsLabel(total)}, with their Messages and Shared links. This can't be undone.`}
+            {count.isError
+              ? "Couldn't count this Project's Conversations, so it can't be deleted right now."
+              : total === undefined
+                ? "Checking how many Conversations it holds…"
+                : `This deletes the Project and its ${conversationsLabel(total)}, with their Messages and Shared links. This can't be undone.`}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
