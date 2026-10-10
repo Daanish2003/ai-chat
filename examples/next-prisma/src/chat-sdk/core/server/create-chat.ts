@@ -6,7 +6,13 @@ import { handleJoin } from "./chat/join-run";
 import type { ChatUser, Context } from "./context";
 import { createDb } from "./db/index";
 import { quotaLookup } from "./chat/quota";
-import { createAppDeps, type AppDeps, type HostProvider, type QuotaSetting } from "./deps";
+import {
+  createAppDeps,
+  type AppDeps,
+  type HostProvider,
+  type HostTool,
+  type QuotaSetting,
+} from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
 import { exportUserData, type UserExport } from "./export-user";
@@ -40,8 +46,11 @@ export type CreateChatOptions = {
   /** Overrides for the default rate limits (spec 87). Each action is optional; `false` turns it off. */
   rateLimits?: RateLimits;
   logger?: Logger;
-  /** The Host's own credentials and the Models they pay for (ADR 0007). Never stored. */
-  hostProviders?: HostProvider[];
+  /**
+   * The Host's own credentials (ADR 0007). A Provider entry carries its Models; a Tool entry (`tool:
+   * "tavily"`) carries its price per search. Never stored.
+   */
+  hostProviders?: Array<HostProvider | HostTool>;
   /** Whether users may use their own Provider credentials. Defaults to `true` (ADR 0007). */
   byok?: boolean;
   /**
@@ -130,7 +139,8 @@ export function createChat(options: CreateChatOptions): {
       db: createDb({ DATABASE_URL: options.databaseUrl }),
       keyEncryptionSecrets: options.keyEncryptionSecrets,
       runtime: options.runtime ?? memoryRuntime(),
-      hostProviders: options.hostProviders ?? [],
+      hostProviders: (options.hostProviders ?? []).filter(isHostProvider),
+      hostTools: (options.hostProviders ?? []).filter(isHostTool),
       byok: options.byok ?? true,
       getQuota: quotaLookup(options.getQuota),
       rateLimits: resolveRateLimits(options.rateLimits),
@@ -168,6 +178,10 @@ export function createChat(options: CreateChatOptions): {
     exportUser: (userId) => exportUserData(getDeps(), userId),
   };
 }
+
+const isHostTool = (entry: HostProvider | HostTool): entry is HostTool => "tool" in entry;
+const isHostProvider = (entry: HostProvider | HostTool): entry is HostProvider =>
+  !isHostTool(entry);
 
 /** Counts a hit on a limited RPC route and answers 429 with `Retry-After` once it is over its limit. */
 async function rpcRateLimitRefusal(

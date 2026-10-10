@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 
 import { attachmentsForSend } from "../attachments/send";
 import { linkAttachments, lockAttachments } from "../attachments/store";
-import { addKeyMessage, tavilyService } from "../../shared/credentials/services";
+import { tavilyService, unusableModelMessage } from "../../shared/credentials/services";
 import { resolveModelCall, resolveToolCall } from "../credentials/resolve";
 import type { AppDeps } from "../deps";
 import type { ChatUser } from "../context";
@@ -61,15 +61,16 @@ export async function handleChat(
   const model = await resolveModel(deps, userId, command.model);
   if (!model) return refuse(400, `"${command.model}" is not an available Model`);
   const call = await resolveModelCall(deps, userId, model.id);
-  if (!call) return refuse(400, addKeyMessage(model.provider));
+  if (!call) return refuse(400, unusableModelMessage(model.provider, deps.byok));
   // A Run on Host credentials is refused once its Quota's window has spent the budget (ADR 0007).
   if (call.hostModel) {
     const refusal = await quotaRefusal(deps, userId);
     if (refusal) {
       return Response.json(
         {
-          message:
-            "You've used this window's Quota; try again after it resets, or add your own key",
+          message: deps.byok
+            ? "You've used this window's Quota; try again after it resets, or add your own key"
+            : "You've used this window's Quota; try again after it resets",
           code: quotaExceededCode,
           resetsAt: refusal.resetsAt.toISOString(),
         },
