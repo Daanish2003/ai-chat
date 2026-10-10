@@ -594,6 +594,9 @@ importers:
       '@tanstack/ai-cloudflare':
         specifier: 0.2.5
         version: 0.2.5(@aws-sdk/credential-provider-node@3.972.84)(@smithy/signature-v4@5.7.4)(@tanstack/ai@0.66.0(zod@4.6.5))(undici@8.11.2)(ws@8.22.0)(zod@4.6.5)
+      '@tanstack/ai-compaction':
+        specifier: 0.1.14
+        version: 0.1.14(@tanstack/ai@0.66.0(zod@4.6.5))
       '@tanstack/ai-gemini':
         specifier: 0.37.0
         version: 0.37.0(@modelcontextprotocol/sdk@1.32.0(zod@4.6.5))(@tanstack/ai@0.66.0(zod@4.6.5))
@@ -681,7 +684,7 @@ importers:
         version: 1.18.0
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(jiti@2.7.0)(yaml@2.9.1))
+        version: 5.0.3(@types/node@26.6.4)(jsdom@30.1.2(@noble/hashes@2.4.0))(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
   packages/config: {}
 
@@ -2899,6 +2902,11 @@ packages:
 
   '@tanstack/ai-cloudflare@0.2.5':
     resolution: {integrity: sha512-B90CF48j1XpUnhqtjVMm+kn7eCkpesEQD/eoRH97ANlPfZ+fQW8dj8LtSaCgcwwZ9q9Iqucd58X95bYbQHUCEw==}
+    peerDependencies:
+      '@tanstack/ai': ^0.66.0
+
+  '@tanstack/ai-compaction@0.1.14':
+    resolution: {integrity: sha512-jznt+cYc/xXOFGhH+Nv4C0hWR+jcNAMwVTK2CxIObY93O+I4eCqaHMOQ15tWyN/vkopnPyrQn3VnOGsFx+7aPg==}
     peerDependencies:
       '@tanstack/ai': ^0.66.0
 
@@ -8302,6 +8310,10 @@ snapshots:
       - undici
       - ws
       - zod
+
+  '@tanstack/ai-compaction@0.1.14(@tanstack/ai@0.66.0(zod@4.6.5))':
+    dependencies:
+      '@tanstack/ai': 0.66.0(zod@4.6.5)
 
   '@tanstack/ai-event-client@0.13.1':
     dependencies:
