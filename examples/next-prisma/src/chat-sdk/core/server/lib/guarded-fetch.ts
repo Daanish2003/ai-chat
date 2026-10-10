@@ -18,6 +18,12 @@ export type GuardedFetchOptions = {
   dial?: (address: string) => string;
   /** Redirect hops followed before the request fails (default 5). */
   maxRedirects?: number;
+  /**
+   * Test-only (`createChat({ fetchAllowHosts })`). `host` or `host:port` entries the guard reaches
+   * over plain HTTP and at any address, the port too when given. Any other host is checked as
+   * usual, and a listed host on an unlisted port is refused.
+   */
+  allowHosts?: string[];
 };
 
 /** A request reached a private, reserved or otherwise non-public address. */
@@ -53,7 +59,11 @@ export function isPublicAddress(address: string): boolean {
 export function createGuardedFetch(options: GuardedFetchOptions): typeof globalThis.fetch {
   const { schemes, resolve = systemResolve, dial = (address) => address } = options;
   const maxRedirects = options.maxRedirects ?? 5;
-  const dispatcher = new Agent({ connect: { lookup: pinnedLookup(resolve, dial) } });
+  const allowed = parseAllowHosts(options.allowHosts ?? []);
+  const allowedNames = new Set(allowed.map((entry) => entry.hostname));
+  const dispatcher = new Agent({
+    connect: { lookup: pinnedLookup(resolve, dial, allowedNames) },
+  });
 
   return async (input, init) => {
     const request = new Request(input, init);
@@ -63,7 +73,7 @@ export function createGuardedFetch(options: GuardedFetchOptions): typeof globalT
     let body = request.body ? new Uint8Array(await request.arrayBuffer()) : undefined;
 
     for (let hops = 0; ; hops++) {
-      assertAllowed(url, schemes);
+      assertAllowed(url, schemes, allowed);
       let response: Response;
       try {
         response = await globalThis.fetch(url, {
@@ -95,12 +105,37 @@ export function createGuardedFetch(options: GuardedFetchOptions): typeof globalT
   };
 }
 
-function assertAllowed(url: URL, schemes: GuardedFetchOptions["schemes"]): void {
-  const allowed = schemes === "https" ? ["https:"] : ["http:", "https:"];
-  if (!allowed.includes(url.protocol)) {
+type AllowedHost = { hostname: string; port: string | null };
+
+/** `host` (any port) or `host:port`; a port of `""` is the scheme's default port. */
+function parseAllowHosts(entries: string[]): AllowedHost[] {
+  return entries.map((entry) => {
+    const text = entry.trim();
+    const url = new URL(`http://${text}`);
+    if (url.pathname !== "/" || url.username || url.password || url.search || url.hash) {
+      throw new Error(`An allowed host is a host or host:port, not "${entry}"`);
+    }
+    return { hostname: url.hostname, port: /:\d*$/.test(text) ? url.port : null };
+  });
+}
+
+function assertAllowed(
+  url: URL,
+  schemes: GuardedFetchOptions["schemes"],
+  allowed: AllowedHost[],
+): void {
+  const listed = allowed.find(
+    (entry) => entry.hostname === url.hostname && (entry.port === null || entry.port === url.port),
+  );
+  if (!listed && allowed.some((entry) => entry.hostname === url.hostname)) {
+    throw new Error(`Refused ${url.host}: only the listed ports of ${url.hostname} are allowed`);
+  }
+  const protocols = schemes === "https" ? ["https:"] : ["http:", "https:"];
+  if (!protocols.includes(url.protocol)) {
     const named = schemes === "https" ? "HTTPS" : "HTTP and HTTPS";
     throw new Error(`Only ${named} URLs are allowed, not ${url.protocol}`);
   }
+  if (listed) return;
   // A literal address never reaches the socket's lookup, so it is checked here. The WHATWG URL
   // parser has already written odd IPv4 notations (decimal, octal, hex, short) in dotted form.
   const literal = literalAddress(url.hostname);
@@ -114,11 +149,18 @@ function literalAddress(hostname: string): string | undefined {
   return net.isIP(bare) === 0 ? undefined : bare;
 }
 
-function pinnedLookup(resolve: Resolver, dial: (address: string) => string): LookupFunction {
+function pinnedLookup(
+  resolve: Resolver,
+  dial: (address: string) => string,
+  allowedNames: Set<string>,
+): LookupFunction {
   return (hostname, options, callback) => {
     const fail = (error: Error) => callback(error, "", 4);
     resolve(hostname).then((addresses) => {
-      const blocked = addresses.find((address) => !isPublicAddress(address));
+      // `assertAllowed` has already checked the port of a listed host's request.
+      const blocked = allowedNames.has(hostname)
+        ? undefined
+        : addresses.find((address) => !isPublicAddress(address));
       if (blocked !== undefined) return fail(new BlockedAddressError(blocked, hostname));
 
       const dialed = addresses.map((address) => dial(address));

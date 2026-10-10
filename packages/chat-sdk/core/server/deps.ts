@@ -163,6 +163,7 @@ export function createAppDeps({
   getQuota,
   rateLimits,
   tools,
+  fetchAllowHosts,
 }: {
   db: Database;
   keyEncryptionSecrets: string[];
@@ -173,6 +174,7 @@ export function createAppDeps({
   getQuota: AppDeps["getQuota"];
   rateLimits: ResolvedRateLimits;
   tools: HostServerTool[];
+  fetchAllowHosts?: string[];
 }): AppDeps {
   return {
     db,
@@ -189,7 +191,7 @@ export function createAppDeps({
     rateLimits,
     limits: defaultLimits,
     lifecycle: { stopping: false, runs: new Map() },
-    fetch: createGuardedFetch({ schemes: "http-and-https" }),
+    fetch: createGuardedFetch({ schemes: "http-and-https", allowHosts: fetchAllowHosts }),
     ollamaFetch: globalThis.fetch,
     keyEncryptionSecrets,
   };

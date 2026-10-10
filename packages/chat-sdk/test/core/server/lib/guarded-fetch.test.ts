@@ -215,3 +215,79 @@ describe("createGuardedFetch", () => {
     expect(error).toBeInstanceOf(BlockedAddressError);
   });
 });
+
+describe("createGuardedFetch test allowance (allowHosts)", () => {
+  it("reaches a listed host at a private address, over plain HTTP", async () => {
+    const resolve = vi.fn(async () => ["127.0.0.1"]);
+    const fetch = guard({ resolve, dial: (address) => address, allowHosts: ["fake.test"] });
+
+    const response = await fetch(`http://fake.test:${port}/page`);
+
+    expect(await response.text()).toBe("served");
+  });
+
+  it("reaches a listed host:port only on that port", async () => {
+    const fetch = guard({
+      resolve: async () => ["127.0.0.1"],
+      dial: (address) => address,
+      allowHosts: [`localhost:${port}`],
+    });
+
+    expect(await (await fetch(`http://localhost:${port}/`)).text()).toBe("served");
+    const error = await rejectionOf(fetch(`http://localhost:${port + 1}/`));
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toMatch(/listed ports/);
+  });
+
+  it("still refuses a private address whose host is not listed", async () => {
+    const fetch = guard({
+      resolve: async (hostname) => (hostname === "fake.test" ? ["127.0.0.1"] : ["10.0.0.9"]),
+      dial: (address) => address,
+      allowHosts: ["fake.test"],
+    });
+
+    const error = await rejectionOf(fetch(`http://other.test:${port}/`));
+
+    expect(error).toBeInstanceOf(BlockedAddressError);
+  });
+
+  it("still refuses a literal private address, even when another host is listed", async () => {
+    const resolve = vi.fn(async () => ["127.0.0.1"]);
+    const fetch = guard({ resolve, allowHosts: ["fake.test"] });
+
+    const error = await rejectionOf(fetch(`http://127.0.0.1:${port}/`));
+
+    expect(error).toBeInstanceOf(BlockedAddressError);
+    expect(resolve).not.toHaveBeenCalled();
+  });
+
+  it("refuses a redirect from a listed host to an unlisted private host", async () => {
+    handler = (_req, res) => {
+      res.writeHead(302, { location: `http://internal.test:${port}/` });
+      res.end();
+    };
+    const resolve = async (hostname: string) =>
+      hostname === "fake.test" ? ["127.0.0.1"] : ["10.0.0.5"];
+    const fetch = guard({ resolve, dial: (address) => address, allowHosts: ["fake.test"] });
+
+    const error = await rejectionOf(fetch(`http://fake.test:${port}/`));
+
+    expect(error).toBeInstanceOf(BlockedAddressError);
+  });
+
+  it("rejects an entry that is not a host or host:port", () => {
+    expect(() => guard({ resolve: async () => [], allowHosts: ["fake.test/path"] })).toThrow(
+      /host or host:port/,
+    );
+  });
+
+  it("does not reach a listed host in the HTTPS-only mode over plain HTTP", async () => {
+    const fetch = createGuardedFetch({
+      schemes: "https",
+      resolve: async () => ["127.0.0.1"],
+      allowHosts: ["fake.test"],
+    });
+
+    await expect(fetch(`http://fake.test:${port}/`)).rejects.toThrow(/HTTPS/);
+  });
+});
