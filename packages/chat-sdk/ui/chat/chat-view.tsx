@@ -10,6 +10,7 @@ import {
   takePendingFirstMessage,
   toUIMessages,
 } from "../../core/client/chat";
+import { contextFill, lastRunTokens } from "../../core/client/context-ring";
 import { missingCredentialsMessage } from "../../core/client/models";
 import { rateLimitedErrorOf, runFetch } from "../../core/client/rate-limit";
 import { fetchServerSentEvents, type UIMessage, useChat } from "@tanstack/ai-react";
@@ -26,6 +27,7 @@ import { quotaBlocksModel } from "../../core/client/quota";
 
 import { AttachButton, DraftAttachmentChips, useAttachmentDraft } from "./attachments";
 import { Composer } from "./composer";
+import { ContextOverflowNotice, ContextRing } from "./context-ring";
 import { MessageRow } from "./message-row";
 import { MissingCredentialsBanner } from "./missing-credentials-banner";
 import { QuotaBanner } from "./quota-banner";
@@ -167,9 +169,12 @@ function ChatThread({
     : null;
   // A spent Quota blocks the selected Model only when it's a Host Model; the user's own still runs.
   const quota = useQuota().data;
-  const quotaBlocked = quotaBlocksModel(
-    models.data?.models.find((model) => model.id === conversation.model),
-    quota,
+  const selectedModel = models.data?.models.find((model) => model.id === conversation.model);
+  const quotaBlocked = quotaBlocksModel(selectedModel, quota);
+  // The context ring: the last Run's tokens on this Branch, against the selected Model's window.
+  const context = contextFill(
+    lastRunTokens(conversation.messages),
+    selectedModel?.contextWindow ?? null,
   );
   const search = useWebSearch(conversation.model);
 
@@ -295,6 +300,7 @@ function ChatThread({
           <QuotaMeter />
           {blocked && <MissingCredentialsBanner message={blocked} />}
           {quotaBlocked && quota && <QuotaBanner resetsAt={quota.resetsAt} />}
+          <ContextOverflowNotice fill={context} />
           <Composer
             onSend={(text) => {
               void send(text, draft.uploaded);
@@ -317,6 +323,7 @@ function ChatThread({
           >
             <AttachButton draft={draft} disabled={!!blocked || quotaBlocked} />
             <SearchToggle search={search} />
+            <ContextRing fill={context} />
           </Composer>
         </div>
       </div>
