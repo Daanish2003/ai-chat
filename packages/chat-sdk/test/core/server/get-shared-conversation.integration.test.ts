@@ -16,7 +16,7 @@ function chatFor(user: TestUser | null) {
   const chat = createChat({
     databaseUrl: testDatabaseUrl,
     getUser: () => (user ? { id: user.id } : null),
-    keyEncryptionSecret: testKeyEncryptionSecret,
+    keyEncryptionSecrets: [testKeyEncryptionSecret],
     basePath,
   });
   const client = createChatClient({

@@ -8,6 +8,7 @@ import { createDb } from "./db/index";
 import { createAppDeps, type AppDeps } from "./deps";
 import { createLifecycle } from "./lifecycle";
 import { deleteUserData } from "./delete-user";
+import { countUnreadableCredentials } from "./credentials/store";
 import { assertMigrated, migrate as migrateSchema } from "./migrate";
 import { memoryRuntime, type ChatRuntime } from "./runtime";
 import { appRouter } from "./routers/index";
@@ -25,8 +26,11 @@ export type CreateChatOptions = {
   databaseUrl: string;
   /** Who the request is from. `null` answers 401, except for the public Shared link read. */
   getUser: GetUser;
-  /** `KEY_ENCRYPTION_SECRET`: encrypts Provider and Tool credentials at rest (ADR 0003). */
-  keyEncryptionSecret: string;
+  /**
+   * The keyring (ADR 0010), at least one secret. The first encrypts Provider and Tool credentials
+   * at rest; every entry decrypts, so a key can be added in front of the old one.
+   */
+  keyEncryptionSecrets: string[];
   /** Where the handler is mounted, for example `/api/chat`. */
   basePath: string;
   runtime?: ChatRuntime;
@@ -97,11 +101,14 @@ export function createChat(options: CreateChatOptions): {
   /** Deletes everything the SDK holds for a user, in one transaction. Idempotent. */
   deleteUser: (userId: string) => Promise<void>;
 } {
+  if (options.keyEncryptionSecrets.length === 0) {
+    throw new Error("keyEncryptionSecrets must hold at least one secret");
+  }
   let deps: AppDeps | undefined;
   const getDeps = () => {
     deps ??= createAppDeps({
       db: createDb({ DATABASE_URL: options.databaseUrl }),
-      keyEncryptionSecret: options.keyEncryptionSecret,
+      keyEncryptionSecrets: options.keyEncryptionSecrets,
       runtime: options.runtime ?? memoryRuntime(),
     });
     return deps;
@@ -119,6 +126,11 @@ export function createChat(options: CreateChatOptions): {
     migrate: () => migrateSchema(options.databaseUrl),
     start: async () => {
       await assertMigrated(options.databaseUrl);
+      // Unreadable rows are reported, never a reason to refuse to boot (ADR 0010).
+      const unreadable = await countUnreadableCredentials(getDeps());
+      if (unreadable.unknownKey + unreadable.corrupt > 0) {
+        (options.logger ?? console).error("Stored credentials can't be read", unreadable);
+      }
       await getLifecycle().start();
     },
     stop: async () => {

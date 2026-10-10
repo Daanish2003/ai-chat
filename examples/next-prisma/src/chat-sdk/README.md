@@ -83,7 +83,7 @@ The server API below is the spec for the SDK (spec #70). Some of it lands in lat
 
 ```ts
 // server: construct at module load (no side effects)
-const chat = createChat({ databaseUrl, getUser, keyEncryptionSecret, basePath: "/api/chat" });
+const chat = createChat({ databaseUrl, getUser, keyEncryptionSecrets, basePath: "/api/chat" });
 
 // one catch-all route on your framework, for every chat call and the Shared link read
 export const handler = (request: Request) => chat.handler(request);

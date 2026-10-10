@@ -13,7 +13,7 @@ import {
   parseModelId,
 } from "../../shared/chat/models";
 
-type Deps = Pick<AppDeps, "db" | "keyEncryptionSecret" | "fetch">;
+type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets" | "fetch">;
 
 /**
  * The Models the user can chat with (those of Providers they have credentials for, with the live

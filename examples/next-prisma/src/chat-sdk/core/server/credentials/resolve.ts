@@ -1,7 +1,7 @@
 import type { AppDeps, Credentials } from "../deps";
 import { listCredentials, loadCredentials } from "./store";
 
-type Deps = Pick<AppDeps, "db" | "keyEncryptionSecret">;
+type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets">;
 
 /**
  * The one place that decides which credentials a call uses. For a Provider or Tool `service`, a

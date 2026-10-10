@@ -36,7 +36,7 @@ export function createTestDeps({
     fetch: async (input) => {
       throw new Error(`Unexpected network call in a test: ${String(input)}`);
     },
-    keyEncryptionSecret: testKeyEncryptionSecret,
+    keyEncryptionSecrets: [testKeyEncryptionSecret],
     lifecycle: { stopping: false, runs: new Map() },
     ...overrides,
   };

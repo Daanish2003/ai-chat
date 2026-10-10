@@ -3,12 +3,18 @@ import { and, eq } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
 import type { CredentialSummary } from "../../shared/credentials/services";
-import { decryptCredentials, encryptCredentials } from "./encryption";
+import { tavilyService } from "../../shared/credentials/services";
+import { decryptCredentials, encryptCredentials, type CredentialKind } from "./encryption";
 
-type Deps = Pick<AppDeps, "db" | "keyEncryptionSecret">;
+type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets">;
+
+/** Tool credentials and Provider credentials are encrypted under different keys (ADR 0010). */
+const kindOf = (service: string): CredentialKind =>
+  service === tavilyService ? "tool" : "provider";
 
 const encryptionOptions = (deps: Deps, userId: string, service: string) => ({
-  secret: deps.keyEncryptionSecret,
+  secrets: deps.keyEncryptionSecrets,
+  kind: kindOf(service),
   context: `${userId}:${service}`,
 });
 
@@ -23,7 +29,8 @@ export async function loadCredentials(
     columns: { encrypted: true },
   });
   if (!row) return null;
-  return decryptCredentials(row.encrypted, encryptionOptions(deps, userId, service));
+  const result = decryptCredentials(row.encrypted, encryptionOptions(deps, userId, service));
+  return result.ok ? result.credentials : null;
 }
 
 /**
@@ -36,10 +43,28 @@ export async function listCredentials(deps: Deps, userId: string): Promise<Crede
     orderBy: { createdAt: "asc", service: "asc" },
   });
   return rows
-    .filter((row) =>
-      decryptCredentials(row.encrypted, encryptionOptions(deps, userId, row.service)),
+    .filter(
+      (row) => decryptCredentials(row.encrypted, encryptionOptions(deps, userId, row.service)).ok,
     )
     .map(({ service, hint, verified }) => ({ service, hint, verified }));
+}
+
+/** How many stored rows can't be read: under a key the keyring no longer holds, or corrupt. */
+export async function countUnreadableCredentials(deps: Deps) {
+  const rows = await deps.db.query.userCredentials.findMany({
+    columns: { userId: true, service: true, encrypted: true },
+  });
+  const counts = { unknownKey: 0, corrupt: 0 };
+  for (const row of rows) {
+    const result = decryptCredentials(
+      row.encrypted,
+      encryptionOptions(deps, row.userId, row.service),
+    );
+    if (result.ok) continue;
+    if (result.reason === "unknown-key") counts.unknownKey += 1;
+    else counts.corrupt += 1;
+  }
+  return counts;
 }
 
 /** Inserts or replaces the user's credentials for `service`. */
