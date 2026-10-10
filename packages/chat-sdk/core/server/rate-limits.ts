@@ -27,7 +27,7 @@ export type ResolvedRateLimits = {
 
 export const defaultRateLimits: ResolvedRateLimits = {
   runStart: { limit: 20, windowSeconds: 60 },
-  attachmentUpload: { limit: 30, windowSeconds: 60 },
+  attachmentUpload: { limit: 30, windowSeconds: 600 },
   credentialSave: { limit: 10, windowSeconds: 60 },
   conversationSearch: { limit: 60, windowSeconds: 60 },
 };

@@ -147,6 +147,14 @@ describe.each(rpcCases)("$name rate limits", ({ route, rateLimits }) => {
   });
 });
 
+it("defaults to spec 87's numbers: 30 uploads per 10 minutes, 10 saves a minute, 60 searches a minute", () => {
+  expect(resolveRateLimits()).toMatchObject({
+    attachmentUpload: { limit: 30, windowSeconds: 600 },
+    credentialSave: { limit: 10, windowSeconds: 60 },
+    conversationSearch: { limit: 60, windowSeconds: 60 },
+  });
+});
+
 it("surfaces the limit to the typed client as a RateLimitedError with the retry time", async () => {
   const user = await insertUser();
   const client = chatRpc({
