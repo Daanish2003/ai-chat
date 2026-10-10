@@ -1,13 +1,18 @@
-import { eq } from "drizzle-orm";
-import { conversation, project } from "../../../../core/server/db/schema/chat";
+import { EventType } from "@tanstack/ai";
+import { and, eq } from "drizzle-orm";
+import { conversation, message, project } from "../../../../core/server/db/schema/chat";
 import { getTestDb } from "../../../support/test-database";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { START } from "../../../../core/server/chat/run-streams";
+import { saveCredentials } from "../../../../core/server/credentials/store";
 import { uuidv7 } from "../../../../core/server/lib/uuidv7";
-import { insertConversation } from "../../../support/conversations";
+import { insertConversation, insertMessage } from "../../../support/conversations";
+import { createTestDeps } from "../../../support/deps";
+import { createFakeAdapter, text } from "../../../support/fake-adapter";
 import { insertUser } from "../../../support/users";
-import { chatRpc } from "../../../support/sdk";
+import { chatRpc, createTestChat } from "../../../support/sdk";
 
 async function signedIn() {
   const user = await insertUser();
@@ -192,6 +197,140 @@ describe("conversation.list in a Project", () => {
 
     await expect(client.conversation.list({ projectId })).rejects.toMatchObject({
       code: "NOT_FOUND",
+    });
+  });
+});
+
+describe("project.conversationCount", () => {
+  it("counts the Project's Conversations, and leaves out other Conversations", async () => {
+    const { user, client } = await signedIn();
+    const { id: projectId } = await client.project.create({ name: "Work" });
+    await insertConversation(user, { projectId });
+    await insertConversation(user, { projectId });
+    await insertConversation(user, { title: "Loose" });
+
+    await expect(client.project.conversationCount({ id: projectId })).resolves.toEqual({
+      count: 2,
+    });
+  });
+
+  it("answers NOT_FOUND for another user's Project", async () => {
+    const other = await insertUser();
+    const { id: projectId } = await chatRpc({ user: other }).project.create({ name: "Theirs" });
+    const { client } = await signedIn();
+
+    await expect(client.project.conversationCount({ id: projectId })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+  });
+});
+
+describe("project.delete", () => {
+  it("deletes the Project with its Conversations, Messages and Shared links, and answers the count", async () => {
+    const { user, client } = await signedIn();
+    const { id: projectId } = await client.project.create({ name: "Work" });
+    const inProject = await insertConversation(user, { projectId });
+    const question = await insertMessage({
+      conversationId: inProject.id,
+      role: "user",
+      text: "Hi",
+    });
+    await insertMessage({
+      conversationId: inProject.id,
+      parentId: question.id,
+      role: "assistant",
+      text: "Hello!",
+      active: true,
+    });
+    const link = await client.share.upsert({ conversationId: inProject.id });
+    const loose = await insertConversation(user, { title: "Loose" });
+
+    await expect(client.project.delete({ id: projectId })).resolves.toEqual({ count: 1 });
+
+    await expect(client.project.get({ id: projectId })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(
+      await getTestDb().select().from(conversation).where(eq(conversation.id, inProject.id)),
+    ).toEqual([]);
+    expect(
+      await getTestDb().select().from(message).where(eq(message.conversationId, inProject.id)),
+    ).toEqual([]);
+    await expect(client.share.get({ token: link.token })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(
+      await getTestDb().select().from(conversation).where(eq(conversation.id, loose.id)),
+    ).toHaveLength(1);
+  });
+
+  it("answers NOT_FOUND for another user's Project, and leaves their Conversations alone", async () => {
+    const other = await insertUser();
+    const otherClient = chatRpc({ user: other });
+    const { id: projectId } = await otherClient.project.create({ name: "Theirs" });
+    const theirs = await insertConversation(other, { projectId });
+    const { client } = await signedIn();
+
+    await expect(client.project.delete({ id: projectId })).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
+    expect(
+      await getTestDb().select().from(conversation).where(eq(conversation.id, theirs.id)),
+    ).toHaveLength(1);
+  });
+
+  describe("a live Run", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("is stopped before its rows go, and writes nothing after", async () => {
+      const { user, client } = await signedIn();
+      const { id: projectId } = await client.project.create({ name: "Work" });
+      const conv = await insertConversation(user, { projectId });
+      const question = await insertMessage({ conversationId: conv.id, role: "user", text: "Hi" });
+      await saveCredentials(createTestDeps(), user.id, {
+        service: "anthropic",
+        fields: { apiKey: "sk-ant-test-key" },
+        hint: "…-key",
+        verified: true,
+      });
+      // Held until the test releases it, so the Run is still live when the Project is deleted.
+      const fake = createFakeAdapter({ rounds: [text("Hel", "lo")], manual: true });
+      const deps = createTestDeps({ adapterFor: () => fake.adapter });
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const chat = createTestChat({ user, deps });
+      const started = await chat.fetch(
+        new Request(chat.chatUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: [],
+            forwardedProps: {
+              conversationId: conv.id,
+              parentId: question.id,
+              attachmentIds: [],
+              model: "anthropic:claude-sonnet-5-5",
+              webSearch: false,
+            },
+          }),
+        }),
+      );
+      expect(started.status).toBe(200);
+      const [reply] = await getTestDb()
+        .select()
+        .from(message)
+        .where(and(eq(message.conversationId, conv.id), eq(message.status, "streaming")));
+      if (!reply) throw new Error("The Run did not start a streaming Message");
+
+      await expect(chat.rpc.project.delete({ id: projectId })).resolves.toEqual({ count: 1 });
+      await fake.release(1);
+
+      // The log ends with a terminal chunk, so a reader does not reconnect and start the Run again.
+      const chunks = [];
+      for await (const entry of deps.runStreams.read(reply.id, START)) chunks.push(entry.chunk);
+      expect(chunks.at(-1)?.type).toBe(EventType.RUN_FINISHED);
+      // The owner's last writes landed on deleted rows, so no Message came back and nothing failed.
+      expect(await getTestDb().select().from(message).where(eq(message.id, reply.id))).toEqual([]);
+      expect(consoleError).not.toHaveBeenCalled();
     });
   });
 });

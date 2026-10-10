@@ -9,7 +9,7 @@ import {
   type ModelMessage,
   type StreamChunk,
 } from "@tanstack/ai";
-import { and, eq, isNull, lt, or } from "drizzle-orm";
+import { and, eq, isNull, lt, or, type SQL } from "drizzle-orm";
 
 import type { AppDeps, Credentials } from "../deps";
 import { cancelRunningCalls, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
@@ -371,11 +371,24 @@ export type Executor = AppDeps["db"] | Parameters<Parameters<AppDeps["db"]["tran
  * transaction. Their owners write nothing more once the rows the caller deletes are gone.
  */
 export async function stopUserRuns(deps: AppDeps, userId: string, db: Executor = deps.db) {
+  await stopLiveRuns(deps, eq(conversation.userId, userId), db);
+}
+
+/**
+ * Stops every live Run in one Project's Conversations, inside the caller's transaction. As
+ * `stopUserRuns`, for `project.delete`.
+ */
+export async function stopProjectRuns(deps: AppDeps, projectId: string, db: Executor = deps.db) {
+  await stopLiveRuns(deps, eq(conversation.projectId, projectId), db);
+}
+
+/** Stops the live Runs whose Conversation matches `where`. */
+async function stopLiveRuns(deps: AppDeps, where: SQL, db: Executor) {
   const live = await db
     .select({ id: message.id })
     .from(message)
     .innerJoin(conversation, eq(conversation.id, message.conversationId))
-    .where(and(eq(conversation.userId, userId), eq(message.status, "streaming")));
+    .where(and(where, eq(message.status, "streaming")));
   for (const { id } of live) await stopRun(deps, id, db);
 }
 

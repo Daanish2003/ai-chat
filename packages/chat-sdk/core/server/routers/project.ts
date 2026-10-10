@@ -2,7 +2,14 @@ import { project } from "../db/schema/chat";
 import { ORPCError } from "@orpc/server";
 import { z } from "zod";
 
-import { countProjects, findProject, listProjects, projectLimit } from "../project/store";
+import {
+  countProjectConversations,
+  countProjects,
+  deleteProject,
+  findProject,
+  listProjects,
+  projectLimit,
+} from "../project/store";
 import { protectedProcedure } from "../procedures";
 import { uuidv7 } from "../lib/uuidv7";
 
@@ -33,5 +40,26 @@ export const projectRouter = {
         .insert(project)
         .values({ id, userId: context.user.id, name: input.name });
       return { id };
+    }),
+
+  /** How many Conversations the Project holds, for the delete confirmation. */
+  conversationCount: protectedProcedure
+    .input(z.object({ id: z.uuid() }))
+    .handler(async ({ context, input }) => {
+      const count = await countProjectConversations(context.deps, context.user.id, input.id);
+      if (count === undefined) throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      return { count };
+    }),
+
+  /**
+   * Deletes the Project with its Conversations, Messages and Shared links, for good. Live Runs in
+   * those Conversations stop first. Answers how many Conversations went.
+   */
+  delete: protectedProcedure
+    .input(z.object({ id: z.uuid() }))
+    .handler(async ({ context, input }) => {
+      const count = await deleteProject(context.deps, context.user.id, input.id);
+      if (count === undefined) throw new ORPCError("NOT_FOUND", { message: "Project not found" });
+      return { count };
     }),
 };
