@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import type { AppDeps } from "../deps";
+import { isAllowListed } from "../lib/guarded-fetch";
 import type { McpServerConfig } from "./servers";
 
 /** A sign-in that failed for a reason the user can read. The routes answer it as text. */
@@ -42,10 +43,13 @@ async function readJson(fetch: Fetch, url: URL): Promise<Record<string, unknown>
   }
 }
 
-function httpsEndpoint(value: unknown): string {
+/** An endpoint must be HTTPS, or plain HTTP on a host the test allowance lists (`allowHosts`). */
+function secureEndpoint(value: unknown, allowHosts: readonly string[]): string {
   if (typeof value === "string") {
     try {
-      if (new URL(value).protocol === "https:") return value;
+      const url = new URL(value);
+      if (url.protocol === "https:") return value;
+      if (url.protocol === "http:" && isAllowListed(url, allowHosts)) return value;
     } catch {
       // Not a URL: refused below.
     }
@@ -58,7 +62,11 @@ function httpsEndpoint(value: unknown): string {
  * the authorization server (RFC 9728), whose metadata gives the endpoints (RFC 8414). Both requests
  * go through the guarded `fetch` (ADR, spec #91).
  */
-export async function discoverEndpoints(server: McpServerConfig, fetch: Fetch): Promise<Endpoints> {
+export async function discoverEndpoints(
+  server: McpServerConfig,
+  fetch: Fetch,
+  allowHosts: readonly string[] = [],
+): Promise<Endpoints> {
   const resource = new URL(server.url);
   const protectedResource = await readJson(
     fetch,
@@ -71,7 +79,7 @@ export async function discoverEndpoints(server: McpServerConfig, fetch: Fetch): 
       resource.origin,
   );
   // The guarded fetch also allows HTTP, and the issuer comes from the server's own metadata.
-  httpsEndpoint(issuer.href);
+  secureEndpoint(issuer.href, allowHosts);
   const path = issuer.pathname.replace(/\/+$/, "");
   const metadata =
     (await readJson(
@@ -81,8 +89,8 @@ export async function discoverEndpoints(server: McpServerConfig, fetch: Fetch): 
     (await readJson(fetch, new URL(`/.well-known/openid-configuration${path}`, issuer.origin)));
   if (!metadata) throw new SignInError("The server doesn't publish its sign-in details");
   return {
-    authorizationEndpoint: httpsEndpoint(metadata.authorization_endpoint),
-    tokenEndpoint: httpsEndpoint(metadata.token_endpoint),
+    authorizationEndpoint: secureEndpoint(metadata.authorization_endpoint, allowHosts),
+    tokenEndpoint: secureEndpoint(metadata.token_endpoint, allowHosts),
   };
 }
 

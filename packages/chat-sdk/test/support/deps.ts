@@ -49,6 +49,7 @@ export function createTestDeps({
     hostProviders: [],
     hostTools: [],
     mcpServers: [],
+    fetchAllowHosts: [],
     byok: true,
     getQuota: async () => null,
     lifecycle: { stopping: false, runs: new Map() },

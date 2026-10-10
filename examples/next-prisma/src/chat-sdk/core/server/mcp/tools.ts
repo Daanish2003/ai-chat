@@ -12,7 +12,10 @@ import type { McpServerConfig } from "./servers";
  * The MCP tools a Run offers (spec #91): one client per Connection switched on in the
  * Conversation, opened when the Run starts and closed when it ends.
  */
-type Deps = Pick<AppDeps, "db" | "keyEncryptionSecrets" | "mcpServers" | "fetch">;
+type Deps = Pick<
+  AppDeps,
+  "db" | "keyEncryptionSecrets" | "mcpServers" | "fetch" | "fetchAllowHosts"
+>;
 
 export type McpTools = { tools: AnyServerTool[]; close: () => Promise<void> };
 
@@ -28,7 +31,7 @@ async function accessTokenFor(deps: Deps, userId: string, server: McpServerConfi
   if (!isExpired(tokens)) return tokens.accessToken;
   if (!tokens.refreshToken) return null;
   try {
-    const { tokenEndpoint } = await discoverEndpoints(server, deps.fetch);
+    const { tokenEndpoint } = await discoverEndpoints(server, deps.fetch, deps.fetchAllowHosts);
     const refreshed = await refreshAccess({
       fetch: deps.fetch,
       server,

@@ -20,17 +20,26 @@ export type FakeMcpAuth = {
 };
 
 export const fakeMcpResource = "https://mcp.test/mcp";
-const authOrigin = "https://auth.test";
+const defaultAuthOrigin = "https://auth.test";
 
+/**
+ * `resource` and `authOrigin` default to the unit tests' origins. The end-to-end tests serve the
+ * resource and the authorization server from one localhost origin, over real HTTP.
+ */
 export function createFakeMcpAuth({
   clientId,
   clientSecret,
   scope = "read:issues write:issues",
+  resource = fakeMcpResource,
+  authOrigin = defaultAuthOrigin,
 }: {
   clientId: string;
   clientSecret: string;
   scope?: string;
+  resource?: string;
+  authOrigin?: string;
 }): FakeMcpAuth {
+  const resourceOrigin = new URL(resource).origin;
   // code -> what the authorize step bound it to
   const codes = new Map<string, { challenge: string; redirectUri: string }>();
   const tokenRequests: Array<Record<string, string>> = [];
@@ -59,11 +68,8 @@ export function createFakeMcpAuth({
     const url = new URL(request.url);
     const method = request.method;
 
-    if (
-      url.origin === "https://mcp.test" &&
-      url.pathname === "/.well-known/oauth-protected-resource"
-    ) {
-      return json({ resource: fakeMcpResource, authorization_servers: [authOrigin] });
+    if (url.origin === resourceOrigin && url.pathname === "/.well-known/oauth-protected-resource") {
+      return json({ resource, authorization_servers: [authOrigin] });
     }
     if (url.origin === authOrigin && url.pathname === "/.well-known/oauth-authorization-server") {
       return json({
@@ -104,7 +110,7 @@ export function createFakeMcpAuth({
 
   return {
     fetch,
-    resource: fakeMcpResource,
+    resource,
     tokenRequests,
     accepts: (accessToken) => accessTokens.has(accessToken),
     revokeRefresh: (refreshToken) => {

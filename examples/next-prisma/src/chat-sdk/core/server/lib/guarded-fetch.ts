@@ -119,6 +119,16 @@ function parseAllowHosts(entries: string[]): AllowedHost[] {
   });
 }
 
+/**
+ * True when the test allowance lists `url`'s host and port (any port when the entry has none).
+ * Plain HTTP to a listed host is the only thing it lets past a check that wants HTTPS (MCP servers).
+ */
+export function isAllowListed(url: URL, allowHosts: readonly string[]): boolean {
+  return parseAllowHosts([...allowHosts]).some(
+    (entry) => entry.hostname === url.hostname && (entry.port === null || entry.port === url.port),
+  );
+}
+
 function assertAllowed(
   url: URL,
   schemes: GuardedFetchOptions["schemes"],

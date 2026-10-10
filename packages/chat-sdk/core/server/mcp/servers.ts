@@ -1,3 +1,5 @@
+import { isAllowListed } from "../lib/guarded-fetch";
+
 /**
  * One remote MCP server a Host offers (`createChat({ mcpServers })`, spec #91). The Host is the
  * operator: a user can only sign in to the servers listed here.
@@ -18,8 +20,15 @@ export type McpServerConfig = {
 
 const keyPattern = /^[A-Za-z0-9_-]+$/;
 
-/** Throws on a server the SDK can't offer: a key that isn't a plain name, a repeated key, or a URL that isn't HTTPS. */
-export function checkMcpServers(servers: readonly McpServerConfig[]): void {
+/**
+ * Throws on a server the SDK can't offer: a key that isn't a plain name, a repeated key, or a URL
+ * that isn't HTTPS. The test allowance (`allowHosts`, `createChat({ fetchAllowHosts })`) lets a
+ * listed host be plain HTTP, and only that host.
+ */
+export function checkMcpServers(
+  servers: readonly McpServerConfig[],
+  allowHosts: readonly string[] = [],
+): void {
   const keys = new Set<string>();
   for (const server of servers) {
     if (!keyPattern.test(server.key)) {
@@ -33,7 +42,8 @@ export function checkMcpServers(servers: readonly McpServerConfig[]): void {
     } catch {
       throw new Error(`MCP server "${server.key}" has no valid URL`);
     }
-    if (url.protocol !== "https:") {
+    const plainHttpAllowed = url.protocol === "http:" && isAllowListed(url, allowHosts);
+    if (url.protocol !== "https:" && !plainHttpAllowed) {
       throw new Error(`MCP server "${server.key}" must use an HTTPS URL, got ${server.url}`);
     }
   }

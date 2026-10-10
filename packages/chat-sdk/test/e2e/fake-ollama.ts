@@ -13,6 +13,20 @@ export const fetchedPagePath = "/e2e/article";
 export const fetchedPageTitle = "Launch notes";
 export const fetchedPageText = "The launch date is 14 March.";
 
+/**
+ * A prompt with this marker makes the fake Model call `mcpToolName` (the e2e MCP server's
+ * `create_issue`, under its Host key), when the request offers it.
+ */
+export const mcpMarker = "[mcp]";
+export const mcpToolName = "tracker_create_issue";
+/** The arguments the fake Model sends with that call. */
+export const mcpToolArguments = { title: "E2E launch" };
+
+/** The reply to an MCP tool's result: what the tool returned, as the Model sees it. */
+export function mcpReply(toolResult: string): string {
+  return `The issue was created. The tool returned: ${toolResult}`;
+}
+
 /** The reply to a `fetch_url` result: the page it read, cited by its link, and what it says. */
 export function fetchedReply(toolResult: string): string {
   const result = JSON.parse(toolResult) as {
@@ -78,7 +92,11 @@ export function startFakeOllama(port: number): Promise<Server> {
         stream = true,
         tools = [],
       } = JSON.parse(body) as {
-        messages: { role: string; content: string }[];
+        messages: {
+          role: string;
+          content: string;
+          tool_calls?: { function: { name: string } }[];
+        }[];
         stream?: boolean;
         tools?: { function?: { name?: string } }[];
       };
@@ -86,30 +104,42 @@ export function startFakeOllama(port: number): Promise<Server> {
       const last = messages.at(-1);
       // Answers from a tool result the stream has just added, as a Model would.
       const answering = stream && last?.role === "tool";
+      // The tool the reply asked for last, whose result is the one just added.
+      const asked = messages.at(-2)?.tool_calls?.[0]?.function.name;
+      const offers = (name: string) => tools.some((tool) => tool.function?.name === name);
       // Scripted: a prompt with the marker and a link asks for `fetch_url`, when the request offers it.
       const link = /https?:\/\/\S+/.exec(prompt)?.[0];
-      const offered = tools.some((tool) => tool.function?.name === fetchToolName);
-      if (stream && !answering && link && offered && prompt.includes(fetchMarker)) {
+      const calls = (name: string, args: Record<string, unknown>) => {
         response.setHeader("content-type", "application/x-ndjson");
-        const call = {
-          function: { name: fetchToolName, arguments: { url: link } },
-        };
         response.end(
           `${JSON.stringify({
             model: fakeModel,
             created_at: new Date().toISOString(),
-            message: { role: "assistant", content: "", tool_calls: [call] },
+            message: {
+              role: "assistant",
+              content: "",
+              tool_calls: [{ function: { name, arguments: args } }],
+            },
             done: true,
             done_reason: "stop",
             prompt_eval_count: 1,
             eval_count: 1,
           })}\n`,
         );
+      };
+      if (stream && !answering && link && offers(fetchToolName) && prompt.includes(fetchMarker)) {
+        calls(fetchToolName, { url: link });
+        return;
+      }
+      if (stream && !answering && offers(mcpToolName) && prompt.includes(mcpMarker)) {
+        calls(mcpToolName, mcpToolArguments);
         return;
       }
       const text =
         last?.role === "tool" && stream
-          ? fetchedReply(last.content)
+          ? asked === mcpToolName
+            ? mcpReply(last.content)
+            : fetchedReply(last.content)
           : fakeReply(prompt.slice(0, 80));
       const line = (content: string, done: boolean) =>
         JSON.stringify({

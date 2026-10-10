@@ -188,7 +188,7 @@ export function createChat(options: CreateChatOptions): {
   if (options.keyEncryptionSecrets.length === 0) {
     throw new Error("keyEncryptionSecrets must hold at least one secret");
   }
-  checkMcpServers(options.mcpServers ?? []);
+  checkMcpServers(options.mcpServers ?? [], options.fetchAllowHosts);
   for (const builtIn of [webSearchToolName, fetchUrlToolName]) {
     if (options.tools?.some((tool) => tool.name === builtIn)) {
       throw new Error(`A Host tool can't be named "${builtIn}": the SDK's tool has it`);

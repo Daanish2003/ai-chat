@@ -5,6 +5,7 @@ import { log } from "evlog";
 
 import { appName, sender } from "./email";
 import { ENV, ssrfAllowHosts } from "./env.server";
+import { mcpServersOf } from "./mcp-server";
 
 export const db = createDb(ENV);
 export const auth = createAuth({ ...ENV, APP_NAME: appName }, db, sender, log);
@@ -17,6 +18,7 @@ export const chat = createChat({
   logger: log,
   basePath: "/api/chat",
   fetchAllowHosts: ssrfAllowHosts,
+  mcpServers: mcpServersOf(ENV),
   getUser: async (request) => {
     const session = await auth.api.getSession({ headers: request.headers });
     return session?.user ? { id: session.user.id } : null;
