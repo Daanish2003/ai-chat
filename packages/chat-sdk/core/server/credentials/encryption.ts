@@ -2,8 +2,8 @@ import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } f
 
 import type { Credentials } from "../deps";
 
-/** Provider credentials and Tool credentials each get their own key (ADR 0010). */
-export type CredentialKind = "provider" | "tool";
+/** Provider credentials, Tool credentials and Connection tokens each get their own key (ADR 0010). */
+export type CredentialKind = "provider" | "tool" | "connection";
 
 type Options = {
   /** `keyEncryptionSecrets`: the first encrypts, every entry decrypts. Never empty. */
@@ -27,6 +27,7 @@ const KID_LENGTH = 8;
 const kindInfo: Record<CredentialKind, string> = {
   provider: "ai-chat provider credentials",
   tool: "ai-chat tool credentials",
+  connection: "ai-chat connection tokens",
 };
 
 /** The AES key for `kind` derived from one secret, and its `kid`: a short HMAC of that key. */

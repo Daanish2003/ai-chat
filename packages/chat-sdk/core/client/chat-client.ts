@@ -21,6 +21,8 @@ export type ChatClient = {
   chatUrl: string;
   /** The signed-in user's export, a JSON download (`GET`). */
   exportUrl: string;
+  /** Where the MCP sign-in starts (`GET ?server=<key>&returnTo=<path>`) and finishes. */
+  connectionsUrl: string;
   /** The transport every RPC call goes through. */
   fetch: ChatFetch;
 };
@@ -45,6 +47,7 @@ export function createChatClient({
     orpc: createTanstackQueryUtils(rpc),
     chatUrl: `${base}/run`,
     exportUrl: `${base}/export`,
+    connectionsUrl: `${base}/mcp`,
     fetch,
   };
 }
