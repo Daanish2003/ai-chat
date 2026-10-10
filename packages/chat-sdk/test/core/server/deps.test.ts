@@ -13,6 +13,7 @@ describe("createAppDeps", () => {
       keyEncryptionSecrets: ["test-secret"],
       runtime: memoryRuntime(),
       hostProviders: [],
+      hostTools: [],
       byok: true,
       getQuota: async () => null,
       rateLimits: resolveRateLimits(),
