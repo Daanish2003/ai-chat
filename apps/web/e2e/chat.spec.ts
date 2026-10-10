@@ -1,24 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 import { slowMarker } from "./fake-ollama";
-import {
-  messageRows,
-  send,
-  signInAsSeededUser,
-  signInAsSeededUserWithModel,
-  signUpWithForm,
-} from "./helpers";
+import { messageRows, send, signInAsSeededUser, signInAsSeededUserWithModel } from "./helpers";
 
-test("the home page sends a signed-out visitor to log in, and a new user to the chat", async ({
-  page,
-}) => {
+test("the home page sends a signed-out visitor to log in", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/login$/);
-
-  await signUpWithForm(page);
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/c$/);
-  await expect(page.getByRole("heading", { name: "Bring your own key to start" })).toBeVisible();
 });
 
 test("a seeded user is signed in, and its password signs in on the form", async ({ page }) => {

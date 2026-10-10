@@ -15,4 +15,10 @@ export const serverEnv = {
   BETTER_AUTH_URL: baseURL,
   BETTER_AUTH_SECRET: "e2e-better-auth-secret-not-for-production",
   KEY_ENCRYPTION_SECRET: "e2e-key-encryption-secret-not-for-production",
+  // Mail goes to the capture mailbox, read back through /api/test-mailbox. Nothing is sent, so
+  // the Resend key is a placeholder (production requires one).
+  EMAIL_TRANSPORT: "capture",
+  EMAIL_FROM: "AI Chat <no-reply@example.com>",
+  APP_NAME: "AI Chat",
+  RESEND_API_KEY: "re_e2e_not_sent",
 };

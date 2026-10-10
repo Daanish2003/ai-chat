@@ -14,7 +14,7 @@ export function createMemorySender(): MemorySender {
       messages.push(message);
     },
     lastLinkTo(address) {
-      const last = messages.findLast((message) => message.to === address);
+      const last = [...messages].reverse().find((message) => message.to === address);
       return last?.link;
     },
   };

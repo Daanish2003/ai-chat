@@ -28,7 +28,12 @@ test("sessions list the current device, and sign out the other sessions", async 
   browser,
 }) => {
   const seeded = await signInAsSeededUser(page);
+  // The list is fetched after the page loads: wait for that fetch, not for a fixed time.
+  const listed = () =>
+    page.waitForResponse((r) => r.url().includes("/api/auth/list-sessions") && r.ok());
+  const firstList = listed();
   await page.goto("/settings/account");
+  await firstList;
   const sessions = page.getByRole("list", { name: "Active sessions" }).getByRole("listitem");
   await expect(sessions).toHaveCount(1);
   await expect(sessions.first()).toContainText("This device");
@@ -37,14 +42,20 @@ test("sessions list the current device, and sign out the other sessions", async 
   try {
     const otherPage = await other.newPage();
     await seedSession(otherPage, seeded.id);
+    const reloaded = listed();
     await page.reload();
+    await reloaded;
     await expect(sessions).toHaveCount(2);
     await expect(sessions.filter({ hasText: "This device" })).toHaveCount(1);
 
+    const afterSignOut = listed();
     await page.getByRole("button", { name: "Sign out other sessions" }).click();
+    await afterSignOut;
     await expect(sessions).toHaveCount(1);
 
+    const finalReload = listed();
     await page.reload();
+    await finalReload;
     await expect(page).toHaveURL(/\/settings\/account$/);
     await expect(sessions).toHaveCount(1);
 

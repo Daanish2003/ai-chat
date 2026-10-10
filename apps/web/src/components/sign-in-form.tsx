@@ -35,6 +35,14 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
             toast.success("Sign in successful");
           },
           onError: (error) => {
+            // Refused until the email is verified (403). Better Auth has sent a fresh link.
+            if (error.error.status === 403) {
+              navigate({
+                to: "/check-email",
+                search: { email: value.email, sent: true },
+              });
+              return;
+            }
             toast.error(error.error.message || error.error.statusText);
           },
         },
