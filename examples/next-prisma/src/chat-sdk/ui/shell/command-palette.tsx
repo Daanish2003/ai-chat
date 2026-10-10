@@ -347,15 +347,18 @@ function SearchFilterRow({
 }: {
   value: SearchFilterValue;
   onChange: (value: SearchFilterValue) => void;
-  models: { id: string; label: string }[];
+  models: { id: string; label: string; provider: string }[];
 }) {
   const modelItems = [
     { value: null, label: "Any Model" },
     ...models.map((model) => ({ value: model.id, label: model.label })),
   ];
+  // The Providers the user's Models come from (`models.list`), labelled as the Provider list names them.
   const providerItems = [
     { value: null, label: "Any Provider" },
-    ...providers.map((provider) => ({ value: provider.id, label: provider.label })),
+    ...providers
+      .filter((provider) => models.some((model) => model.provider === provider.id))
+      .map((provider) => ({ value: provider.id, label: provider.label })),
   ];
   return (
     <div
