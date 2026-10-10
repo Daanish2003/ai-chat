@@ -3,6 +3,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./templates": "./src/templates.tsx",
     "./*": "./src/*.ts"
   },
   "scripts": {

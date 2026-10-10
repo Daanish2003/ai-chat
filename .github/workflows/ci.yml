@@ -48,6 +48,10 @@ jobs:
       BETTER_AUTH_URL: http://localhost:3001
       BETTER_AUTH_SECRET: ci-better-auth-secret-not-for-production
       KEY_ENCRYPTION_SECRET: ci-key-encryption-secret-not-for-production
+      RESEND_API_KEY: ci-resend-key-not-sent
+      EMAIL_FROM: AI Chat <no-reply@example.com>
+      APP_NAME: AI Chat
+      EMAIL_TRANSPORT: capture
 
     steps:
       - uses: actions/checkout@v4

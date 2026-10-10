@@ -1,15 +1,7 @@
-import { randomUUID } from "node:crypto";
-
 import { expect, type Page } from "@playwright/test";
 
-import { fakeOllamaHost } from "./env";
+import { baseURL, fakeOllamaHost } from "./env";
 import { type SeededUser, seedUser } from "./seed-user";
-
-const newUser = () => ({
-  name: "E2E User",
-  email: `e2e-${randomUUID()}@example.com`,
-  password: "password1234",
-});
 
 /** Signs in as a new seeded, verified user (so tests don't share data) on the new Conversation page. */
 export async function signInAsSeededUser(page: Page): Promise<SeededUser> {
@@ -19,23 +11,29 @@ export async function signInAsSeededUser(page: Page): Promise<SeededUser> {
   return seeded;
 }
 
-/** Signs up through the form, retrying while it is rate limited. */
-export async function signUpWithForm(page: Page) {
-  await page.goto("/login");
-  const user = newUser();
-  await page.getByLabel("Name").fill(user.name);
-  await page.getByLabel("Email").fill(user.email);
-  await page.getByLabel("Password").fill(user.password);
-  const tooMany = page.getByText(/too many requests/i);
-  for (let attempt = 0; attempt < 10; attempt++) {
-    await page.getByRole("button", { name: "Sign Up" }).click();
-    await expect(
-      page.getByText(/too many requests/i).or(page.getByRole("navigation", { name: "App" })),
-    ).toBeAttached({ timeout: 15_000 });
-    if (!(await tooMany.isVisible())) break;
-    await page.waitForTimeout(10_000);
-  }
-  await expect(page).toHaveURL(/\/c$/);
+export type CapturedMail = { template: string; subject: string; text: string };
+
+/** The messages the capture mailbox holds for `email`, oldest first. */
+export async function mailboxFor(page: Page, email: string): Promise<CapturedMail[]> {
+  const response = await page.request.get(`${baseURL}/api/test-mailbox`, { params: { email } });
+  expect(response.ok()).toBe(true);
+  return response.json();
+}
+
+/** Waits until the mailbox holds `count` messages for `email` (sends run after the response). */
+export async function waitForMail(page: Page, email: string, count = 1): Promise<CapturedMail[]> {
+  let messages: CapturedMail[] = [];
+  await expect
+    .poll(async () => (messages = await mailboxFor(page, email)).length, { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(count);
+  return messages;
+}
+
+/** The verification link in a message's plain text. */
+export function verificationLink(mail: CapturedMail): string {
+  const match = /https?:\/\/\S*verify-email\?token=\S+/.exec(mail.text);
+  if (!match) throw new Error(`no verification link in "${mail.subject}"`);
+  return match[0];
 }
 
 /** Saves Ollama credentials pointing at the fake Ollama host, so its Model can be picked. */
