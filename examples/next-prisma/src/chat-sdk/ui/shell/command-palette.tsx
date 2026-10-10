@@ -1,9 +1,23 @@
 import { minSearchLength } from "../../core/shared/search/text";
 import { relativeTime } from "../../core/client/relative-time";
-import { recentConversations, type SearchHit, splitSnippet } from "../../core/client/search";
+import {
+  localDayRange,
+  recentConversations,
+  type SearchHit,
+  splitSnippet,
+} from "../../core/client/search";
+import { providers } from "../../core/shared/credentials/services";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   KeyRoundIcon,
   MessageSquareIcon,
@@ -116,9 +130,17 @@ function PaletteBody({
   const current = loaded.find((c) => c.id === conversationId);
   const remove = useDeleteConversation();
   const searched = useDebounced(q.trim(), searchDebounceMs);
+  const [filters, setFilters] = useState<SearchFilterValue>({});
+  const models = useQuery(orpc.models.list.queryOptions());
   const search = useInfiniteQuery(
     orpc.search.query.infiniteOptions({
-      input: (cursor: string | undefined) => ({ q: searched, cursor }),
+      input: (cursor: string | undefined) => ({
+        q: searched,
+        cursor,
+        model: filters.model,
+        provider: filters.provider,
+        ...localDayRange(filters.fromDay, filters.toDay),
+      }),
       initialPageParam: undefined,
       getNextPageParam: (page) => page.nextCursor ?? undefined,
       enabled: searched.length >= minSearchLength,
@@ -255,6 +277,7 @@ function PaletteBody({
         placeholder="Jump to a Conversation, search Messages, or run a command…"
         className="h-12 w-full shrink-0 border-b bg-transparent px-4 text-sm outline-none"
       />
+      <SearchFilterRow value={filters} onChange={setFilters} models={models.data?.models ?? []} />
       <div
         ref={listRef}
         id="palette-list"
@@ -305,6 +328,93 @@ function PaletteBody({
         <span>esc close</span>
       </div>
     </>
+  );
+}
+
+/** The Message search's filters: a Model, a Provider, and a day range (`YYYY-MM-DD`, local). */
+type SearchFilterValue = {
+  model?: string;
+  provider?: string;
+  fromDay?: string;
+  toDay?: string;
+};
+
+/** The palette's filter controls; changing one re-runs the search from its first page. */
+function SearchFilterRow({
+  value,
+  onChange,
+  models,
+}: {
+  value: SearchFilterValue;
+  onChange: (value: SearchFilterValue) => void;
+  models: { id: string; label: string; provider: string }[];
+}) {
+  const modelItems = [
+    { value: null, label: "Any Model" },
+    ...models.map((model) => ({ value: model.id, label: model.label })),
+  ];
+  // The Providers the user's Models come from (`models.list`), labelled as the Provider list names them.
+  const providerItems = [
+    { value: null, label: "Any Provider" },
+    ...providers
+      .filter((provider) => models.some((model) => model.provider === provider.id))
+      .map((provider) => ({ value: provider.id, label: provider.label })),
+  ];
+  return (
+    <div
+      role="group"
+      aria-label="Search filters"
+      className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2 text-xs"
+    >
+      <Select
+        items={modelItems}
+        value={value.model ?? null}
+        onValueChange={(model) => onChange({ ...value, model: model ?? undefined })}
+      >
+        <SelectTrigger aria-label="Model" size="sm" className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {modelItems.map((item) => (
+            <SelectItem key={item.value ?? ""} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select
+        items={providerItems}
+        value={value.provider ?? null}
+        onValueChange={(provider) => onChange({ ...value, provider: provider ?? undefined })}
+      >
+        <SelectTrigger aria-label="Provider" size="sm" className="w-40">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {providerItems.map((item) => (
+            <SelectItem key={item.value ?? ""} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        type="date"
+        aria-label="From"
+        value={value.fromDay ?? ""}
+        max={value.toDay}
+        onChange={(event) => onChange({ ...value, fromDay: event.target.value || undefined })}
+        className="h-7 w-auto text-xs"
+      />
+      <Input
+        type="date"
+        aria-label="To"
+        value={value.toDay ?? ""}
+        min={value.fromDay}
+        onChange={(event) => onChange({ ...value, toDay: event.target.value || undefined })}
+        className="h-7 w-auto text-xs"
+      />
+    </div>
   );
 }
 
