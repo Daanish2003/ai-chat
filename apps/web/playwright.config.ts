@@ -20,7 +20,10 @@ export default defineConfig({
   projects: [
     {
       name: "desktop",
-      testIgnore: /\.phone\.spec\.ts$/,
+      // redis.spec.ts needs REDIS_URL, which only a run with Redis provides.
+      testIgnore: process.env.REDIS_URL
+        ? /\.phone\.spec\.ts$/
+        : [/\.phone\.spec\.ts$/, /redis\.spec\.ts$/],
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
     },
     { name: "phone", testMatch: /\.phone\.spec\.ts$/, use: { ...devices["Pixel 7"] } },

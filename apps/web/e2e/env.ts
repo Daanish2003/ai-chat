@@ -15,4 +15,6 @@ export const serverEnv = {
   BETTER_AUTH_URL: baseURL,
   BETTER_AUTH_SECRET: "e2e-better-auth-secret-not-for-production",
   KEY_ENCRYPTION_SECRET: "e2e-key-encryption-secret-not-for-production",
+  // Set only by a run with Redis (`redis.spec.ts`); otherwise the server runs on memory.
+  ...(process.env.REDIS_URL ? { REDIS_URL: process.env.REDIS_URL } : {}),
 };
