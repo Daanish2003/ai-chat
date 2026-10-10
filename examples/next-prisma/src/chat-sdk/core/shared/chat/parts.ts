@@ -154,16 +154,18 @@ export function createPartsBuilder(initial: StoredPart[] = []) {
     },
     /**
      * Stores a call the model asked for that waits for Approval: its name and full arguments, as
-     * the model streamed them, with no result.
+     * the model streamed them, with no result. `mcpNames` are the names of the MCP tools offered,
+     * which makes the call an `mcp` one; any other is a Host tool.
      */
-    awaitApproval(toolCallId: string) {
+    awaitApproval(toolCallId: string, mcpNames: ReadonlySet<string> = new Set()) {
       const streamed = streamedCalls.get(toolCallId);
       const args = parseArgs(streamed?.json ?? "");
+      const name = streamed?.name ?? "";
       parts.push({
         type: "tool_call",
         toolCallId,
-        name: streamed?.name ?? "",
-        source: "host",
+        name,
+        source: mcpNames.has(name) ? "mcp" : "host",
         args,
         state: "awaiting_approval",
       });
@@ -253,13 +255,18 @@ function placeholderOf(part: WebSearchPart | ToolCallPart) {
 }
 
 /** The tools a request offers: a finished search or tool call of a kind not offered is text. */
-type OfferedTools = { webSearch: boolean; fetchUrl: boolean; hostTools: boolean };
+type OfferedTools = {
+  webSearch: boolean;
+  fetchUrl: boolean;
+  hostTools: boolean;
+  mcpTools: boolean;
+};
 
-/** A finished call a request offers its tool for, as the Model replays it. */
+/** A call a request offers its tool for, as the Model replays it: a Host or an MCP tool, by its source. */
 const offeredCall = (part: WebSearchPart | ToolCallPart, offered: OfferedTools) => {
   if (part.type === "web_search") return offered.webSearch;
   if (part.name === fetchUrlToolName) return offered.fetchUrl;
-  return offered.hostTools;
+  return part.source === "mcp" ? offered.mcpTools : offered.hostTools;
 };
 
 /**
@@ -310,7 +317,7 @@ function withToolCalls({ role, parts }: StoredMessage, offered: OfferedTools): M
       content += part.text;
     } else if (part.type === "tool_call" && part.state === "awaiting_approval") {
       // Sent without a result, so the resumed Run can answer it (the Model's call is still open).
-      if (offered.hostTools) calls.push(part);
+      if (offeredCall(part, offered)) calls.push(part);
     } else if ((part.type === "web_search" || part.type === "tool_call") && finished(part)) {
       if (offeredCall(part, offered)) {
         calls.push(part);
@@ -358,6 +365,7 @@ export function toModelMessages(
     webSearch = false,
     fetchUrl = false,
     hostTools = false,
+    mcpTools = false,
     reads = { images: false, pdfs: false },
   }: {
     provider?: string;
@@ -366,14 +374,16 @@ export function toModelMessages(
     fetchUrl?: boolean;
     /** Whether this request offers the Host's tools. */
     hostTools?: boolean;
+    /** Whether this request offers any MCP tools (spec #91). */
+    mcpTools?: boolean;
     /** Attachments the Model can't read become text placeholders. */
     reads?: ModelReads;
   } = {},
 ): ModelMessage[] {
   return history.flatMap((stored) => {
     const messages =
-      webSearch || fetchUrl || hostTools
-        ? withToolCalls(stored, { webSearch, fetchUrl, hostTools })
+      webSearch || fetchUrl || hostTools || mcpTools
+        ? withToolCalls(stored, { webSearch, fetchUrl, hostTools, mcpTools })
         : withPlaceholders(stored);
     const [first] = messages;
     if (!first) return [];

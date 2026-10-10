@@ -14,7 +14,14 @@ import { and, eq, isNull, lt, or, type SQL } from "drizzle-orm";
 import type { AppDeps, Credentials } from "../deps";
 import { cancelRunningCalls, createPartsBuilder, searchTextOf } from "../../shared/chat/parts";
 import { titleConversation } from "./title";
-import { createHostTools, type HostServerTool, type HostToolContext } from "./host-tools";
+import {
+  createToolBudget,
+  spentCalls,
+  trackTools,
+  type HostServerTool,
+  type HostToolContext,
+} from "./host-tools";
+import type { McpTools } from "../mcp/tools";
 import { createWebSearchTool } from "./web-search-tool";
 import { createFetchUrlTool } from "./fetch-url-tool";
 import { cancelChannel, heartbeatExpired, listenForStop, stopRequested } from "./stop";
@@ -58,6 +65,7 @@ export async function startRun(
     compaction,
     meter,
     searchMeter,
+    mcp,
   }: {
     messageId: string;
     /** The Run's number on its Message: a decision on a waiting call starts the next one (ADR 0008). */
@@ -94,15 +102,29 @@ export async function startRun(
     meter?: UsageMeter;
     /** Set when the search runs on the Host's Tavily key: each search is recorded (ADR 0007). */
     searchMeter?: SearchMeter;
+    /**
+     * The MCP tools this Run offers, opened by the caller (spec #91). The Run closes them when it
+     * ends, Stop included. `undefined` when no Connection is switched on.
+     */
+    mcp?: McpTools;
   },
 ): Promise<void> {
   const abortController = new AbortController();
   const logId = runLogId(messageId, runNumber);
-  await deps.runStreams.open(logId);
-  const unsubscribeStop = await listenForStop(deps, messageId, () => abortController.abort());
+  let unsubscribeStop: Awaited<ReturnType<typeof listenForStop>>;
+  try {
+    await deps.runStreams.open(logId);
+    unsubscribeStop = await listenForStop(deps, messageId, () => abortController.abort());
+  } catch (caught) {
+    // The Run never started, so nothing else will close the clients it was given.
+    await mcp?.close();
+    throw caught;
+  }
   // Registered once nothing before the Run's own `finally` can throw, so it always leaves again.
   deps.lifecycle.runs.set(messageId, abortController);
   const parts = createPartsBuilder(initialParts);
+  // One budget for the reply's Host and MCP calls, across its Runs (spec #91).
+  const budget = createToolBudget(spentCalls(initialParts));
   /** The call a reply stops on, waiting for Approval, and the Run that stopped (ADR 0008). */
   let awaiting: { toolCallId: string; threadId: string; runId: string } | undefined;
   // The Run's usage, summed over its model iterations as the stream is read (issue #117).
@@ -154,6 +176,7 @@ export async function startRun(
   void (async () => {
     let error: ProviderError | undefined;
     try {
+      const mcpNames = new Set((mcp?.tools ?? []).map((tool) => tool.name));
       const tools = [
         ...(webSearch
           ? [
@@ -181,7 +204,18 @@ export async function startRun(
               }),
             ]
           : []),
-        ...createHostTools(hostTools, { parts, onChange: () => (changed = true) }),
+        ...trackTools(hostTools, {
+          source: "host",
+          parts,
+          onChange: () => (changed = true),
+          budget,
+        }),
+        ...trackTools(mcp?.tools ?? [], {
+          source: "mcp",
+          parts,
+          onChange: () => (changed = true),
+          budget,
+        }),
       ];
       const stream = chat({
         adapter,
@@ -213,7 +247,7 @@ export async function startRun(
         if (approval && chunkIds) {
           // The Run ends here, with the call stored as waiting (ADR 0008): nothing waits in a process.
           awaiting = { toolCallId: approval, ...chunkIds };
-          parts.awaitApproval(approval);
+          parts.awaitApproval(approval, mcpNames);
         }
         if (chunk.type === EventType.RUN_FINISHED && chunk.usage) {
           // The AG-UI array form is converted back to TanStack's shape first.
@@ -241,6 +275,8 @@ export async function startRun(
       clearInterval(snapshotTimer);
       clearTimeout(capTimer);
       parts.cancelRunningCalls();
+      // The MCP clients close with the Run, Stop included (spec #91).
+      await mcp?.close();
       const interrupted = abortController.signal.reason === shutdownAbort;
       const ending: MessageUpdate = timedOut
         ? { status: "error", error: "timed out" }

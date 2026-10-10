@@ -15,6 +15,7 @@ import {
   moveConversation,
   pinConversation,
   renameConversation,
+  setConversationConnections,
   setConversationModel,
   setConversationReasoningEffort,
   switchBranch,
@@ -86,6 +87,7 @@ export const conversationRouter = {
       title: row.title,
       model: row.model,
       reasoningEffort: row.reasoningEffort,
+      tools: row.toolSettings,
       messages,
     };
   }),
@@ -144,6 +146,23 @@ export const conversationRouter = {
     }),
 
   /** Selects the reasoning effort the next Message and regenerate use; `null` is the Model's default. */
+  /**
+   * Switches the MCP Connections on for the Conversation's next Message and regenerate (spec #91).
+   * Each key must be an MCP server the Host lists. Doesn't bump `lastMessageAt`.
+   */
+  setConnections: protectedProcedure
+    .input(z.object({ id: z.uuid(), connections: z.array(z.string()) }))
+    .handler(async ({ context, input }) => {
+      const known = new Set(context.deps.mcpServers.map((server) => server.key));
+      if (input.connections.some((key) => !known.has(key))) {
+        throw new ORPCError("BAD_REQUEST", { message: "Unknown MCP server" });
+      }
+      const updated = await setConversationConnections(context.deps, context.user.id, input.id, [
+        ...new Set(input.connections),
+      ]);
+      if (!updated) throw new ORPCError("NOT_FOUND", { message: "Conversation not found" });
+    }),
+
   setReasoningEffort: protectedProcedure
     .input(
       z.object({

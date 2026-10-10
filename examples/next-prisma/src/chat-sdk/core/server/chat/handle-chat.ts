@@ -16,6 +16,7 @@ import { parseStoredParts, searchTextOf, toModelMessages } from "../../shared/ch
 import { chatCommandSchema } from "../../shared/chat/command";
 import { runStreamDurability, START } from "./run-streams";
 import { startRun } from "./run";
+import { mcpToolsFor } from "../mcp/tools";
 import { findConversation, loadPath } from "./store";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
@@ -86,6 +87,10 @@ export async function handleChat(
   const searchCall = web ? await resolveToolCall(deps, userId, tavilyService) : null;
   // The Host's tools are offered to a Model that has tools (`createChat({ tools })`).
   const hostTools = model.tools ? deps.tools : [];
+  // The MCP tools switched on here (spec #91). The first Message takes the composer's choice; any
+  // later one reads the stored choice.
+  const takesComposerTools = command.tools !== undefined && owned.activeLeafId === null;
+  const toolSettings = takesComposerTools ? command.tools! : owned.toolSettings;
   // Read now, so a Run keeps the Instructions it started with; a regenerate or edit reads them anew.
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({
@@ -113,6 +118,10 @@ export async function handleChat(
     history,
   });
   if (attachments.error) return refuse(attachments.error.status, attachments.error.message);
+
+  // The MCP tools this reply offers, opened before its history is built: a finished call of a tool
+  // not offered is sent as text (spec #91). Every refusal below closes them, and so does the Run.
+  const mcp = model.tools ? await mcpToolsFor(deps, userId, toolSettings.connections) : undefined;
 
   // Everything that can fail runs before the Messages are written.
   const adapter = deps.adapterFor(model.id, call.credentials, {
@@ -148,6 +157,7 @@ export async function handleChat(
       webSearch: searchCall !== null,
       fetchUrl: web,
       hostTools: hostTools.length > 0,
+      mcpTools: (mcp?.tools.length ?? 0) > 0,
       reads: { images: model.images, pdfs: model.pdfs },
     }),
   }));
@@ -165,70 +175,85 @@ export async function handleChat(
     budget !== null &&
     newMessages.reduce((total, message) => total + estimateModelMessageTokens(message), 0) > budget
   ) {
+    await mcp?.close();
     return refuse(
       400,
       "This message is too long for the Model's context window. Shorten it or remove an attachment.",
     );
   }
   const now = new Date();
-  const started = await deps.db.transaction(async (tx) => {
-    // One run per Conversation (ADR 0002). Locking the Conversation row queues concurrent sends
-    // here, so the later one sees the earlier one's streaming Message.
-    await tx
-      .select({ id: conversation.id })
-      .from(conversation)
-      .where(eq(conversation.id, owned.id))
-      .for("update");
-    const [running] = await tx
-      .select({ id: message.id })
-      .from(message)
-      .where(and(eq(message.conversationId, owned.id), eq(message.status, "streaming")))
-      .limit(1);
-    if (running) return "streaming";
-    // Holds the attachments against the orphan cleanup until they're linked.
-    if (!(await lockAttachments(tx, userId, attachmentIds))) return "attachment_gone";
+  const started = await deps.db
+    .transaction(async (tx) => {
+      // One run per Conversation (ADR 0002). Locking the Conversation row queues concurrent sends
+      // here, so the later one sees the earlier one's streaming Message.
+      await tx
+        .select({ id: conversation.id })
+        .from(conversation)
+        .where(eq(conversation.id, owned.id))
+        .for("update");
+      const [running] = await tx
+        .select({ id: message.id })
+        .from(message)
+        .where(and(eq(message.conversationId, owned.id), eq(message.status, "streaming")))
+        .limit(1);
+      if (running) return "streaming";
+      // Holds the attachments against the orphan cleanup until they're linked.
+      if (!(await lockAttachments(tx, userId, attachmentIds))) return "attachment_gone";
 
-    await tx.insert(message).values([
-      // An edit is a new user Message beside the one it replaces; a regenerate writes none.
-      ...(userParts
-        ? [
-            {
-              id: userMessageId,
-              conversationId: owned.id,
-              parentId: command.parentId,
-              role: "user" as const,
-              parts: userParts,
-              searchText: searchTextOf(userParts),
-              status: "complete" as const,
-              createdAt: now,
-            },
-          ]
-        : []),
-      {
-        id: assistantMessageId,
-        conversationId: owned.id,
-        parentId: userParts ? userMessageId : command.parentId,
-        role: "assistant",
-        parts: storedParts([]),
-        model: model.id,
-        reasoningEffort: effort ?? null,
-        status: "streaming",
-        createdAt: new Date(now.getTime() + 1),
-        // The Run's lease starts now (ADR 0006); the Run's snapshot timer keeps it fresh.
-        heartbeatAt: now,
-      },
-    ]);
-    if (userParts) await linkAttachments(tx, userMessageId, attachmentIds);
-    await tx
-      .update(conversation)
-      .set({ activeLeafId: assistantMessageId, lastMessageAt: now, model: model.id })
-      .where(eq(conversation.id, owned.id));
-    return "started";
-  });
+      await tx.insert(message).values([
+        // An edit is a new user Message beside the one it replaces; a regenerate writes none.
+        ...(userParts
+          ? [
+              {
+                id: userMessageId,
+                conversationId: owned.id,
+                parentId: command.parentId,
+                role: "user" as const,
+                parts: userParts,
+                searchText: searchTextOf(userParts),
+                status: "complete" as const,
+                createdAt: now,
+              },
+            ]
+          : []),
+        {
+          id: assistantMessageId,
+          conversationId: owned.id,
+          parentId: userParts ? userMessageId : command.parentId,
+          role: "assistant",
+          parts: storedParts([]),
+          model: model.id,
+          reasoningEffort: effort ?? null,
+          status: "streaming",
+          createdAt: new Date(now.getTime() + 1),
+          // The Run's lease starts now (ADR 0006); the Run's snapshot timer keeps it fresh.
+          heartbeatAt: now,
+        },
+      ]);
+      if (userParts) await linkAttachments(tx, userMessageId, attachmentIds);
+      await tx
+        .update(conversation)
+        .set({
+          activeLeafId: assistantMessageId,
+          lastMessageAt: now,
+          model: model.id,
+          ...(takesComposerTools && { toolSettings }),
+        })
+        .where(eq(conversation.id, owned.id));
+      return "started";
+    })
+    .catch(async (caught: unknown) => {
+      await mcp?.close();
+      throw caught;
+    });
   if (started === "streaming") {
+    await mcp?.close();
     return refuse(409, "A reply is still streaming in this Conversation");
   }
-  if (started === "attachment_gone") return refuse(404, "Attachment not found");
+  if (started === "attachment_gone") {
+    await mcp?.close();
+    return refuse(404, "Attachment not found");
+  }
 
   await startRun(deps, {
     messageId: assistantMessageId,
@@ -238,6 +263,7 @@ export async function handleChat(
     webSearch: searchCall?.credentials,
     fetchUrl: web,
     hostTools,
+    mcp,
     context: { userId, conversationId: owned.id },
     systemPrompts,
     modelOptions: generationOptionsFor(model.id, {

@@ -30,6 +30,8 @@ import { MissingCredentialsBanner } from "./missing-credentials-banner";
 import { QuotaBanner } from "./quota-banner";
 import { QuotaMeter } from "./quota-meter";
 import { SearchToggle, useWebSearch } from "./search-toggle";
+import { ToolsMenu } from "./tools-menu";
+import { mcpToolsMenu, switchConnection } from "../../core/client/mcp-tools";
 import { useFocusMessage } from "./use-focus-message";
 
 export type ConversationData = Awaited<ReturnType<AppRouterClient["conversation"]["get"]>>;
@@ -172,6 +174,25 @@ function ChatThread({
   );
   const search = useWebSearch(conversation.model);
 
+  // The MCP tools switched on (spec #91). Before the first Message they live in the composer and go
+  // with the first send; after it, each switch is stored with the Conversation.
+  const firstMessage = conversation.messages.length === 0;
+  const [composerConnections, setComposerConnections] = useState<string[]>([]);
+  const connections = firstMessage ? composerConnections : conversation.tools.connections;
+  const servers = useQuery(orpc.connections.list.queryOptions());
+  const setConnections = useMutation(
+    orpc.conversation.setConnections.mutationOptions({
+      onSuccess: () => fetchConversation(),
+      onError: (caught) => toast.error(`Switching a tool failed: ${caught.message}`),
+    }),
+  );
+  const toolItems = mcpToolsMenu(servers.data?.servers ?? [], connections);
+  const toggleTool = (key: string, on: boolean) => {
+    const next = switchConnection(connections, key, on);
+    if (firstMessage) setComposerConnections(next);
+    else setConnections.mutate({ id: conversation.id, connections: next });
+  };
+
   const draft = useAttachmentDraft(conversation.model);
 
   /**
@@ -195,6 +216,8 @@ function ChatThread({
       model: conversation.model,
       // Read now: a first Message is sent on mount, before the toggle's state has loaded.
       webSearch: search.available && readSearchPreference(),
+      // Read with the send: the first Message takes the composer's choice (the server ignores it later).
+      tools: { connections, allowedTools: [] },
     };
     try {
       if (history) setMessages(history);
@@ -312,6 +335,7 @@ function ChatThread({
           >
             <AttachButton draft={draft} disabled={!!blocked || quotaBlocked} />
             <SearchToggle search={search} />
+            <ToolsMenu items={toolItems} onToggle={toggleTool} />
           </Composer>
         </div>
       </div>

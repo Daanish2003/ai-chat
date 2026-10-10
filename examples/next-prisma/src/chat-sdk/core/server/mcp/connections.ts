@@ -36,17 +36,64 @@ const pendingOptions = (deps: Deps, userId: string, key: string) => ({
 
 const splitScopes = (scopes: string | null) => (scopes ?? "").split(" ").filter(Boolean);
 
+/** The tokens a Connection holds, as `saveTokens` stores them. */
+export type StoredTokens = {
+  accessToken: string;
+  tokenType: string;
+  refreshToken?: string;
+  expiresAt?: string;
+};
+
+/** Whether the access token has run out. A token with no expiry never has. */
+export const isExpired = (tokens: StoredTokens) =>
+  tokens.expiresAt !== undefined && Date.parse(tokens.expiresAt) <= Date.now();
+
+/** The stored tokens of a decrypted Connection, or `null` when it holds no access token. */
+function tokensOf(credentials: Record<string, string>): StoredTokens | null {
+  const { accessToken, tokenType, refreshToken, expiresAt } = credentials;
+  if (!accessToken) return null;
+  return {
+    accessToken,
+    tokenType: tokenType || "Bearer",
+    ...(refreshToken ? { refreshToken } : {}),
+    ...(expiresAt ? { expiresAt } : {}),
+  };
+}
+
+/**
+ * The user's tokens for one server, with the scopes they were granted: `null` when there is no
+ * Connection, or its tokens no longer decrypt.
+ */
+export async function readTokens(
+  deps: Deps,
+  userId: string,
+  key: string,
+): Promise<{ tokens: StoredTokens; scope: string } | null> {
+  const [row] = await deps.db
+    .select()
+    .from(mcpConnection)
+    .where(and(eq(mcpConnection.userId, userId), eq(mcpConnection.serverKey, key)));
+  if (!row?.encrypted) return null;
+  const decrypted = decryptCredentials(row.encrypted, tokenOptions(deps, userId, key));
+  if (!decrypted.ok) return null;
+  const tokens = tokensOf(decrypted.credentials);
+  return tokens ? { tokens, scope: row.scopes ?? "" } : null;
+}
+
 /** One entry per server the Host lists, in the Host's order. */
 export async function listConnections(deps: Deps, userId: string): Promise<ConnectionSummary[]> {
   const rows = await deps.db.select().from(mcpConnection).where(eq(mcpConnection.userId, userId));
   return deps.mcpServers.map(({ key, name }) => {
     const row = rows.find((candidate) => candidate.serverKey === key);
     if (!row?.encrypted) return { key, name, state: "disconnected", scopes: [] };
-    const readable = decryptCredentials(row.encrypted, tokenOptions(deps, userId, key)).ok;
+    const decrypted = decryptCredentials(row.encrypted, tokenOptions(deps, userId, key));
+    // Unreadable tokens, or an expired access token with no refresh token left, need a reconnect.
+    const tokens = decrypted.ok ? tokensOf(decrypted.credentials) : null;
+    const reconnect = !tokens || (isExpired(tokens) && !tokens.refreshToken);
     return {
       key,
       name,
-      state: readable ? "connected" : "reconnect",
+      state: reconnect ? "reconnect" : "connected",
       scopes: splitScopes(row.scopes),
     };
   });

@@ -337,7 +337,24 @@ describe("chat.migrate()", () => {
     await expect(Promise.all([chat.migrate(), chat.migrate()])).resolves.toBeDefined();
 
     const applied = await rows<{ count: string }>(url, "select count(*) from chat.__migrations");
-    expect(applied).toEqual([{ count: "6" }]);
+    expect(applied).toEqual([{ count: "7" }]);
+  });
+
+  it("gives a Conversation's tool settings empty lists by default, so existing rows read as empty", async () => {
+    const url = await scratchDatabase("tool_settings");
+    await chatFor(url).migrate();
+
+    await rows(
+      url,
+      `insert into chat.conversation (id, user_id, model)
+       values ('0196a000-0000-7000-8000-000000000001', 'user-1', 'anthropic:claude-sonnet-5-5')`,
+    );
+    const stored = await rows<{ tool_settings: unknown }>(
+      url,
+      `select tool_settings from chat.conversation where id = '0196a000-0000-7000-8000-000000000001'`,
+    );
+
+    expect(stored).toEqual([{ tool_settings: { connections: [], allowedTools: [] } }]);
   });
 
   it("throws an error naming pg_trgm when the role may not create it", async () => {

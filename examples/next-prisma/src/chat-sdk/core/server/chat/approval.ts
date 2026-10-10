@@ -15,7 +15,8 @@ import { resolveModel } from "./available-models";
 import { generationOptionsFor } from "./generation";
 import { quotaRefusal } from "./quota";
 import { approvalPrefix, startRun } from "./run";
-import { findMessage, loadPath } from "./store";
+import { findConversation, findMessage, loadPath } from "./store";
+import { mcpToolsFor } from "../mcp/tools";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 
@@ -70,6 +71,12 @@ export async function decideApproval(
   });
   if (attachments.error) return "unavailable";
   const hostTools = model.tools ? deps.tools : [];
+  // The resumed Run offers the same MCP tools as the Run that asked, so the approved call can run.
+  const asked = await findConversation(deps, userId, owned.conversationId);
+  const mcp =
+    model.tools && asked
+      ? await mcpToolsFor(deps, userId, asked.toolSettings.connections)
+      : undefined;
   const { instructions } = await loadSettings(deps, userId);
   const systemPrompts = systemPromptsFor({ web: false, instructions });
   const messages = toModelMessages(
@@ -82,6 +89,7 @@ export async function decideApproval(
     {
       provider: model.provider,
       hostTools: hostTools.length > 0,
+      mcpTools: (mcp?.tools.length ?? 0) > 0,
       reads: { images: model.images, pdfs: model.pdfs },
     },
   );
@@ -99,33 +107,43 @@ export async function decideApproval(
         : part,
     ),
   );
-  const claimed = await deps.db.transaction(async (tx) => {
-    // The same lock a send takes: one Run per Conversation (ADR 0002).
-    await tx
-      .select({ id: conversation.id })
-      .from(conversation)
-      .where(eq(conversation.id, owned.conversationId))
-      .for("update");
-    const [running] = await tx
-      .select({ id: message.id })
-      .from(message)
-      .where(and(eq(message.conversationId, owned.conversationId), eq(message.status, "streaming")))
-      .limit(1);
-    if (running) return "streaming";
-    const [row] = await tx
-      .update(message)
-      .set({
-        status: "streaming",
-        parts: decided,
-        runNumber,
-        heartbeatAt: new Date(),
-        cancelRequestedAt: null,
-      })
-      .where(and(eq(message.id, owned.id), eq(message.status, "awaiting_approval")))
-      .returning({ id: message.id });
-    return row ? "claimed" : "not_waiting";
-  });
-  if (claimed !== "claimed") return claimed;
+  const claimed = await deps.db
+    .transaction(async (tx) => {
+      // The same lock a send takes: one Run per Conversation (ADR 0002).
+      await tx
+        .select({ id: conversation.id })
+        .from(conversation)
+        .where(eq(conversation.id, owned.conversationId))
+        .for("update");
+      const [running] = await tx
+        .select({ id: message.id })
+        .from(message)
+        .where(
+          and(eq(message.conversationId, owned.conversationId), eq(message.status, "streaming")),
+        )
+        .limit(1);
+      if (running) return "streaming";
+      const [row] = await tx
+        .update(message)
+        .set({
+          status: "streaming",
+          parts: decided,
+          runNumber,
+          heartbeatAt: new Date(),
+          cancelRequestedAt: null,
+        })
+        .where(and(eq(message.id, owned.id), eq(message.status, "awaiting_approval")))
+        .returning({ id: message.id });
+      return row ? "claimed" : "not_waiting";
+    })
+    .catch(async (caught: unknown) => {
+      await mcp?.close();
+      throw caught;
+    });
+  if (claimed !== "claimed") {
+    await mcp?.close();
+    return claimed;
+  }
 
   await startRun(deps, {
     messageId: owned.id,
@@ -141,6 +159,7 @@ export async function decideApproval(
     adapter,
     messages,
     hostTools,
+    mcp,
     context: { userId, conversationId: owned.conversationId },
     systemPrompts,
     modelOptions: generationOptionsFor(model.id, {
