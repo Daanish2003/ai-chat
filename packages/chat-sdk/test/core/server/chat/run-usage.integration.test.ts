@@ -1,5 +1,6 @@
 import { message } from "../../../../core/server/db/schema/chat";
 import { asc, eq } from "drizzle-orm";
+import { EventType } from "@tanstack/ai";
 import { describe, expect, it } from "vitest";
 
 import { saveCredentials } from "../../../../core/server/credentials/store";
@@ -217,6 +218,28 @@ describe("the Run's usage", () => {
       null,
       { input: 7, output: 3, reasoning: 0, cached: 0, estimated: false },
     ]);
+  });
+
+  it("stores usage reported in the AG-UI array form as reported, not as an estimate", async () => {
+    const { deps, conv, send } = await setup({
+      rounds: [
+        round(text("Done")).map((chunk) =>
+          chunk.type === EventType.RUN_FINISHED
+            ? { ...chunk, usage: [{ inputTokens: 12, outputTokens: 3, totalTokens: 15 }] }
+            : chunk,
+        ),
+      ],
+    });
+
+    await (await send(openaiModel)).text();
+
+    expect((await replyOf(deps, conv.id)).usage).toEqual({
+      input: 12,
+      output: 3,
+      reasoning: 0,
+      cached: 0,
+      estimated: false,
+    });
   });
 
   it("leaves usage out of a Shared link snapshot", async () => {

@@ -4,6 +4,7 @@ import {
   type AnyTextAdapter,
   chat,
   EventType,
+  fromSpecTokenUsage,
   type ModelMessage,
   type StreamChunk,
 } from "@tanstack/ai";
@@ -55,7 +56,7 @@ export async function startRun(
   deps.lifecycle.runs.set(messageId, abortController);
   const parts = createPartsBuilder();
   // The Run's usage, summed over its model iterations as the stream is read (issue #117).
-  let reported: RunUsage | undefined;
+  let total: RunUsage | undefined;
   const promptCharacters = promptCharactersOf(messages);
 
   let writes = Promise.resolve();
@@ -118,8 +119,10 @@ export async function startRun(
       for await (const chunk of untilAborted(stream, abortController.signal)) {
         parts.add(chunk);
         changed = true;
-        if (chunk.type === EventType.RUN_FINISHED && chunk.usage && !Array.isArray(chunk.usage)) {
-          reported = addUsage(reported, normalizeUsage(provider, chunk.usage));
+        if (chunk.type === EventType.RUN_FINISHED && chunk.usage) {
+          // The AG-UI array form is converted back to TanStack's shape first.
+          const tokens = Array.isArray(chunk.usage) ? fromSpecTokenUsage(chunk.usage) : chunk.usage;
+          if (tokens) total = addUsage(total, normalizeUsage(provider, tokens));
         }
         if (chunk.type === EventType.RUN_ERROR) {
           error = { message: chunk.message, code: chunk.code ?? chunk.error?.code };
@@ -153,7 +156,7 @@ export async function startRun(
                 }
               : { status: "complete" };
       // Stored whatever the ending: the Provider's usage for a complete Run, else an estimate.
-      const usage = messageUsage(ending.status === "complete" ? reported : undefined, {
+      const usage = messageUsage(ending.status === "complete" ? total : undefined, {
         promptCharacters,
         parts: parts.parts().parts,
       });
