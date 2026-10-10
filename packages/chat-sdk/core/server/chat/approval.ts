@@ -18,7 +18,7 @@ import { approvalPrefix, startRun } from "./run";
 import { allowTools } from "./host-tools";
 import { findConversation, findMessage, loadPath } from "./store";
 import { mcpToolsFor } from "../mcp/tools";
-import { noConversationTools } from "../../shared/chat/conversation-tools";
+import { noConversationTools, type ConversationTools } from "../../shared/chat/conversation-tools";
 import { loadSettings } from "../settings/store";
 import { systemPromptsFor } from "./system-prompts";
 
@@ -30,6 +30,11 @@ export type DecideResult =
   | "streaming"
   | "unavailable"
   | "quota";
+
+/** The Conversation's settings with `toolName` allowed for the rest of it (#159). */
+function allowing(settings: ConversationTools, toolName: string): ConversationTools {
+  return { ...settings, allowedTools: [...new Set([...settings.allowedTools, toolName])] };
+}
 
 /** What a refused call's result says to the Model and the stored part (`denied`). */
 export const declinedResult = { error: "User declined tool execution" };
@@ -80,13 +85,6 @@ export async function decideApproval(
   // longer asks has none to answer. An allowance (#159) is stored with the claim, for later Runs.
   const asked = await findConversation(deps, userId, owned.conversationId);
   const askedSettings = asked?.toolSettings ?? noConversationTools;
-  const allow = approved && allowForConversation;
-  const allowed = allow
-    ? {
-        ...askedSettings,
-        allowedTools: [...new Set([...askedSettings.allowedTools, waiting.name])],
-      }
-    : askedSettings;
   const hostTools = model.tools ? allowTools(deps.tools, askedSettings.allowedTools) : [];
   const mcp = model.tools && asked ? await mcpToolsFor(deps, userId, askedSettings) : undefined;
   const { instructions } = await loadSettings(deps, userId);
@@ -122,8 +120,8 @@ export async function decideApproval(
   const claimed = await deps.db
     .transaction(async (tx) => {
       // The same lock a send takes: one Run per Conversation (ADR 0002).
-      await tx
-        .select({ id: conversation.id })
+      const [locked] = await tx
+        .select({ toolSettings: conversation.toolSettings })
         .from(conversation)
         .where(eq(conversation.id, owned.conversationId))
         .for("update");
@@ -147,11 +145,12 @@ export async function decideApproval(
         .where(and(eq(message.id, owned.id), eq(message.status, "awaiting_approval")))
         .returning({ id: message.id });
       if (!row) return "not_waiting";
-      // The allowance is stored with the claim, so a refused decision stores nothing.
-      if (allow) {
+      // The allowance is stored with the claim, on the settings read under the lock, so a refused
+      // decision stores nothing and a concurrent change to the Connections is kept.
+      if (allowForConversation && approved && locked) {
         await tx
           .update(conversation)
-          .set({ toolSettings: allowed })
+          .set({ toolSettings: allowing(locked.toolSettings, waiting.name) })
           .where(eq(conversation.id, owned.conversationId));
       }
       return "claimed";
