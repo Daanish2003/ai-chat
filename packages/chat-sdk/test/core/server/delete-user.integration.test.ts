@@ -49,7 +49,9 @@ async function seedOwner(user: TestUser) {
     hint: "…-key",
     verified: true,
   });
-  await getTestDb().insert(userSettings).values({ userId: user.id, titleModel: "anthropic:x" });
+  await getTestDb()
+    .insert(userSettings)
+    .values({ userId: user.id, titleModel: "anthropic:x", instructions: "Be terse." });
   await getTestDb().insert(project).values({ id: uuidv7(), userId: user.id, name: "Work" });
   return { conv, question, reply, file, link, deps };
 }

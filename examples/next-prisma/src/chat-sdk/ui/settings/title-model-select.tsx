@@ -25,7 +25,10 @@ export function TitleModelSelect() {
     orpc.settings.setTitleModel.mutationOptions({
       onMutate: ({ titleModel }) => {
         const previous = settings.data;
-        queryClient.setQueryData(settingsKey, { titleModel });
+        queryClient.setQueryData(settingsKey, {
+          titleModel,
+          instructions: settings.data?.instructions ?? null,
+        });
         return { previous };
       },
       onError: (error, _, context) => {
