@@ -16,6 +16,7 @@ export function toClientMessage(row: MessageRecord, attachments: AttachmentInfo[
     status: row.status,
     error: row.error,
     errorReason: row.errorReason,
+    usage: row.usage,
     createdAt: row.createdAt,
   };
 }
