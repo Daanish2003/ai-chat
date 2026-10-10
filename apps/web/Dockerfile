@@ -15,6 +15,8 @@ RUN cd apps/web && BETTER_AUTH_SECRET=ci-only-secret-0123456789abcdef0123456789 
     DATABASE_URL=postgresql://postgres:password@localhost:5432/ai-chat \
     KEY_ENCRYPTION_SECRET=ci-only-key-encryption-0123456789abcdef \
     RESEND_API_KEY=ci-resend-key-not-sent EMAIL_FROM="AI Chat <no-reply@example.com>" APP_NAME="AI Chat" \
+    GITHUB_CLIENT_ID=ci-github-client-id GITHUB_CLIENT_SECRET=ci-github-client-secret-not-for-production \
+    GOOGLE_CLIENT_ID=ci-google-client-id GOOGLE_CLIENT_SECRET=ci-google-client-secret-not-for-production \
     pnpm run build
 
 FROM node:24-slim AS runner

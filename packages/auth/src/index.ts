@@ -10,7 +10,16 @@ export type AuthConfig = {
   BETTER_AUTH_URL: string;
   BETTER_AUTH_SECRET: string;
   APP_NAME: string;
+  GITHUB_CLIENT_ID: string;
+  GITHUB_CLIENT_SECRET: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
 };
+
+// Social sign-in. Better Auth links to an existing account only when the provider reports the email
+// as verified (its default); neither provider is in `trustedProviders`, so an unverified provider
+// email never links. A user created here is verified, whatever the provider reports.
+const SOCIAL_CREATE_PATHS = ["/callback/:id", "/sign-in/social"];
 
 // Where a failed background send is reported. evlog's `log` fits this shape.
 export type AuthLogger = {
@@ -53,6 +62,29 @@ export function createAuth(
       schema,
     }),
     trustedOrigins: [env.BETTER_AUTH_URL],
+    socialProviders: {
+      github: {
+        clientId: env.GITHUB_CLIENT_ID,
+        clientSecret: env.GITHUB_CLIENT_SECRET,
+      },
+      google: {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        // Better Auth adds its own default scopes unless told not to, which would repeat these.
+        disableDefaultScope: true,
+        scope: ["openid", "email", "profile"],
+      },
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user, ctx) => {
+            if (!ctx || !SOCIAL_CREATE_PATHS.includes(ctx.path)) return;
+            return { data: { ...user, emailVerified: true } };
+          },
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: true,

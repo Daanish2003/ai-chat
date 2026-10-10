@@ -21,6 +21,11 @@ export const serverEnv = {
   EMAIL_FROM: "AI Chat <no-reply@example.com>",
   APP_NAME: "AI Chat",
   RESEND_API_KEY: "re_e2e_not_sent",
+  // OAuth client ids and secrets for the login buttons' start URLs. Nothing calls the providers.
+  GITHUB_CLIENT_ID: "e2e-github-client-id",
+  GITHUB_CLIENT_SECRET: "e2e-github-client-secret-not-for-production",
+  GOOGLE_CLIENT_ID: "e2e-google-client-id.apps.googleusercontent.com",
+  GOOGLE_CLIENT_SECRET: "e2e-google-client-secret-not-for-production",
   // The fake page `fetch_url` reads is served by the fake Ollama host, on localhost (see fake-ollama.ts).
   SSRF_ALLOW_HOSTS: `localhost:${fakeOllamaPort}`,
   // Set only by a run with Redis (`redis.spec.ts`); otherwise the server runs on memory.
