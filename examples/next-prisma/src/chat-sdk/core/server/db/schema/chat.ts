@@ -1,8 +1,11 @@
 import { sql } from "drizzle-orm";
 import { type AnyPgColumn, index, jsonb, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
+import type { MessageUsage } from "../../../shared/chat/message-record";
 import type { StoredParts } from "../../../shared/message-parts";
 import { chatSchema } from "./chat-schema";
+
+export type { MessageUsage };
 
 /** How hard a reasoning Model thinks. Null means the Model's own default. */
 export const reasoningEffort = chatSchema.enum("reasoning_effort", [
@@ -11,16 +14,6 @@ export const reasoningEffort = chatSchema.enum("reasoning_effort", [
   "medium",
   "high",
 ]);
-
-/** Tokens a Run used, summed over its model iterations (input includes cached tokens). */
-export type MessageUsage = {
-  input: number;
-  output: number;
-  reasoning: number;
-  cached: number;
-  /** True when the Provider reported no usage (a stopped or failed reply) and this is an estimate. */
-  estimated: boolean;
-};
 
 /** A Project: a named group of one user's Conversations, with Instructions and a default Model. */
 export const project = chatSchema.table(

@@ -143,6 +143,7 @@ describe("startRun", () => {
     const startedAt = Date.now();
     await startRun(deps, {
       messageId: row.id,
+      provider: "anthropic",
       adapter: held.adapter,
       messages: [],
       systemPrompts: [],

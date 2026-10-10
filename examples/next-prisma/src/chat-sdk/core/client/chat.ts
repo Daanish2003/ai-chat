@@ -5,7 +5,10 @@ import type { SharedConversation } from "../shared/share/conversation";
 import type { UIMessage } from "@tanstack/ai-client";
 
 /** What the server knows about a Message beyond its parts, kept in `UIMessage.metadata`. */
-export type MessageInfo = Pick<ClientMessage, "model" | "status" | "error" | "errorReason">;
+export type MessageInfo = Pick<
+  ClientMessage,
+  "model" | "status" | "error" | "errorReason" | "usage"
+>;
 
 /**
  * An attachment as a chip. A Shared link shows only its filename and type; the user's own
@@ -17,7 +20,19 @@ export type AttachmentChip = Pick<AttachmentInfo, "filename" | "mediaType"> &
 /** `useChat` messages from the Active Branch (`conversation.get`). */
 export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
   return messages.map(
-    ({ id, role, parts, createdAt, model, status, error, errorReason, siblings, attachments }) => ({
+    ({
+      id,
+      role,
+      parts,
+      createdAt,
+      model,
+      status,
+      error,
+      errorReason,
+      usage,
+      siblings,
+      attachments,
+    }) => ({
       id,
       role,
       parts: parts as UIMessage["parts"],
@@ -27,6 +42,7 @@ export function toUIMessages(messages: ActiveBranchMessage[]): UIMessage[] {
         status,
         error,
         errorReason,
+        usage,
         siblings,
         attachments,
       } satisfies MessageInfo & {
@@ -49,6 +65,7 @@ export function sharedToUIMessages(messages: SharedConversation["messages"]): UI
       status,
       error: null,
       errorReason: null,
+      usage: null,
       attachments,
     } satisfies MessageInfo & {
       attachments: AttachmentChip[];
@@ -91,6 +108,7 @@ export function messageInfo(message: UIMessage): MessageInfo {
     status: info?.status ?? "streaming",
     error: info?.error ?? null,
     errorReason: info?.errorReason ?? null,
+    usage: info?.usage ?? null,
   };
 }
 
